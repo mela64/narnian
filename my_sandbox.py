@@ -1,3 +1,4 @@
+from narnian.server import Server
 from narnian.streams import Stream, Random
 from basic.basic_streams import Sin, Square
 from basic.basic_agent import BasicAgent
@@ -37,12 +38,10 @@ ag.behav.add_transit("playlist_ready", "student_found", action="send_engagement"
 ag.behav.add_transit("student_found", "playlist_ready", action="nop", score=1.0)
 ag.behav.add_transit("student_found", "student_engaged", action="got_engagement", score=0.0)
 ag.behav.add_transit("student_engaged", "asked_learn", action="ask_learn_gen",
-                     args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "steps": 200}, score=1.0)
+                     args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "ask_steps": 200}, score=1.0)
 ag.behav.add_transit("asked_learn", "done_learn", action="done_learn_gen", score=0.0)
-ag.behav.add_transit("asked_learn", "student_engaged", action="nop", score=1.0)
-ag.behav.add_transit("done_learn", "asked_gen", action="ask_gen", args={"du_hash": "<playlist>", "steps": 50}, score=1.0)
+ag.behav.add_transit("done_learn", "asked_gen", action="ask_gen", args={"du_hash": "<playlist>", "ask_steps": 50})
 ag.behav.add_transit("asked_gen", "done_gen", action="done_gen", score=0.0)
-ag.behav.add_transit("asked_gen", "student_engaged", action="nop", score=1.0)
 ag.behav.add_state_action("done_gen", action="eval", args={"stream_hash": "<playlist>", "what": "y", "steps": 50})
 ag.behav.add_transit("done_gen", "student_engaged", action="compare_eval", args={"cmp": "<", "thres": 0.5}, score=1.0)
 ag.behav.add_transit("done_gen", "good", action="compare_eval", args={"cmp": ">=", "thres": 0.5}, score=1.0)
@@ -77,5 +76,8 @@ print(env)
 for ag in env.agents.values():
     print(ag)
 
+# creating server
+Server(env=env)
+
 # running
-env.run(steps=15, step_mode=False)
+env.run()

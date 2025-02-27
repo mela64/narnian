@@ -1,8 +1,8 @@
 import inspect
 from .model import Model
 from .streams import Stream
-from .fsm import FiniteStateMachine
 from typing_extensions import Self
+from .fsm import FiniteStateMachine
 from collections.abc import Iterable
 
 
@@ -18,6 +18,10 @@ class Agent:
         self.known_streams = {}  # streams that are known to this agent
         self.known_agents = {}  # other agents that are known to this agent
         self.print_enabled = True  # if output should be printed to screen
+        self.output_messages = [""] * 20
+        self.output_messages_ids = [-1] * 20
+        self.output_messages_count = 0
+        self.output_messages_last_pos = -1
 
         self.commands_to_send = [  # list of known commands (to be sent)
             "enable_print",
@@ -53,20 +57,28 @@ class Agent:
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""
 
+        s = f"agent: {self.name}"
+        if show_state:
+            s += f", state: {self.behav.limbo_state}"
+        if show_act:
+            caller = str(inspect.stack()[1].function)
+            i = 0
+            while str(caller).startswith("__"):
+                i += 1
+                caller = str(inspect.stack()[1 + i].function)
+            args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
+            s_args = Agent.__string_args(args, values)
+            s += f", act: {caller}({s_args})"
+        s = f"[{s}] {msg}"
+
+        last_id = self.output_messages_ids[self.output_messages_last_pos]
+        self.output_messages_last_pos = (self.output_messages_last_pos + 1) % len(self.output_messages)
+        self.output_messages_count = min(self.output_messages_count + 1, len(self.output_messages))
+        self.output_messages_ids[self.output_messages_last_pos] = last_id + 1
+        self.output_messages[self.output_messages_last_pos] = s
+
         if self.print_enabled:
-            s = f"agent: {self.name}"
-            if show_state:
-                s += f", state: {self.behav.state}"
-            if show_act:
-                caller = str(inspect.stack()[1].function)
-                i = 0
-                while str(caller).startswith("__"):
-                    i += 1
-                    caller = str(inspect.stack()[1 + i].function)
-                args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
-                s_args = Agent.__string_args(args, values)
-                s += f", act: {caller}({s_args})"
-            print(f"[{s}] {msg}")
+            print(s)
 
     def err(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print an error message to the console, if enabled."""
@@ -127,6 +139,9 @@ class Agent:
 
         else:
             return False
+
+    def get_action_step(self):
+        return self.behav.action_step
 
     def nop(self):
         """Do nothing."""

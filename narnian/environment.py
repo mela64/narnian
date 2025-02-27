@@ -15,16 +15,21 @@ class Environment:
         self.streams = {}  # streams that are available in this environment
         self.agents = {}  # agents living in this environment
         self.print_enabled = True  # if output should be printed to screen
-        self.step_mode = False
-        self.step_event = None  # event that triggers a new step
+        self.using_server = False  # it will be changed by the server, if any
+        self.step_event = None  # event that triggers a new step (manipulated by the server)
+        self.wait_event = None  # event that triggers a new "wait-for-step-event" case (manipulated by the server)
+        self.skip_clear_for = 0
+        self.step = 0
+        self.steps = None
+        self.output_messages = [""] * 20
+        self.output_messages_ids = [-1] * 20
+        self.output_messages_count = 0
+        self.output_messages_last_pos = -1
         self.commands_to_send = [  # list of known commands (to be sent)
             "enable_print",
             "disable_print"
         ]
         self.commands_to_receive = [  # list of known commands (either to be received)
-            "enable_step_mode",
-            "disable_step_mode",
-            "next_step"
             "enable_print",
             "disable_print"
         ]
@@ -58,52 +63,63 @@ class Environment:
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""
 
+        s = f"envir: {self.name}"
+        if show_state:
+            s += f", state: {self.behav.limbo_state}"
+        if show_act:
+            caller = str(inspect.stack()[1].function)
+            i = 0
+            while str(caller).startswith("__"):
+                i += 1
+                caller = str(inspect.stack()[1 + i].function)
+            args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
+            s_args = Environment.__string_args(args, values)
+            s += f", act: {caller}({s_args})"
+        s = f"[{s}] {msg}"
+
+        last_id = self.output_messages_ids[self.output_messages_last_pos]
+        self.output_messages_last_pos = (self.output_messages_last_pos + 1) % len(self.output_messages)
+        self.output_messages_count = min(self.output_messages_count + 1, len(self.output_messages))
+        self.output_messages_ids[self.output_messages_last_pos] = last_id + 1
+        self.output_messages[self.output_messages_last_pos] = s
+
         if self.print_enabled:
-            s = f"envir: {self.name}"
-            if show_state:
-                s += f", state: {self.behav.state}"
-            if show_act:
-                caller = str(inspect.stack()[1].function)
-                i = 0
-                while str(caller).startswith("__"):
-                    i += 1
-                    caller = str(inspect.stack()[1 + i].function)
-                args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
-                s_args = Environment.__string_args(args, values)
-                s += f", act: {caller}({s_args})"
-            print(f"[{s}] {msg}")
+            print(s)
 
     def err(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print an error message to the console, if enabled."""
         self.out("<FAILED> " + msg, show_state, show_act)
 
-    def run(self, steps: int | None = None, step_mode: bool = False):
+    def run(self, steps: int | None = None):
         """Run the environment."""
 
         assert steps is None or steps > 0, "Invalid number of steps"
+        self.steps = steps
 
         # sort agents by authority (largest authorities go first)
         sorted_agents = sorted(self.agents.values(), key=lambda x: x.authority, reverse=True)
 
-        # external event
-        self.step_mode = step_mode
-        self.step_event = threading.Event()
-        if not self.step_mode:
-            self.step_event.set()
+        # external events
+        if self.using_server:
+            self.step_event = threading.Event()
+            self.wait_event = threading.Event()
 
         # main loop
-        k = 0
+        self.step = 0
         while True:
 
-            # in step mode, we wait for an external event to go ahead (step_event.set())
-            self.step_event.wait()
+            # in server mode, we wait for an external event to go ahead (step_event.set())
+            if self.using_server:
+                self.wait_event.set()
+                self.step_event.wait()
+                self.wait_event.clear()
 
             # increase the step index (keep it here, after "wait", even if it sounds odd)
-            if k > 0:
+            if self.step > 0:
                 for _, stream in self.streams.items():
                     stream.next_step()
 
-            self.out(f">>> Running step {k} <<<", show_state=False, show_act=False)
+            self.out(f">>> Running step {self.step} <<<", show_state=False, show_act=False)
 
             # self.out("Running inner state actions (if any)", show_act=False)
             self.behav.act_states()
@@ -117,13 +133,16 @@ class Environment:
                 # agent.out("Running transition-related actions (if any)", show_act=False)
                 agent.behav.act_transitions()
 
-            k += 1
-            if k == steps:
+            self.step += 1
+            if self.steps is not None and self.step == self.steps:
                 break
 
             # in step mode, we clear the external event to be able to wait for a new one
-            if self.step_mode:
-                self.step_event.clear()
+            if self.using_server:
+                if self.skip_clear_for <= 0:
+                    self.step_event.clear()
+                else:
+                    self.skip_clear_for -= 1
 
     def send_command(self, command: str, dest_agent: Agent, data: dict | None = None) -> bool:
         """Send a predefined command to an agent."""
@@ -158,31 +177,6 @@ class Environment:
         if src_agent not in self.agents:
             self.err(f"Unknown source agent {src_agent} for command {command}")
             return False
-
-        if command == "enable_step_mode":
-            if self.step_mode is False:
-                self.step_mode = True
-                return True
-            else:
-                self.err("Step mode was already enabled")
-                return False
-
-        if command == "disable_step_mode":
-            if self.step_mode is True:
-                self.step_mode = False
-                self.step_event.set()
-                return True
-            else:
-                self.err("Step mode is not enabled")
-                return False
-
-        if command == "next_step":
-            if self.step_mode:
-                self.step_event.set()
-                return True
-            else:
-                self.err(f"Not running in step mode")
-                return False
 
         elif command == "enable_print":
             self.print_enabled = True

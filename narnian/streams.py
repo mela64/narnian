@@ -50,6 +50,22 @@ class Stream(torch.utils.data.Dataset):
     def __getitem__(self, step: int) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         raise NotImplementedError("Subclasses must implement __getitem__")
 
+    def get_since(self, step: int, data_id: int = 0) -> tuple[list[int], list[torch.Tensor | None], int]:
+        assert data_id >= 0, f"Invalid get_since request with data_id = {data_id}"
+
+        step = max(step, 0)
+        steps = self.k - step + 1
+        ret_ks = []
+        ret_data = []
+        for k in range(0, steps):
+            _k = self.k - steps + 1 + k
+            data = self[_k]
+
+            if data[data_id] is not None:
+                ret_ks.append(_k)
+                ret_data.append(data[data_id]) if len(data) > 0 else ret_data.append(data)
+        return ret_ks, ret_data, self.k
+
     def __str__(self) -> str:
         return "Stream: " + self.name + " [registration id: " + str(self.id) + "]"
 
@@ -102,6 +118,8 @@ class PassThroughStream(Stream):
         self.data_d = d
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
+        if step != -1:
+            raise ValueError("Invalid step index for PassThroughStream: only the last sample is available (step: -1)")
         return self.data_y, self.data_d
 
 
@@ -113,6 +131,7 @@ class BufferedStream(Stream):
         self.last_added_step = -1
         self.last_added_pos = -1
         self.static_descriptor = static_descriptor
+        self.k = -1  # since it is empty
         self.__d = None
 
         if self.max_len is None:
@@ -136,8 +155,14 @@ class BufferedStream(Stream):
                 self.data_d[self.last_added_pos] = d
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
+        if step == -1:
+            step = self.k if self.k >= 0 else self.last_added_step
         if self.max_len is None:
-            return self.data_y[step], self.data_d[step] if not self.static_descriptor else self.data_d[0]
+            if step <= len(self.data_y):
+                return self.data_y[step], self.data_d[step] if not self.static_descriptor else self.data_d[0]
+            else:
+                raise ValueError(f"Unavailable step for buffered stream: {step} "
+                                 f"(last added step: {self.last_added_step}, max length: {self.max_len})")
         else:
             if step > self.last_added_step or (self.last_added_step - step) >= self.max_len:
                 raise ValueError(f"Unavailable step for buffered stream: {step} "
@@ -158,7 +183,7 @@ class Random(Stream):
         self.std = std
         self.shape = torch.Size(shape)
 
-    def __getitem__(self, item) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
+    def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         return (self.std * torch.rand((1,) + self.shape),
                 torch.nn.functional.one_hot(torch.LongTensor([self.id]),
                                             num_classes=len(Stream.registered_streams)).to(torch.float32))

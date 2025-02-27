@@ -13,7 +13,8 @@ class Sin(Stream):
         self.period = 1. / self.freq
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
-        step += self.k
+        if step == -1:
+            step = self.k
         t = step * self.delta + self.phase * self.period
         return (torch.sin(torch.tensor([[2. * math.pi * self.freq * t]])),
                 torch.nn.functional.one_hot(torch.LongTensor([self.id]),
@@ -30,7 +31,8 @@ class Square(Stream):
         self.period = 1. / self.freq
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
-        step += self.k
+        if step == -1:
+            step = self.k
         t = step * self.delta + self.phase * self.period
         return (torch.tensor([[(-1.) ** (math.floor(2. * self.freq * t))]]),
                 torch.nn.functional.one_hot(torch.LongTensor([self.id]),
