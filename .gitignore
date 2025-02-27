@@ -17,7 +17,9 @@ dist/
 coverage/
 
 # IDEs & Editors
+.idea
 .idea/           # PyCharm and IntelliJ
+.vscode
 .vscode/         # VS Code
 *.sublime-project
 *.sublime-workspace
@@ -38,6 +40,7 @@ Thumbs.db        # Windows
 *.whl
 
 # Jupyter Notebooks
+.ipynb_checkpoints
 .ipynb_checkpoints/
 
 # Misc
