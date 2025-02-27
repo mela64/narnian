@@ -22,7 +22,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "rm -rf ../www && mkdir ../www && npx tailwindcss -o public/index_dist.css && GENERATE_SOURCEMAP=false react-scripts build && mv build/* ../www && rm -rf build",
+    "build": "rm -rf ../www && mkdir ../www && npx tailwindcss -o public/index_dist.css && NODE_ENV=production GENERATE_SOURCEMAP=false react-scripts build && mv build/* ../www && rm -rf build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

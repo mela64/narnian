@@ -1,6 +1,9 @@
 import {useEffect, useRef, useState} from "react";
-import * as d3 from "d3";
-import * as dot from "graphlib-dot";
+import { select as d3_select, zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from "d3";
+import { forceSimulation as d3_forceSimulation, forceLink as d3_forceLink, forceManyBody as d3_forceManyBody,
+    forceCenter as d3_forceCenter} from "d3-force";
+import { drag as d3_drag } from "d3-drag";
+import { read as dotRead } from "graphlib-dot"
 import {callAPI, out} from "./utils"
 
 export default function FSM({_agentName_, _playPauseStatus_}) {
@@ -114,7 +117,7 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             setEdge2Highlight(null);
 
             out("[FSM] Highlighting (clicking on) node '" + node2Highlight + "'");
-            const targetNode = d3.select(svgRef.current).select("#" + node2Highlight);
+            const targetNode = d3_select(svgRef.current).select("#" + node2Highlight);
 
             if (!targetNode.empty()) {
                 targetNode.dispatch("click"); // dispatching a "click" event on node
@@ -129,7 +132,7 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             setEdge2Highlight(null);
 
             out("[FSM] Highlighting edge '" + edge2Highlight + "'");
-            const targetEdge = d3.select(svgRef.current).select("#" + edge2Highlight);
+            const targetEdge = d3_select(svgRef.current).select("#" + edge2Highlight);
 
             if (!targetEdge.empty()) {
                 targetEdge.dispatch("click"); // dispatching a "click" event on edge
@@ -168,14 +171,14 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             const centerY = (edge.source.y + edge.target.y) / 2;
             const scale = 3;
             svg.transition().duration(750)
-                .call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2)
+                .call(zoom.transform, d3_zoomIdentity.translate(width / 2, height / 2)
                     .scale(scale).translate(-centerX, -centerY));
         };
 
         const zoomToNode = (node) => {
             const scale = 2;
             svg.transition().duration(750)
-                .call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2)
+                .call(zoom.transform, d3_zoomIdentity.translate(width / 2, height / 2)
                     .scale(scale).translate(-node.x, -node.y));
         };
 
@@ -196,7 +199,7 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         }
 
         // getting the SVG area (by means of D3)
-        const svg = d3.select(svgRef.current);
+        const svg = d3_select(svgRef.current);
 
         // clearing the whole SVG area
         svg.selectAll("*").remove();
@@ -205,11 +208,11 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         const g = svg.append("g");
 
         // zooming to get the right size
-        const zoom = d3.zoom().on("zoom", (event) => g.attr("transform", event.transform));
+        const zoom = d3_zoom().on("zoom", (event) => g.attr("transform", event.transform));
         svg.call(zoom);
 
         // reading the GraphViz string into graph named "graph"
-        const graph = dot.read(graphvizDotStringData);
+        const graph = dotRead(graphvizDotStringData);
 
         // from GraphViz "graph": creating a node structure that includes the IDs that were manually added in GraphViz
         const nodesWithIDs = graph.nodes().map(nodeName => {
@@ -248,10 +251,10 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         }
 
         // creating a new simulation (and stopping it, immediately)
-        const sim = d3.forceSimulation(graphData.nodes)
-            .force("link", d3.forceLink(graphData.links).id((d) => d.id).distance(100))
-            .force("charge", d3.forceManyBody().strength(-200))
-            .force("center", d3.forceCenter(width / 2, height / 2))
+        const sim = d3_forceSimulation(graphData.nodes)
+            .force("link", d3_forceLink(graphData.links).id((d) => d.id).distance(100))
+            .force("charge", d3_forceManyBody().strength(-200))
+            .force("center", d3_forceCenter(width / 2, height / 2))
             .stop();
 
         // saving the state with the new simulation
@@ -322,7 +325,7 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         }
 
         // drag action, applied to nodes (will be provided as attribute in what follows)
-        const drag = d3.drag()
+        const drag = d3_drag()
             .on("start", (event, d) => {
 
                 // fixing position of nodes and labels (to synch them at the beginning)
@@ -445,7 +448,7 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
 
         // when clicking on the SVG-area (not on the graph), a de-zoom operation is triggered
         svg.on("click", () => {
-            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity); // reset zoom to original
+            svg.transition().duration(750).call(zoom.transform, d3_zoomIdentity); // reset zoom to original
         });
 
         // for every simulation tick, we have to update the position of the nodes (that changes!)
