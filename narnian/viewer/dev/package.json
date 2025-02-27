@@ -1,0 +1,53 @@
+{
+  "name": "viewer",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^13.5.0",
+    "d3": "^7.9.0",
+    "framer-motion": "^12.4.5",
+    "graphlib-dot": "^0.6.4",
+    "lucide-react": "^0.475.0",
+    "plotly.js": "^3.0.1",
+    "react": "^19.0.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "^19.0.0",
+    "react-plotly.js": "^2.6.0",
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "rm -rf ../www && mkdir ../www && npx tailwindcss -o public/index_dist.css && GENERATE_SOURCEMAP=false react-scripts build && mv build/* ../www && rm -rf build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17"
+  },
+  "sideEffects": false
+}
