@@ -1,50 +1,6 @@
 import torch
 from narnian.model import Model
-
-
-class BasicGenerator(torch.nn.Module):
-
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
-        super(BasicGenerator, self).__init__()
-        self.linear_hidden_to_hidden = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
-        self.linear_input_to_hidden = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
-        self.hidden_to_output = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h = torch.randn((1, h_dim), device=device)  # initial state (first dimension is batch dim)
-        self.h_init = self.h.clone()
-        self.u_dim = u_dim
-        self.du_dim = du_dim
-        self.device = device
-
-    def forward(self, u, du, first=False):
-        if u is None:
-            u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
-        if du is None:
-            du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
-        if first:
-            self.h = self.h_init
-        h = self.linear_hidden_to_hidden(self.h) + self.linear_input_to_hidden(torch.cat([du, u], dim=1))
-        y = self.hidden_to_output(torch.tanh(h))
-        self.h = h.detach()
-        return y
-
-
-class BasicPredictor(torch.nn.Module):
-
-    def __init__(self, y_dim: int, d_dim: int,  h_dim: int):
-        super(BasicPredictor, self).__init__()
-        self.linear_hidden_to_hidden = torch.nn.Linear(h_dim, h_dim, bias=False)
-        self.linear_input_to_hidden = torch.nn.Linear(y_dim, h_dim, bias=False)
-        self.hidden_to_output = torch.nn.Linear(h_dim, d_dim, bias=False)
-        self.h = torch.randn((h_dim, h_dim))  # initial state
-        self.h_init = self.h.clone()
-
-    def forward(self, y, first=False):
-        if first:
-            self.h = self.h_init
-        h = self.linear_hidden_to_hidden(self.h) + self.linear_input_to_hidden(y)
-        d = self.hidden_to_output(torch.tanh(h))
-        self.h = h.detach()
-        return d
+from networks.models import BasicGenerator, BasicPredictor
 
 
 class BasicModel(Model):

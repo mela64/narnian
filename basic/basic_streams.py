@@ -45,15 +45,12 @@ class CombSin(Stream):
     """Synthetic datasets."""
 
     def __init__(self, f_cap: float, c_cap: float, order: int, delta: float):
-        """Synthetic datasets.
+        """Stream obtained by composition of sine waves.
 
-        :param stream_len:  the length of the stream.
-        :param delta:       time (in seconds) between two consecutive elements of the sequence.
-        :param device:      cuda or cpu.
-        :param order:       number of Sine components to sum.
         :param f_cap:       maximum frequency (uniform(0,f_cap)).
         :param c_cap:       maximum coefficient (uniform(-c_cap,c_cap)).
-        :param desampling:  if we want to sample the signal at a lower rate, providing fewer samples per period.
+        :param order:       number of Sine components to sum.
+        :param delta:       time (in seconds) between two consecutive elements of the sequence.
         """
         super().__init__()
         self.freqs = f_cap * torch.rand(order)
