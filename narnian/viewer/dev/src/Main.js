@@ -54,7 +54,7 @@ export default function Main() {
     const [envName, setEnvName] = useState("?");
 
     // the structure with the current play/pause status of the environment (see "unknownPlayPauseStatus" above)
-    const playPauseStatusRef = useRef(unknownPlayPauseStatus);
+    const [playPauseStatus, setPlayPauseStatus] = useState(unknownPlayPauseStatus);
 
     // flag that avoids asking the play/pause status more than once, when waiting for a reply from the API
     const playPauseStatusAskedRef = useRef(false);
@@ -150,7 +150,7 @@ export default function Main() {
         getAndUpdatePlayPauseStatus(
             () => {}, // "if playing" callback (do nothing)
             () => {
-                playPauseStatusRef.current = unknownPlayPauseStatus;
+                setPlayPauseStatus(unknownPlayPauseStatus);
             } // "if error" callback
         );
     }, [envName]);
@@ -430,7 +430,7 @@ export default function Main() {
                     } else {
                         throw new Error("Unknown status: " + x.status);
                     }
-                    playPauseStatusRef.current = x;
+                    setPlayPauseStatus(x);
                 },
                 () => {
                     if (_errorCallback_) {
@@ -454,7 +454,7 @@ export default function Main() {
             out("[Main] *** click on play/pause button ***");
         }
 
-        if (playPauseStatusRef.current.status === "paused") {
+        if (playPauseStatus.status === "paused") {
 
             // getting play options (number of steps to run)
             const steps = selectedPlayOption.endsWith("k") ?
@@ -474,7 +474,7 @@ export default function Main() {
                 () => {
                 });
 
-        } else if (playPauseStatusRef.current.status === "playing") {
+        } else if (playPauseStatus.status === "playing") {
 
             // asking to pause
             out("[Main] *** fetching data (ask-to-pause) ***");
@@ -507,23 +507,23 @@ export default function Main() {
                 <div className="flex flex-wrap gap-4 w-full justify-center">
 
                     <div className="flex items-center"
-                         style={{ display: playPauseStatusRef.current.status === 'ended' ? 'none' : 'flex' }}>
+                         style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
 
                         <span className="text-xs font-semibold w-20 text-right block mr-2">
-                          {playPauseStatusRef.current.status === '?' ? "What?" :
-                              (playPauseStatusRef.current.status === 'playing'
-                              && playPauseStatusRef.current.still_to_play > 1 ?
-                                  playPauseStatusRef.current.still_to_play : "")}
+                          {playPauseStatus.status === '?' ? "What?" :
+                              ((playPauseStatus.status === 'playing'
+                              && playPauseStatus.still_to_play > 1) ?
+                                  playPauseStatus.still_to_play : "")}
                         </span>
 
                         <button
                             className={`relative flex items-center justify-center mr-1 pointer-events-none 
                             h-6 w-6 rounded-full 
-                            ${playPauseStatusRef.current.status === 'playing' 
-                            && playPauseStatusRef.current.still_to_play > 1 ? "bg-red-500" :
-                                playPauseStatusRef.current.status === 'playing' 
-                                && playPauseStatusRef.current.still_to_play === 1
-                                    ? "bg-orange-400" : playPauseStatusRef.current.status === 'paused' ? "bg-green-500" 
+                            ${playPauseStatus.status === 'playing' 
+                            && playPauseStatus.still_to_play > 1 ? "bg-red-500" :
+                                playPauseStatus.status === 'playing' 
+                                && playPauseStatus.still_to_play === 1
+                                    ? "bg-orange-400" : playPauseStatus.status === 'paused' ? "bg-green-500" 
                                         : "bg-gray-400"}`}
                         >
                         </button>
@@ -534,9 +534,9 @@ export default function Main() {
                             className={`px-4 py-2 rounded-2xl bg-amber-200 
                             ${(isFSMBusy || isConsoleBusy || isPlotFigureBusy) ? 
                                 "hover:bg-gray-200" : "hover:bg-amber-300"}`}
-                            style={{ display: playPauseStatusRef.current.status === 'ended' ? 'none' : 'flex' }} >
+                            style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }} >
 
-                        {playPauseStatusRef.current.status === 'playing' ? (
+                        {playPauseStatus.status === 'playing' ? (
 
                             // pause icon
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -544,7 +544,7 @@ export default function Main() {
                                                              strokeWidth="2" d="M6 19V5M18 19V5"/>
                             </svg>
 
-                        ) : (playPauseStatusRef.current.status === 'paused' ? (
+                        ) : (playPauseStatus.status === 'paused' ? (
 
                             // play icon
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -566,7 +566,7 @@ export default function Main() {
                     </button>
 
                     <div className="flex gap-2 items-center"
-                         style={{ display: playPauseStatusRef.current.status === 'ended' ? 'none' : 'flex' }}>
+                         style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
                         {["1", "10", "100", "1k", "10k", "100k"].map((option) => (
                             <button key={option} onClick={() => setSelectedPlayOption(option)}
                                 className={selectedPlayOption === option ? "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +

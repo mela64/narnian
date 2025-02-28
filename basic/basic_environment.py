@@ -31,3 +31,16 @@ class BasicEnvironment(Environment):
             return False
         else:
             return ret
+
+    def add_agent(self, agent: Agent):
+        """Add an agent and mark those action that will be triggered by other agents."""
+
+        super().add_agent(agent)
+
+        # send (don't wait), get (wait), got (wait)
+        agent.behav.wait_for_all_action_that_start_with("get_")
+        agent.behav.wait_for_all_action_that_start_with("got_")
+
+        # ask (don't wait), do (wait), done (wait)
+        agent.behav.wait_for_all_action_that_start_with("do_")
+        agent.behav.wait_for_all_action_that_start_with("done_")

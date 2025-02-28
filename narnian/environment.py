@@ -65,7 +65,7 @@ class Environment:
 
         s = f"envir: {self.name}"
         if show_state:
-            s += f", state: {self.behav.limbo_state}"
+            s += f", state: {self.behav.limbo_state if self.behav.limbo_state is not None else self.behav.state}"
         if show_act:
             caller = str(inspect.stack()[1].function)
             i = 0
@@ -121,16 +121,12 @@ class Environment:
 
             self.out(f">>> Running step {self.step} <<<", show_state=False, show_act=False)
 
-            # self.out("Running inner state actions (if any)", show_act=False)
             self.behav.act_states()
             for agent in sorted_agents:
-                # agent.out("Running inner state actions (if any)", show_act=False)
                 agent.behav.act_states()
 
-            # self.out("Running transition-related actions (if any)", show_act=False)
             self.behav.act_transitions()
             for agent in sorted_agents:
-                # agent.out("Running transition-related actions (if any)", show_act=False)
                 agent.behav.act_transitions()
 
             self.step += 1
@@ -200,7 +196,7 @@ class Environment:
 
         self.out(f"Providing {len(self.streams)} streams to all agents")
         for agent in self.agents.values():
-            if agent.behav.set_action_score("get_streams", new_score='top'):
+            if agent.behav.set_next_action("get_streams"):
                 agent.behav.set_buffer_param_value("agent", None)
                 agent.behav.set_buffer_param_value("streams", self.streams)
             else:
@@ -213,7 +209,7 @@ class Environment:
 
         self.out(f"Sharing contacts of {len(self.agents)} agents with all the other agents")
         for agent in self.agents.values():
-            if agent.behav.set_action_score("get_agents", new_score='top'):
+            if agent.behav.set_next_action("get_agents"):
                 agent.behav.set_buffer_param_value("agent", None)
                 agent.behav.set_buffer_param_value("agents", self.agents)
             else:

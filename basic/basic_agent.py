@@ -66,7 +66,7 @@ class BasicAgent(Agent):
         """Offer engagement ot another agent."""
 
         self.out(f"Sending engagement request to {self.target_agent.name}")
-        if self.target_agent.behav.set_action_score("get_engagement", new_score='top'):
+        if self.target_agent.behav.set_next_action("get_engagement"):
             self.target_agent.behav.set_buffer_param_value("agent", self)
             return True
         else:
@@ -83,7 +83,7 @@ class BasicAgent(Agent):
 
         # confirming
         if self.available and min_auth <= agent.authority <= max_auth:
-            if agent.behav.set_action_score("got_engagement", new_score='top'):
+            if agent.behav.set_next_action("got_engagement"):
                 agent.behav.set_buffer_param_value("agent", self)
                 self.target_agent = None
                 self.engaged_agent = agent
@@ -484,7 +484,7 @@ class BasicAgent(Agent):
 
         # triggering
         if for_what == "gen":
-            if agent.behav.set_action_score("do_gen", new_score='top'):
+            if agent.behav.set_next_action("do_gen"):
                 agent.behav.set_buffer_param_value("u_hash", u_hash)
                 agent.behav.set_buffer_param_value("du_hash", du_hash)
                 agent.behav.set_buffer_param_value("steps", steps)
@@ -493,7 +493,7 @@ class BasicAgent(Agent):
                 self.err(f"Unable to ask {agent.name} to generate")
                 return False
         elif for_what == "pred":
-            if agent.behav.set_action_score("do_pred", new_score='top'):
+            if agent.behav.set_next_action("do_pred"):
                 agent.behav.set_buffer_param_value("yhat_hash", yhat_hash)
                 agent.behav.set_buffer_param_value("steps", steps)
                 return True
@@ -501,7 +501,7 @@ class BasicAgent(Agent):
                 self.err(f"Unable to ask {agent.name} to predict")
                 return False
         elif for_what == "gen_and_pred":
-            if agent.behav.set_action_score("do_gen_and_pred", new_score='top'):
+            if agent.behav.set_next_action("do_gen_and_pred"):
                 agent.behav.set_buffer_param_value("u_hash", u_hash)
                 agent.behav.set_buffer_param_value("du_hash", dhat_hash)
                 agent.behav.set_buffer_param_value("steps", steps)
@@ -510,7 +510,7 @@ class BasicAgent(Agent):
                 self.err(f"Unable to ask {agent.name} to generated and predict")
                 return False
         elif for_what == "learn_gen":
-            if agent.behav.set_action_score("do_learn_gen", new_score='top'):
+            if agent.behav.set_next_action("do_learn_gen"):
                 agent.behav.set_buffer_param_value("u_hash", u_hash)
                 agent.behav.set_buffer_param_value("du_hash", du_hash)
                 agent.behav.set_buffer_param_value("yhat_hash", yhat_hash)
@@ -520,7 +520,7 @@ class BasicAgent(Agent):
                 self.err(f"Unable to ask {agent.name} to learn to generate")
                 return False
         elif for_what == "learn_pred":
-            if agent.behav.set_action_score("do_learn_pred", new_score='top'):
+            if agent.behav.set_next_action("do_learn_pred"):
                 agent.behav.set_buffer_param_value("yhat_hash", yhat_hash)
                 agent.behav.set_buffer_param_value("dhat_hash", dhat_hash)
                 agent.behav.set_buffer_param_value("steps", steps)
@@ -529,7 +529,7 @@ class BasicAgent(Agent):
                 self.err(f"Unable to ask {agent.name} to learn to predict")
                 return False
         elif for_what == "learn_gen_and_pred":
-            if agent.behav.set_action_score("do_learn_gen_and_pred", new_score='top'):
+            if agent.behav.set_next_action("do_learn_gen_and_pred"):
                 agent.behav.set_buffer_param_value("u_hash", u_hash)
                 agent.behav.set_buffer_param_value("du_hash", du_hash)
                 agent.behav.set_buffer_param_value("yhat_hash", yhat_hash)
@@ -736,7 +736,7 @@ class BasicAgent(Agent):
                 return False
 
             # confirming
-            if agent.behav.set_action_score("done_" + do_what, new_score='top'):
+            if agent.behav.set_next_action("done_" + do_what):
                 agent.behav.set_buffer_param_value("agent", self)
                 agent.behav.set_buffer_param_value("streams", {stream_hash: self.known_streams[stream_hash]})
                 return True

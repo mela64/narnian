@@ -44,8 +44,8 @@ class FiniteStateMachine:
             },
             'transitions': {
                 from_state: {
-                    to_state: str([[action.__name__, args, score, act_id]
-                                   for (action, args, score, act_id) in action_tuple])
+                    to_state: str([[action.__name__, args, wait, act_id]
+                                   for (action, args, wait, act_id) in action_tuple])
                     for to_state, action_tuple in to_states.items()
                 }
                 for from_state, to_states in self.transitions.items()
@@ -123,10 +123,8 @@ class FiniteStateMachine:
             raise ValueError("Unknown state: " + str(state))
 
     def add_transit(self, from_state: str, to_state: str,
-                    action: str, args: dict | None = None, score: float = 1.0, act_id: int | None = None):
+                    action: str, args: dict | None = None, wait: bool = False, act_id: int | None = None):
         """Define a transition between two states with an associated action."""
-
-        assert 0 <= score <= 1.0, f"Invalid transition score: {score}"
 
         if from_state not in self.transitions:
             self.add_state_action(from_state, action=None)
@@ -152,13 +150,13 @@ class FiniteStateMachine:
         self.action_to_params[action_callable.__name__] = (params, defaults)
 
         if to_state not in self.transitions[from_state]:
-            self.transitions[from_state][to_state] = [(action_callable, args, score, act_id)]
+            self.transitions[from_state][to_state] = [(action_callable, args, wait, act_id)]
             self.__tot_actions += 1
         else:
-            if (action_callable, args, score) in self.transitions[from_state][to_state]:
+            if (action_callable, args, wait) in self.transitions[from_state][to_state]:
                 raise ValueError(f"Repeated transition from {from_state} to {to_state}: "
-                                 f"{(action, args, score)}")
-            self.transitions[from_state][to_state].append((action_callable, args, score, act_id))
+                                 f"{(action, args, wait)}")
+            self.transitions[from_state][to_state].append((action_callable, args, wait, act_id))
             self.__tot_actions += 1
 
     def set_buffer_param_value(self, param_name: str, param_value):
@@ -199,44 +197,44 @@ class FiniteStateMachine:
 
     def act_transitions(self):
 
-        # collecting list of feasible actions, scores, etc. (from the current state)
+        # collecting list of feasible actions, wait flags, etc. (from the current state)
         if self.__act_transitions_status is None:
             actions_list = []
             args_list = []
-            scores_list = []
+            waits_list = []
             to_state_list = []
             actions_ids = []
 
             for to_state, action_tuples in self.transitions[self.state].items():
-                for i, (action, args, score, act_id) in enumerate(action_tuples):
-                    if (not isinstance(score, tuple | list) and score > 0.) or \
-                            (isinstance(score, tuple | list) and score[0] > 0.):
+                for i, (action, args, wait, act_id) in enumerate(action_tuples):
+                    if (not isinstance(wait, tuple | list) and wait is False) or \
+                            (isinstance(wait, tuple | list) and wait[0] is False):
                         actions_list.append(action)
                         args_list.append(args)
                         to_state_list.append(to_state)
                         actions_ids.append(act_id)
-                        if not isinstance(score, tuple | list):  # if "score" is a tuple, it includes a tmp value
-                            scores_list.append(score)
+                        if not isinstance(wait, tuple | list):  # if "wait" is a tuple, it includes a tmp value
+                            waits_list.append(wait)
                         else:
-                            scores_list.append(score[0])
-                    if isinstance(score, tuple | list):
-                        action_tuples[i] = (action, args, score[1], act_id)  # restore original
+                            waits_list.append(wait[0])  # tmp value
+                    if isinstance(wait, tuple | list):
+                        action_tuples[i] = (action, args, wait[1], act_id)  # replace tmp with original (restore)
 
             if len(actions_list) > 0:
                 self.__act_transitions_status = {
                     'actions_list': actions_list,
                     'args_list': args_list,
-                    'scores_list': scores_list,
+                    'waits_list': waits_list,
                     'to_state_list': to_state_list,
                     'actions_ids': actions_ids,
                     'idx': 0
                 }
         else:
 
-            # reloading the already computed set of actions, scores, etc. (when in the middle of an action)
+            # reloading the already computed set of actions, wait flags, etc. (when in the middle of an action)
             actions_list = self.__act_transitions_status['actions_list']
             args_list = self.__act_transitions_status['args_list']
-            scores_list = self.__act_transitions_status['scores_list']
+            waits_list = self.__act_transitions_status['waits_list']
             to_state_list = self.__act_transitions_status['to_state_list']
             actions_ids = self.__act_transitions_status['actions_ids']
 
@@ -247,14 +245,15 @@ class FiniteStateMachine:
             _debug_printed = False
 
             if self.action is None:
-                if self.policy == "uniform":
-                    idx = torch.randint(0, len(actions_list), [1]).item()
 
-                elif self.policy == "sampling":
-                    s = torch.tensor(scores_list, dtype=torch.float)
-                    idx = torch.multinomial(s, 1, replacement=True).item()
-                else:
-                    raise ValueError(f"Unknown policy: {self.policy}")
+                # naive policy: take the first action that is ready (i.e., not waiting)
+                idx = -1
+                for i, wait in enumerate(waits_list):
+                    if wait is False:
+                        idx = i
+                        break
+                if idx == -1:
+                    break
 
                 # picking up the actual parameters, considering their current buffered values and the given ones
                 actual_params = self.__get_actual_params(actions_list[idx].__name__, args_list[idx])
@@ -305,7 +304,7 @@ class FiniteStateMachine:
                         print("   [DEBUG FSM] Tried and failed (failed execution): " + action.__name__)
                 del actions_list[idx]
                 del args_list[idx]
-                del scores_list[idx]
+                del waits_list[idx]
                 del to_state_list[idx]
                 del actions_ids[idx]
 
@@ -323,9 +322,9 @@ class FiniteStateMachine:
     def clear_param_buffer(self):
         self.param_buffer = {}
 
-    def set_action_score(self, action_name: str, args: dict | None = None,
-                         new_score: float | str = "top", from_state: str | None = None, to_state: str | None = None):
-        """Change the score of an action, if the action exists."""
+    def set_next_action(self, action_name: str, args: dict | None = None,
+                        from_state: str | None = None, to_state: str | None = None):
+        """Forces the next action (temporary setting all the others to a 'wait' status), if the action exists."""
 
         if from_state is None:
             from_state = self.state
@@ -336,53 +335,33 @@ class FiniteStateMachine:
         if to_state is not None and to_state not in self.transitions[from_state]:
             return False
 
-        assert isinstance(new_score, float) or isinstance(new_score, str), f"Invalid score: {new_score}"
-        assert isinstance(new_score, float) or new_score in ["top", "bottom", "eq_max", "eq_min", "eq_middle"], \
-            f"Invalid score: {new_score}"
-
         to_states = self.transitions[from_state].keys() if to_state is None else [to_state]
 
         for to_state in to_states:
-            for i, (_action, _args, _score, _act_id) in enumerate(self.transitions[from_state][to_state]):
+            for i, (_action, _args, _wait, _act_id) in enumerate(self.transitions[from_state][to_state]):
                 if _action.__name__ == action_name and (args is None or _args == args):
-                    if isinstance(new_score, float):
-                        self.transitions[from_state][to_state][i] = (_action, _args, (new_score, _score), _act_id)
-                    elif isinstance(new_score, str):
-                        _max = _score
-                        _min = _score
-                        _mean = 0.
-                        _n = 0
-                        for _to_state, _action_tuples in self.transitions[from_state].items():
-                            for (_, _, __score, _) in _action_tuples:
-                                _max = max(__score, _max)
-                                _min = min(__score, _min)
-                                _mean += __score
-                                _n += 1
-                        _mean /= _n
-
-                        if new_score == 'eq_max':
-                            self.transitions[from_state][to_state][i] = (_action, _args, (_max, _score), _act_id)
-                        elif new_score == 'eq_min':
-                            self.transitions[from_state][to_state][i] = (_action, _args, (_min, _score), _act_id)
-                        elif new_score == 'eq_mean':
-                            self.transitions[from_state][to_state][i] = (_action, _args, (_mean, _score), _act_id)
-                        elif new_score == 'bottom':
-                            self.transitions[from_state][to_state][i] = (_action, _args, (0., _score), _act_id)
-                        elif new_score == 'top':
-                            for _to_state, _action_tuples in self.transitions[from_state].items():
-                                for j, (__action, __args, __score, __act_id) \
-                                        in enumerate(_action_tuples):
-                                    if (__action.__name__ == action_name and
-                                            (args is None or __args == args)):
-                                        self.transitions[from_state][_to_state][j] = \
-                                            (__action, __args, (1., __score), __act_id)
-                                    else:
-                                        self.transitions[from_state][_to_state][j] = \
-                                            (__action, __args, (0., __score), __act_id)
-                    else:
-                        raise ValueError(f"Invalid score: {new_score}")
+                    for _to_state, _action_tuples in self.transitions[from_state].items():
+                        for j, (__action, __args, __wait, __act_id) \
+                                in enumerate(_action_tuples):
+                            if (__action.__name__ == action_name and
+                                    (args is None or __args == args)):
+                                self.transitions[from_state][_to_state][j] = \
+                                    (__action, __args, (False, __wait), __act_id)  # un-block action (make it ready!)
+                            else:
+                                self.transitions[from_state][_to_state][j] = \
+                                    (__action, __args, (True, __wait), __act_id)  # block action
                     return True
         return False
+
+    def wait_for_all_action_that_start_with(self, prefix):
+        """Forces the wait flag to all actions whose name start with a given prefix."""
+
+        for state, to_states in self.transitions.items():
+            for to_state, action_tuples in to_states.items():
+                for i, (action, args, wait, act_id) in enumerate(action_tuples):
+                    if action.__name__.startswith(prefix):
+                        wait = True
+                        action_tuples[i] = (action, args, wait, act_id)
 
     def save(self, filename: str):
         """Save the FSM to a JSON file."""
@@ -413,8 +392,8 @@ class FiniteStateMachine:
         self.transitions = {}
         for from_state, to_states in fsm_data['transitions'].items():
             for to_state, action_tuples in to_states.items():
-                for action_name, args, score, act_id in action_tuples:
-                    self.add_transit(from_state, to_state, action_name, args, score, act_id)
+                for action_name, args, wait, act_id in action_tuples:
+                    self.add_transit(from_state, to_state, action_name, args, wait, act_id)
 
     def to_graphviz(self):
         """Encode the FSM in GraphViz format."""
@@ -458,14 +437,14 @@ class FiniteStateMachine:
 
         for from_state, to_states in self.transitions.items():
             for to_state, action_tuples in to_states.items():
-                for action, args, score, act_id in action_tuples:
+                for action, args, wait, act_id in action_tuples:
                     s = "("
                     for i, (k, v) in enumerate(args.items()):
                         s += str(k) + "=" + (str(v) if not isinstance(v, str) else ("'" + v + "'"))
                         if i < len(args) - 1:
                             s += ", "
                     s += ")"
-                    label = action.__name__ + s + ":" + str(score)
+                    label = action.__name__ + s
                     if len(label) > 40:
                         tokens = label.split(" ")
                         z = ""
