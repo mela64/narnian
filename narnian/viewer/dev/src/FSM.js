@@ -1,24 +1,23 @@
 import {useEffect, useRef, useState} from "react";
-import { select as d3_select, zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from "d3";
+import { select as d3_select, zoom as d3_zoom, zoomIdentity as d3_zoomIdentity, interrupt as d3_interrupt } from "d3";
 import { forceSimulation as d3_forceSimulation, forceLink as d3_forceLink, forceManyBody as d3_forceManyBody,
     forceCenter as d3_forceCenter} from "d3-force";
 import { drag as d3_drag } from "d3-drag";
 import { read as dotRead } from "graphlib-dot"
 import {callAPI, out} from "./utils"
 
-export default function FSM({_agentName_, _playPauseStatus_}) {
-    out("[FSM] _agentName_: " + _agentName_ + ", _playPauseStatus_: " + _playPauseStatus_);
+export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
+    out("[FSM] " +
+        "_agentName_: " + _agentName_ + ", " +
+        "_isPaused_: " + _isPaused_);
 
     // reference to the SVG area where the graph will de displayed
     const svgRef = useRef();
 
-    // references to the node or edge that are currently highlighted (or zoomed in)
+    // references to the node or edge that are currently highlighted (or zoomed in) and to the zoom transition
     const highlightedNodeRef = useRef(null);
     const highlightedEdgeRef = useRef(null);
-
-    // node or ende that must highlighted (once they are set, there is usually an animation running)
-    const [node2Highlight, setNode2Highlight] = useState(null);
-    const [edge2Highlight, setEdge2Highlight] = useState(null);
+    const activeZoomTransitionRef = useRef(null);
 
     // state of the SVG area (structured as {width: a, height: b})
     const [svgSize, setSvgSize] = useState({width: 0, height: 0});
@@ -33,7 +32,7 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
     const [graphvizDotStringData, setGraphvizDotStringData] = useState(null);
 
     // the D3 simulation engine
-    const [simulation, setSimulation] = useState(null);
+    const simulationRef = useRef(null);
 
     // fetch the GraphViz string of the FSM
     useEffect(() => {
@@ -43,40 +42,71 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         callAPI('/get_behav', "agent_name=" + _agentName_,
             (x) => {
                 setGraphvizDotStringData(x);
-                setLoading(false);  // done loading
             },
             () => setGraphvizDotStringData(null),  // clearing
             () => {
+                setLoading(false);  // done loading
             })
-    }, []);
+    }, [_agentName_]);  // _agentName_ is not going to change
 
     // fetch the current state/action
     useEffect(() => {
-        if (doneDrawing && graphvizDotStringData && svgSize) {
-            out("[FSM] useEffect *** fetching data (get behaviour status, agent name: " + _agentName_ + ") ***");
-
-            callAPI('/get_behav_status', "agent_name=" + _agentName_,
-                (x) => {
-                    if (x.state != null && x.action == null) {
-                        setNode2Highlight("node" + x.state); // state ID (manually defined state ID in GraphViz)
-                    } else if (x.action != null && x.state == null) {
-                        setEdge2Highlight("edge" + x.action);  // edge ID (manually defined edge ID in GraphViz)
-                    } else {
-                        throw new Error("Unknown behaviour status (state: " + x.state + ", action: " + x.action + ")");
-                    }
-                },
-                () => {
-                },
-                () => {
-                }
-            );
-        } else {
-            out("[FSM] useEffect *** fetching data (get behaviour status, skipping - too early) ***");
+        if (!_isPaused_) {
+            out("[FSM] useEffect *** fetching data (get behaviour status, agent name: " + _agentName_ + ") *** " +
+                "(skipping, not paused)");
+            return;
         }
-    }, [doneDrawing, graphvizDotStringData, svgSize, _playPauseStatus_]);
+
+        if (!doneDrawing) {
+            out("[FSM] useEffect *** fetching data (get behaviour status, skipping - too early) ***");
+            return;
+        }
+
+        out("[FSM] useEffect *** fetching data (get behaviour status, agent name: " + _agentName_ + ") ***");
+
+        callAPI('/get_behav_status', "agent_name=" + _agentName_,
+            (x) => {
+                if (x.state != null && x.action == null) {
+                    const node2Highlight = "node" + x.state;
+
+                    out("[FSM] Highlighting (clicking on) node '" + node2Highlight + "'");
+                    const targetNode = d3_select(svgRef.current).select("#" + node2Highlight);
+
+                    if (!targetNode.empty()) {
+                        targetNode.dispatch("click"); // dispatching a "click" event on node
+                    } else {
+                        out("[FSM] Node with id '" + node2Highlight + "' not found");
+                    }
+                } else if (x.action != null && x.state == null) {
+                    const edge2Highlight = "edge" + x.action;
+
+                    out("[FSM] Highlighting edge '" + edge2Highlight + "'");
+                    const targetEdge = d3_select(svgRef.current).select("#" + edge2Highlight);
+
+                    if (!targetEdge.empty()) {
+                        targetEdge.dispatch("click"); // dispatching a "click" event on edge
+                    } else {
+                        out("[FSM] Edge with id '" + edge2Highlight + "' not found");
+                    }
+                } else {
+                    throw new Error("Unknown behaviour status (state: " + x.state + ", action: " + x.action + ")");
+                }
+            },
+            () => {
+            },
+            () => {
+            }
+        );
+    }, [doneDrawing, _isPaused_, _agentName_]);
+    // listens to doneDrawing (when drawing is done, it's time to highlight) and _isPaused_
 
     // resize the FSM drawing
     useEffect(() => {
+        if (!graphvizDotStringData) {
+            out("[FSM] useEffect *** resizing *** (skipping, graph not loaded yet)");
+            return;
+        }
+
         out("[FSM] useEffect *** resizing ***");
 
         const handleResize = () => {
@@ -98,61 +128,33 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         }
 
         // initial resize call
+        out("[FSM] calling handleResize as initial setter");
         handleResize();
 
         return () => {
             window.removeEventListener('resize', handleResize);  // clearing event
             resizeObserver.disconnect(); // clean up ResizeObserver
         };
-    }, [graphvizDotStringData]);
-
-    // highlight node or edge (triggered by changes to "node2Highlight" or to "edge2Highlight")
-    // notice that "node2Highlight" and "edge2Highlight" are the IDs manually associated to the GraphViz nodes and edges
-    useEffect(() => {
-        out("[FSM] useEffect *** highlighting node or edge ***");
-
-        // node
-        if (node2Highlight && doneDrawing && svgSize.width !== 0 && svgSize.height !== 0) {
-            setNode2Highlight(null);
-            setEdge2Highlight(null);
-
-            out("[FSM] Highlighting (clicking on) node '" + node2Highlight + "'");
-            const targetNode = d3_select(svgRef.current).select("#" + node2Highlight);
-
-            if (!targetNode.empty()) {
-                targetNode.dispatch("click"); // dispatching a "click" event on node
-            } else {
-                out("[FSM] Node with id '" + node2Highlight + "' not found");
-            }
-        }
-
-        // edge
-        if (edge2Highlight && doneDrawing && svgSize.width !== 0 && svgSize.height !== 0) {
-            setNode2Highlight(null);
-            setEdge2Highlight(null);
-
-            out("[FSM] Highlighting edge '" + edge2Highlight + "'");
-            const targetEdge = d3_select(svgRef.current).select("#" + edge2Highlight);
-
-            if (!targetEdge.empty()) {
-                targetEdge.dispatch("click"); // dispatching a "click" event on edge
-            } else {
-                out("[FSM] Edge with id '" + edge2Highlight + "' not found");
-            }
-        }
-    }, [doneDrawing, svgSize, node2Highlight, edge2Highlight]); // when drawing is done,
-                                                                      // when size changes,
-                                                                      // when behaviour status is loaded
+    }, [graphvizDotStringData]); // when data has been loaded, it's time to resize
 
     // drawing operations (when the data is fully loaded and when the size changes)
     useEffect(() => {
-        if (!graphvizDotStringData || svgSize.width === 0 || svgSize.height === 0) {
-            out("[FSM] useEffect *** drawing *** (data or svgSize not ready yet, skipping)");
+        if (!graphvizDotStringData) {
+            out("[FSM] useEffect *** drawing *** (graphviz data not ready yet, skipping)");
+            return;
+        }
+        if (svgSize.width <= 0 || svgSize.height <= 0) {
+            out("[FSM] useEffect *** drawing *** (size too small, skipping)");
             return;
         }
 
+        // this will tell the parent that this component is working
+        _setBusy_(true);
+
         const {width, height} = svgSize;
         out("[FSM] useEffect *** drawing *** (data ready, width: " + width + ", height: " + height + ")");
+
+        setDrawingDone(false);  // marking the drawing has started
 
         const updateNodeHighlighting = () => {
             node.attr("fill", (d) => (d.id === highlightedNodeRef.current?.id ? "#82e0aa" : "#aed6f1"));
@@ -169,15 +171,17 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         const zoomToEdge = (edge) => {
             const centerX = (edge.source.x + edge.target.x) / 2;
             const centerY = (edge.source.y + edge.target.y) / 2;
-            const scale = 3;
-            svg.transition().duration(750)
+            const scale = 2;
+            d3_interrupt(svg, activeZoomTransitionRef.current);  // stopping other possibly running transitions (zooms)
+            activeZoomTransitionRef.current = svg.transition().duration(750)
                 .call(zoom.transform, d3_zoomIdentity.translate(width / 2, height / 2)
                     .scale(scale).translate(-centerX, -centerY));
         };
 
         const zoomToNode = (node) => {
             const scale = 2;
-            svg.transition().duration(750)
+            d3_interrupt(svg, activeZoomTransitionRef.current);  // stopping other possibly running transitions (zooms)
+            activeZoomTransitionRef.current = svg.transition().duration(750)
                 .call(zoom.transform, d3_zoomIdentity.translate(width / 2, height / 2)
                     .scale(scale).translate(-node.x, -node.y));
         };
@@ -199,7 +203,11 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
         }
 
         // getting the SVG area (by means of D3)
-        const svg = d3_select(svgRef.current);
+        const svg = d3_select(svgRef.current)
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
 
         // clearing the whole SVG area
         svg.selectAll("*").remove();
@@ -244,12 +252,6 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             links: edgesWithIDs
         };
 
-        // stopping simulations that might be running due to previous calls
-        if (simulation) {
-            out("[FSM] stopping previous simulation");
-            simulation.stop();
-        }
-
         // creating a new simulation (and stopping it, immediately)
         const sim = d3_forceSimulation(graphData.nodes)
             .force("link", d3_forceLink(graphData.links).id((d) => d.id).distance(100))
@@ -257,8 +259,12 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             .force("center", d3_forceCenter(width / 2, height / 2))
             .stop();
 
-        // saving the state with the new simulation
-        setSimulation(sim);
+        // saving the state with the new simulation (and possibly stopping an already running one)
+        if (simulationRef.current) {
+            out("[FSM] stopping previous simulation");
+            simulationRef.current.stop();
+        }
+        simulationRef.current = sim;
 
         // manually running the simulation until this nice condition is met (or try for 300 steps)
         while (sim.alpha() > sim.alphaMin()) {
@@ -287,7 +293,9 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             .attr("d", getLinkPath)
             .on("click", (event, d) => {
                 event.stopPropagation();
-                highlightEdge(d);
+                if (!event.isTrusted) {
+                    highlightEdge(d);
+                }
             });
 
         // adding edge labels to the SVG-graph "g", based on the pre-processed GraphViz edges in "graphData"
@@ -306,7 +314,9 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
             .text((d) => d.label)
             .on("click", (event, d) => {
                 event.stopPropagation();
-                highlightEdge(d);
+                if (!event.isTrusted) {
+                    highlightEdge(d);
+                }
             });
 
           // dynamically update the width and height of the node based on the label's bounding box (used many times)
@@ -464,9 +474,21 @@ export default function FSM({_agentName_, _playPauseStatus_}) {
                 .attr("y", d => d.y);
         });
 
+        // if this drawing operation occurred due to a resize and there were already nodes/edges highlighted, we
+        // ensure they get re-highlighted
+        if (highlightedNodeRef.current != null) {
+            highlightNode(highlightedNodeRef.current);
+        } else if (highlightedEdgeRef.current != null) {
+            highlightEdge(highlightedEdgeRef.current);
+        }
+
         out("[FSM] Graph simulation/drawing ended");
         setDrawingDone(true);  // marking the drawing has completed
-    }, [graphvizDotStringData, svgSize]); // redraw when the data is loaded and when the size changes
+
+        // this will tell the parent that this component is now ready
+        _setBusy_(false);
+    }, [graphvizDotStringData, svgSize, _setBusy_]);
+    // redraw when the data is loaded and when the size changes due to resize (_setBusy_ will not change)
 
     // returning the <div>...</div> that will be displayed when loading data (rotating spin or similar)
     if (loading) {

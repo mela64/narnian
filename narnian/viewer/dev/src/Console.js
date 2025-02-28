@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { callAPI, out } from "./utils";
 import { Inbox } from "lucide-react";  // icon
 
-export default function Console({ _agentName_, _isPaused_ }) {
+export default function Console({ _agentName_, _isPaused_, _setBusy_}) {
     out("[Console] " +
         "_agentName_: " + _agentName_ + ", " +
         "_isPaused_: " + _isPaused_);
@@ -12,20 +12,31 @@ export default function Console({ _agentName_, _isPaused_ }) {
 
     // identifier (time step "k") of the last message that was stored in the message-buffer of this console
     const [lastStoredStep, setLastStoredStep] = useState(-1);
+    const lastStoredStepRef = useRef(lastStoredStep);
 
     // this is a reference to the last shown message, used to force the scrolling operation when a new message is added
     const messagesEndRef = useRef(null);
 
     // update the reference that is used for automatic scrolling purposes only
     useEffect(() => {
+        out("[Console] useEffect *** update reference: messagesEndRef ***");
         messagesEndRef.current?.scrollIntoView({behavior: "smooth", block: "end"});
     }, [messages]); // when new messages are added, this variable changes
+
+    // update reference
+    useEffect(() => {
+        out("[Console] useEffect *** update reference: lastStoredStepRef ***");
+        lastStoredStepRef.current = lastStoredStep;
+    }, [lastStoredStep]);
 
     useEffect(() => {
         if (!_isPaused_) {
             out("[Console] useEffect *** fetching data (get console messages) *** (skipping, not paused)");
             return;
         }
+
+        // this will tell the parent that this component is working
+        _setBusy_(true);
 
         out("[Console] useEffect *** fetching data (agent_name: " + _agentName_ + ") ***");
         callAPI('/get_console', "agent_name=" + _agentName_,
@@ -41,7 +52,7 @@ export default function Console({ _agentName_, _isPaused_ }) {
 
                 // reordering the circular buffer so that the first message has index 0
                 const newMessages = [];  // reordered buffer
-                let _lastStoredStep = lastStoredStep
+                let _lastStoredStep = lastStoredStepRef.current
                 let isFirst = true;
                 for (let i = 0; i < x.output_messages_count; i++) {
                     if (x.output_messages_ids[posId] > _lastStoredStep) {
@@ -67,9 +78,12 @@ export default function Console({ _agentName_, _isPaused_ }) {
             },
             () => setMessages((prev) => (prev)),
             () => {
+                // this will tell the parent that this component is now ready
+                _setBusy_(false);
             }
         );
-    }, [_isPaused_]);  // listen to the pause state
+    }, [_isPaused_, _agentName_, _setBusy_]);
+    // listen to the pause state (_isPaused_), while _agentName_ and _setBusy_ are not going to change
 
     // returning the <div>...</div> that will be displayed when no messages are there at all (some icon)
     if (messages.length === 0) {

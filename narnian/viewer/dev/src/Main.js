@@ -26,13 +26,18 @@ const agentButtonIcons = [<PanelLeft/>, <PanelRight/>, <PanelTop/>, <PanelBottom
 const streamButtonIcons = [<Square/>, <Circle/>, <Triangle/>];
 
 
+// the structure representing the play/pause status, in its initial (unknown) setting
+const unknownPlayPauseStatus = {
+    "status": "?",
+    "still_to_play": -1
+}
+
 export default function Main() {
 
-    // the structure representing the play/pause status, in its initial (unknown) setting
-    const unknownPlayPauseStatus = {
-        "status": "?",
-        "still_to_play": -1
-    }
+    // working-state of the components used in this page
+    const [isFSMBusy, setIsFSMBusy] = useState(false);
+    const [isConsoleBusy, setIsConsoleBusy] = useState(false);
+    const [isPlotFigureBusy, setIsPlotFigureBusy] = useState(false);
 
     // whenever an agent button is clicked, an agent panel is opened (with the FSM, console, streams, stream panels)
     const [agentButtons, setAgentButtons] = useState([]);
@@ -45,17 +50,14 @@ export default function Main() {
     // the column-layout of the agent panels: 1 column when only 1 agent is shown, two columns otherwise
     const [gridCols, setGridCols] = useState("grid-cols-1");
 
-    // flag that tells that we asked the API for the environment name and waiting for a reply
-    const [loadingEnvName, setLoadingEnvName] = useState(false);
-
     // the name of the environment (set to "?" if unknown)
     const [envName, setEnvName] = useState("?");
 
     // the structure with the current play/pause status of the environment (see "unknownPlayPauseStatus" above)
-    const [playPauseStatus, setPlayPauseStatus] = useState(unknownPlayPauseStatus);
-    
+    const playPauseStatusRef = useRef(unknownPlayPauseStatus);
+
     // flag that avoids asking the play/pause status more than once, when waiting for a reply from the API
-    const [playPauseStatusAsked, setPlayPauseStatusAsked] = useState(false);    
+    const playPauseStatusAskedRef = useRef(false);
 
     // flag that tells if the environment is in pause mode
     const [isPaused, setIsPaused] = useState(false);
@@ -65,35 +67,43 @@ export default function Main() {
 
     // references to "streamButtons" above and "openStreamPanels" above, used in click (and similar) callbacks
     const streamButtonsRef = useRef(streamButtons);
+    const agentButtonsRef = useRef(agentButtons);
     const openStreamPanelsRef = useRef(openStreamPanels);
 
     out("[Main]");
 
     // keeping references up-to-date at each rendering operation
     useEffect(() => {
-        out("[Main] useEffect *** updating refs ***");
+        out("[Main] useEffect *** updating streamButtonsRef ***");
         streamButtonsRef.current = streamButtons;
-        openStreamPanelsRef.current = openStreamPanels;
-    }, [streamButtons, openStreamPanels]);
+    }, [streamButtons]);
 
-    // getting the name of the environment
+    // keeping references up-to-date at each rendering operation
     useEffect(() => {
-        if (!loadingEnvName) {
-            out("[Main] useEffect *** fetching data (environment name) ***");
-            setLoadingEnvName(true);
+        out("[Main] useEffect *** updating openStreamPanelsRef ***");
+        openStreamPanelsRef.current = openStreamPanels;
+    }, [openStreamPanels]);
 
-            callAPI('/get_env_name', null,
-                (x) => setEnvName(x),
-                () => setEnvName("?"),
-                () => setLoadingEnvName(false));
-        } else {
-            out("[Main] useEffect *** fetching data (environment name) *** (skipping, already asked)");
-        }
+    // keeping references up-to-date at each rendering operation
+    useEffect(() => {
+        out("[Main] useEffect *** updating agentButtonsRef ***");
+        agentButtonsRef.current = agentButtons;
+    }, [agentButtons]);
+
+    // first thing to do when loading the page: getting the name of the environment
+    useEffect(() => {
+        out("[Main] useEffect *** fetching data (environment name) ***");
+
+        callAPI('/get_env_name', null,
+            (x) => setEnvName(x),
+            () => setEnvName("?"),
+            () => {
+            });
     }, []);
 
     // getting list of agents
     useEffect(() => {
-        if (loadingEnvName || envName === "?") {
+        if (envName === "?") {
             out("[Main] useEffect *** fetching data (list of agents) *** (skipping, missing env name)");
             return;
         } else {
@@ -112,7 +122,7 @@ export default function Main() {
             },
             () => setAgentButtons([]),
             () => {});
-    }, [loadingEnvName]);  // when the status of the loading env name operation changes, we get the agent list
+    }, [envName]);  // when the status of the loading env name operation changes, we get the agent list
 
     // when paused, we get the list of streams for all the agents of the environment
     useEffect(() => {
@@ -121,25 +131,30 @@ export default function Main() {
             return;
         }
 
-        agentButtons.forEach((agentButton) => {
-            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id);
+        out("[Main] useEffect *** fetching data (list of streams for all agents) ***");
+
+        agentButtonsRef.current.forEach((agentButton) => {
+            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id, streamButtonsRef.current);
         });
     }, [isPaused]);
 
     // getting the play/pause status of the environment when loading the page the first time
     useEffect(() => {
-        if (loadingEnvName || envName === "?") {
+        if (envName === "?") {
             out("[Main] useEffect *** fetching data (play/pause status) *** (skipping, missing env name)");
             return;
-        } else {
-             out("[Main] useEffect *** fetching data (play/pause status) ***")
         }
+
+        out("[Main] useEffect *** fetching data (play/pause status) ***");
 
         getAndUpdatePlayPauseStatus(
             () => {}, // "if playing" callback (do nothing)
-            () => { setPlayPauseStatus(unknownPlayPauseStatus); } // "if error" callback
+            () => {
+                playPauseStatusRef.current = unknownPlayPauseStatus;
+            } // "if error" callback
         );
-    }, [loadingEnvName]);  // wait for the environment name to be loaded, then ask for play/pause status
+    }, [envName]);
+    // wait for the environment name to be loaded, then ask for play/pause status
 
     // whenever a new agent panel is opened, the column-layout could switch from 1 to 2 columns
     useEffect(() => {
@@ -153,7 +168,7 @@ export default function Main() {
             if (prev.includes(_agentButtonId_)) {
                 return prev.filter((pid) => pid !== _agentButtonId_);
             } else {
-                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_);  // right now it does this for all
+                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, streamButtonsRef.current);  // for all
                 return [...prev, _agentButtonId_];
             }
         });
@@ -230,7 +245,7 @@ export default function Main() {
                 [agentButtonId]: [...curStreamButtons, newStreamButton], // Add the merged button to the specific panel
             };
         });
-    }, [openStreamPanels, streamButtons]); // we have to list on those variables that will be updated here
+    }, []); // we have to list on those variables that will be updated here
 
     // checks if a stream button is active (i.e., there is an opened stream panel associated to it) or not
     function checkIfActive(_agentButtonId_, _streamButtonId_) {
@@ -326,17 +341,17 @@ export default function Main() {
 
 
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
-    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_) {
+    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _streamButtons_) {
         callAPI('/get_list_of_streams', "agent_name=" + _agentName_,
             (x) => {
 
                 // building the list of single stream names that are not on the current buttons (single and merged)
                 const missingStreamNames = x.filter(
                     (streamName) =>
-                        !streamButtons[_agentButtonId_]
-                        || !Array.isArray(streamButtons[_agentButtonId_])
-                        || streamButtons[_agentButtonId_].length === 0
-                        || !streamButtons[_agentButtonId_].some((streamButton) => (
+                        !_streamButtons_[_agentButtonId_]
+                        || !Array.isArray(_streamButtons_[_agentButtonId_])
+                        || _streamButtons_[_agentButtonId_].length === 0
+                        || !_streamButtons_[_agentButtonId_].some((streamButton) => (
                             streamButton.label === streamName  // single stream name
                             || streamButton.label.includes(streamName + " + ")  // merged stream names!
                             || streamButton.label.includes(" + " + streamName))   // merged streams names!
@@ -345,10 +360,10 @@ export default function Main() {
 
                 // finding the largest ID of the existing stream buttons, also looking inside the mergedIds array
                 let maxStreamButtonId = 0;
-                if (streamButtons[_agentButtonId_]
-                    && Array.isArray(streamButtons[_agentButtonId_])
-                    && streamButtons[_agentButtonId_].length > 0) {
-                    maxStreamButtonId = streamButtons[_agentButtonId_]
+                if (_streamButtons_[_agentButtonId_]
+                    && Array.isArray(_streamButtons_[_agentButtonId_])
+                    && _streamButtons_[_agentButtonId_].length > 0) {
+                    maxStreamButtonId = _streamButtons_[_agentButtonId_]
                         .map((button) => Math.max(...(button.mergedIds || []))) // max value for each mergedIds
                         .reduce((max, current) => Math.max(max, current), -Infinity); // max of all the maxes
                 }
@@ -397,9 +412,10 @@ export default function Main() {
 
     // get the current status of play/pause, and calls two optional callback
     function getAndUpdatePlayPauseStatus(_playCallback_, _errorCallback_) {
-        if (!playPauseStatusAsked) {
+        if (!playPauseStatusAskedRef.current) {
             setIsPaused(false);
-            setPlayPauseStatusAsked(true);
+            playPauseStatusAskedRef.current = true;
+
             callAPI('/get_play_pause_status', null,
                 (x) => {
                     if (x.status === "playing") {
@@ -414,7 +430,7 @@ export default function Main() {
                     } else {
                         throw new Error("Unknown status: " + x.status);
                     }
-                    setPlayPauseStatus(x);
+                    playPauseStatusRef.current = x;
                 },
                 () => {
                     if (_errorCallback_) {
@@ -422,7 +438,7 @@ export default function Main() {
                     }
                 },
                 () => {
-                    setPlayPauseStatusAsked(false);
+                    playPauseStatusAskedRef.current = false;
                 });
         }
     }
@@ -430,7 +446,15 @@ export default function Main() {
     // handle the click on the play/pause button
     const handleClickOnPlayPauseButton = () => {
 
-        if (playPauseStatus.status === "paused") {
+        // if something is drawing/working/fetching-data, do not let it go
+        if (isFSMBusy || isConsoleBusy || isPlotFigureBusy) {
+            out("[Main] *** click on play/pause button *** (ignored due to other components busy)");
+            return;
+        } else {
+            out("[Main] *** click on play/pause button ***");
+        }
+
+        if (playPauseStatusRef.current.status === "paused") {
 
             // getting play options (number of steps to run)
             const steps = selectedPlayOption.endsWith("k") ?
@@ -450,7 +474,7 @@ export default function Main() {
                 () => {
                 });
 
-        } else if (playPauseStatus.status === "playing") {
+        } else if (playPauseStatusRef.current.status === "playing") {
 
             // asking to pause
             out("[Main] *** fetching data (ask-to-pause) ***");
@@ -477,26 +501,29 @@ export default function Main() {
                 <div className="flex flex-col items-center justify-center text-center">
                     <h1 className="text-2xl font-semibold mt-2">NARNIAN</h1>
                     <h1 className="text-2xl font-semibold mt-2">Environment:{" "}
-                        {loadingEnvName ? "Loading..." : envName}</h1>
+                        {envName}</h1>
                 </div>
 
                 <div className="flex flex-wrap gap-4 w-full justify-center">
 
                     <div className="flex items-center"
-                         style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
+                         style={{ display: playPauseStatusRef.current.status === 'ended' ? 'none' : 'flex' }}>
 
                         <span className="text-xs font-semibold w-20 text-right block mr-2">
-                          {playPauseStatus.status === '?' ? "What?" :
-                              (playPauseStatus.status === 'playing' && playPauseStatus.still_to_play > 1 ?
-                                  playPauseStatus.still_to_play : "")}
+                          {playPauseStatusRef.current.status === '?' ? "What?" :
+                              (playPauseStatusRef.current.status === 'playing'
+                              && playPauseStatusRef.current.still_to_play > 1 ?
+                                  playPauseStatusRef.current.still_to_play : "")}
                         </span>
 
                         <button
                             className={`relative flex items-center justify-center mr-1 pointer-events-none 
                             h-6 w-6 rounded-full 
-                            ${playPauseStatus.status === 'playing' && playPauseStatus.still_to_play > 1 ? "bg-red-500" :
-                                playPauseStatus.status === 'playing' && playPauseStatus.still_to_play === 1
-                                    ? "bg-orange-400" : playPauseStatus.status === 'paused' ? "bg-green-500" 
+                            ${playPauseStatusRef.current.status === 'playing' 
+                            && playPauseStatusRef.current.still_to_play > 1 ? "bg-red-500" :
+                                playPauseStatusRef.current.status === 'playing' 
+                                && playPauseStatusRef.current.still_to_play === 1
+                                    ? "bg-orange-400" : playPauseStatusRef.current.status === 'paused' ? "bg-green-500" 
                                         : "bg-gray-400"}`}
                         >
                         </button>
@@ -504,10 +531,12 @@ export default function Main() {
                     </div>
 
                     <button onClick={handleClickOnPlayPauseButton}
-                            className="px-4 py-2 rounded-2xl bg-amber-200 hover:bg-amber-300"
-                            style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }} >
+                            className={`px-4 py-2 rounded-2xl bg-amber-200 
+                            ${(isFSMBusy || isConsoleBusy || isPlotFigureBusy) ? 
+                                "hover:bg-gray-200" : "hover:bg-amber-300"}`}
+                            style={{ display: playPauseStatusRef.current.status === 'ended' ? 'none' : 'flex' }} >
 
-                        {playPauseStatus.status === 'playing' ? (
+                        {playPauseStatusRef.current.status === 'playing' ? (
 
                             // pause icon
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -515,7 +544,7 @@ export default function Main() {
                                                              strokeWidth="2" d="M6 19V5M18 19V5"/>
                             </svg>
 
-                        ) : (playPauseStatus.status === 'paused' ? (
+                        ) : (playPauseStatusRef.current.status === 'paused' ? (
 
                             // play icon
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -537,7 +566,7 @@ export default function Main() {
                     </button>
 
                     <div className="flex gap-2 items-center"
-                         style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
+                         style={{ display: playPauseStatusRef.current.status === 'ended' ? 'none' : 'flex' }}>
                         {["1", "10", "100", "1k", "10k", "100k"].map((option) => (
                             <button key={option} onClick={() => setSelectedPlayOption(option)}
                                 className={selectedPlayOption === option ? "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
@@ -583,7 +612,9 @@ export default function Main() {
                                                     rounded-xl shadow text-center">
                                                     <h3 className="font-medium">Behaviour</h3>
                                                     <FSM _agentName_={agent_button.label}
-                                                         _playPauseStatus_={playPauseStatus}/>
+                                                         _isPaused_={isPaused}
+                                                         _setBusy_={setIsFSMBusy}
+                                                    />
                                                 </div>
                                             </div>
 
@@ -591,7 +622,10 @@ export default function Main() {
                                                 <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
                                                     rounded-xl shadow text-center">
                                                     <h3 className="font-medium">Console</h3>
-                                                    <Console _agentName_={agent_button.label} _isPaused_={isPaused}/>
+                                                    <Console _agentName_={agent_button.label}
+                                                             _isPaused_={isPaused}
+                                                             _setBusy_={setIsConsoleBusy}
+                                                    />
                                                 </div>
                                             </div>
 
@@ -643,7 +677,9 @@ export default function Main() {
                                                         <h3 className="font-medium">{streamButton?.label}</h3>
                                                         <PlotFigure _agentName_={agent_button.label}
                                                                     _streamName_={streamButton.label}
-                                                                    _isPaused_={isPaused} />
+                                                                    _isPaused_={isPaused}
+                                                                    _setBusy_={setIsPlotFigureBusy}
+                                                        />
                                                     </div>
                                                 );
                                             })}

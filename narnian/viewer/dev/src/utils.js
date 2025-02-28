@@ -1,4 +1,7 @@
-export const DEBUG = false;  // this flag activates console outputs (and might change the endpoint address)
+// this flag activates console outputs
+// (and might change the endpoint address)
+// it is automatically set when running "npm start", no need to change here!
+export const DEBUG = process.env.REACT_APP_DEBUG || false;
 
 // the console printer :)
 export function out(s) {
