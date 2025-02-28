@@ -5,12 +5,11 @@ from basic.hl_utils import HL
 
 class BasicHLModel(Model):
 
-    def __init__(self, lr: float = 0.0001, delta: float = None, **hl_args):
+    def __init__(self, lr: float = 0.0001, delta: float = None):
         """Creates a model composed of a generator and a predictor."""
-        # todo comunicare meglio tra env e agenti per quanto riguarda delta
         assert delta is not None, f"delta should be specified."
         self.delta = delta
-        super(BasicHLModel, self).__init__(DiagCompl(u_dim=1, du_dim=3, y_dim=1, h_dim=10),
+        super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_dim=1, du_dim=3, y_dim=1, h_dim=10, delta=delta),
                                            BasicPredictor(y_dim=1, d_dim=3, h_dim=3))
 
         # SGD based optimization of the predictor

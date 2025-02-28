@@ -117,7 +117,7 @@ class AntisymmetricExpGenerator(torch.nn.Module):
         self.I = torch.eye(h_dim, requires_grad=False, device=device)
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h = torch.randn((1, h_dim), device=device)  # initial state (first dimension is batch dim)
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # initial state (first dimension is batch dim)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
@@ -173,7 +173,7 @@ class BlockAntisymmetricGenerator(torch.nn.Module):
         elif alpha == -1.:
             self.project_method = 'alpha'
             self.register_buffer('alpha', torch.zeros_like(self.omega, requires_grad=False))
-        self.h = torch.randn((1, h_dim), device=device)  # initial state (first dimension is batch dim)
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # initial state (first dimension is batch dim)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
@@ -231,7 +231,7 @@ class BlockAntisymmetricExpGenerator(torch.nn.Module):
         self.omega = torch.nn.Parameter(torch.empty(self.order))
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h = torch.randn((1, h_dim), device=device)  # initial state (first dimension is batch dim)
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # initial state (first dimension is batch dim)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
