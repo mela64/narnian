@@ -144,9 +144,9 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                     _newPlotPNGsStorage_.push(..._yData_.map((pngImageBase64, index) => ({
                         source: pngImageBase64, // base64 image source
                         x: _xData_[index],
-                        y: plotIdx, // fixed
-                        sizex: 1.0, // size of the image in x-direction
-                        sizey: 1.0, // size of the image in y-direction
+                        y: plotIdx + 0.025, // fixed
+                        sizex: 0.95, // size of the image in x-direction
+                        sizey: 0.95, // size of the image in y-direction
                         xanchor: "center",
                         yanchor: "bottom", // "middle",
                         layer: "above", // ensure images are on top of markers
@@ -313,7 +313,8 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
             type: "category", // this is fine when the x-axis component are explicitly provided
         },
         yaxis: {
-            range: [minMaxRef.current.yMin, minMaxRef.current.yMax],
+            range: [minMaxRef.current.yMin,
+                !limitToLastN.current ? minMaxRef.current.yMax : minMaxRef.current.yMax + 1.0],
             title: "",
         },
         legend: {
