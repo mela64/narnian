@@ -1,0 +1,30 @@
+Data were taken from the ImageNet collection, http://www.image-net.org/
+
+350 labeled samples
+
+Images of different main classes are organised into different subfolders.
+
+-------------------------------
+CLASS_NAME	#LABELED_IMAGES
+-------------------------------
+albatross	50
+cheetah		50
+ostrich		50
+tiger		50
+zebra		50
+giraffe		50
+penguin		50
+
+TOTAL		350
+
+Each label image is paired with a label that involves 33 classes where the first 7
+ones are the class names above (main classes) and the other 26 ones are 
+additional attributes.
+
+The whole set of classes, ordered accordingly to the label-set, is the 
+following one:
+
+albatross,cheetah,giraffe,ostrich,penguin,tiger,zebra,
+bird,black,blackstripes,blackwhite,carnivore,claws,cud,darkspots,eventoed,
+feather,fly,forwardeyes,goodflier,hair,hoofs,layeggs,longlegs,longneck,mammal,
+meat,milk,pointedteeth,swim,tawny,ungulate,white
