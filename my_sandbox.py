@@ -1,6 +1,6 @@
 from narnian.server import Server
-from narnian.streams import Stream, Random
-from basic.basic_streams import Sin, Square
+from narnian.streams import Stream
+from basic.basic_streams import Sin, Square, Random
 from basic.basic_agent import BasicAgent
 from basic.basic_model import BasicModel
 from basic.basic_environment import BasicEnvironment
@@ -42,7 +42,7 @@ ag.behav.add_transit("student_engaged", "asked_learn", action="ask_learn_gen",
                            "ask_steps": 200})
 ag.behav.add_transit("asked_learn", "done_learn", action="done_learn_gen")
 ag.behav.add_transit("done_learn", "asked_gen", action="ask_gen",
-                     args={"du_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": 50})
+                     args={"du_hash": "<playlist>",  "dhat_hash": "<playlist>", "ask_steps": 50})
 ag.behav.add_transit("asked_gen", "done_gen", action="done_gen")
 ag.behav.add_state_action("done_gen", action="eval", args={"stream_hash": "<playlist>", "what": "y", "steps": 50})
 ag.behav.add_transit("done_gen", "student_engaged", action="compare_eval", args={"cmp": "<", "thres": 0.5})

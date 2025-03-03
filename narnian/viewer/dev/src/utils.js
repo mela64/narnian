@@ -36,6 +36,10 @@ function unpack_data(received_data) {
     out("[unpack_data] Unpacking received data of type: " + type);
     out("[unpack_data] Received data is: " + JSON.stringify(data, null, 2));
 
+    if (!data) {
+        return data;
+    }
+
     if (type.startsWith('Tensor')) {  // PyTorch tensor (expected type is "Tensor_float32" for example)
         return base64ToTypedArray(data, type);  // becomes a Javascript typed array
 

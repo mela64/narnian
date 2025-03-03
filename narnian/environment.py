@@ -140,9 +140,8 @@ class Environment:
                 self.wait_event.clear()
 
             # increase the step index (keep it here, after "wait", even if it sounds odd)
-            if self.step > 0:
-                for _, stream in self.streams.items():
-                    stream.next_step()
+            for _, stream in self.streams.items():
+                stream.next_step()
 
             self.out(f">>> Running step {self.step} <<<", show_state=False, show_act=False)
 

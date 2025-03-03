@@ -249,7 +249,7 @@ class Server:
 
             # if data has labeled components (and is not "img" and is not "token_ids"),
             # then we take a decision and convert it to a text string
-            if attr.data_type == 'misc' or attr.data_type == 'token_ids' and len(attr) > 0:
+            if (attr.data_type == 'misc' or attr.data_type == 'token_ids') and len(attr) > 0:
                 for _i, _data in enumerate(data):
                     data[_i] = attr.data_to_text(_data)
 
