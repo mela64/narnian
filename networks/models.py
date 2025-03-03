@@ -5,7 +5,8 @@ import torch.nn.functional as F
 
 class BasicGenerator(torch.nn.Module):
     """ Basic generator model with linear transformations and a recurrent hidden state """
-    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu")):
         super(BasicGenerator, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -64,8 +65,12 @@ class BasicGenerator(torch.nn.Module):
 
 class DiagReal(torch.nn.Module):
     """ Diagonal matrix-based generator with real-valued transformations """
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu")):
         super(DiagReal, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
 
         # Define diagonal transformation and linear layers
         self.diag = torch.nn.Linear(in_features=1, out_features=h_dim, bias=False, device=device, dtype=torch.float32)
@@ -94,6 +99,8 @@ class DiagReal(torch.nn.Module):
         # Handle None inputs
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
+        else:
+            u = u.flatten(1)
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
 
@@ -116,8 +123,12 @@ class DiagReal(torch.nn.Module):
 
 class DiagCompl(torch.nn.Module):
     """ Diagonal matrix-based generator with complex-valued transformations """
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu")):
         super(DiagCompl, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
 
         # Define diagonal transformation with complex numbers
         self.diag = torch.nn.Linear(in_features=1, out_features=h_dim, bias=False, device=device, dtype=torch.cfloat)
@@ -147,6 +158,7 @@ class DiagCompl(torch.nn.Module):
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.cfloat, device=self.device)
         else:
+            u = u.flatten(1)
             u.to(dtype=torch.cfloat)
 
         if du is None:
@@ -177,17 +189,21 @@ class AntisymmetricExpGenerator(torch.nn.Module):
     Uses antisymmetric weight matrix with matrix exponential for stable hidden state evolution.
 
     Args:
-        u_dim: Input dimension
-        du_dim: Input descriptor dimension
+        u_shape: Input shape (tuple of integers)
+        d_dim: Input descriptor dimension
         y_dim: Output dimension
         h_dim: Hidden state dimension
         delta: Time step for discrete approximation
         device: Computation device (CPU/GPU)
     """
 
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, delta: float,
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
                  device: torch.device = torch.device("cpu")):
         super(AntisymmetricExpGenerator, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
+
         # Antisymmetric weight matrix (W - W^T)
         self.W = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
         self.I = torch.eye(h_dim, requires_grad=False, device=device)  # Identity matrix
@@ -224,7 +240,7 @@ class AntisymmetricExpGenerator(torch.nn.Module):
             y: Output tensor of shape (batch_size, y_dim)
         """
         # Handle missing inputs
-        u = u if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
@@ -258,8 +274,8 @@ class BlockAntisymmetricGenerator(torch.nn.Module):
     Implements structured antisymmetric dynamics through learnable rotational frequencies.
 
     Args:
-        u_dim: Input dimension
-        du_dim: Input descriptor dimension
+        u_shape: Input shape (tuple of integers)
+        d_dim: Input descriptor dimension
         y_dim: Output dimension
         h_dim: Hidden state dimension
         delta: Time step for discrete approximation
@@ -267,9 +283,13 @@ class BlockAntisymmetricGenerator(torch.nn.Module):
         device: Computation device (CPU/GPU)
     """
 
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, delta: float = None,
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float = None,
                  alpha: float = 0., device: torch.device = torch.device("cpu")):
         super(BlockAntisymmetricGenerator, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
+
         assert h_dim % 2 == 0, "Hidden dimension must be even for 2x2 blocks"
         self.order = h_dim // 2  # Number of 2x2 blocks
 
@@ -326,7 +346,7 @@ class BlockAntisymmetricGenerator(torch.nn.Module):
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through block-structured dynamics"""
         # Input handling
-        u = u if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # State management
@@ -358,17 +378,21 @@ class BlockAntisymmetricExpGenerator(torch.nn.Module):
     Implements precise rotational dynamics using trigonometric parameterization.
 
     Args:
-        u_dim: Input dimension
-        du_dim: Input descriptor dimension
+        u_shape: Input shape (tuple of integers)
+        d_dim: Input descriptor dimension
         y_dim: Output dimension
         h_dim: Hidden state dimension
         delta: Time step for discrete approximation
         device: Computation device (CPU/GPU)
     """
 
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, delta: float,
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
                  device: torch.device = torch.device("cpu")):
         super(BlockAntisymmetricExpGenerator, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
+
         assert h_dim % 2 == 0, "Hidden dimension must be even for 2x2 blocks"
         self.order = h_dim // 2
 
@@ -401,7 +425,7 @@ class BlockAntisymmetricExpGenerator(torch.nn.Module):
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Exact matrix exponential forward pass"""
         # Input handling
-        u = u if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # State management
@@ -468,6 +492,7 @@ class BasicPredictor(torch.nn.Module):
 
         return d
 
+
 class BasicImagePredictor(torch.nn.Module):
 
     def __init__(self, d_dim: int):
@@ -514,7 +539,7 @@ class BasicTokenGenerator(torch.nn.Module):
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # initial state (first dimension is batch dim)
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # initial state (1st dim is batch dim)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
