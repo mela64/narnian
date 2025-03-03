@@ -108,7 +108,7 @@ class Server:
                             __type = "list_png"
 
                         buffer = io.BytesIO()
-                        __img.save(buffer, format="PNG")
+                        __img.save(buffer, format="PNG", optimize=True, compress_level=9)
                         buffer.seek(0)
                         _data_b64.append(f"data:image/png;base64,{base64.b64encode(buffer.read()).decode('utf-8')}")
                     else:
@@ -121,7 +121,7 @@ class Server:
             if isinstance(__data, Image.Image):
                 __type = "png"
                 __buffer = io.BytesIO()
-                __data.save(__buffer, format="PNG")
+                __data.save(__buffer, format="PNG", optimize=True, compress_level=9)
                 __data = f"data:image/png;base64,{base64.b64encode(__buffer.read()).decode('utf-8')}"
 
             return __data, __type
