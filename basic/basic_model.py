@@ -1,15 +1,26 @@
 import torch
 from narnian.model import Model
+from narnian.attributes import Attributes
 from networks.models import BasicGenerator, BasicPredictor
 
 
 class BasicModel(Model):
 
-    def __init__(self, lr: float = 0.0001):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001):
         """Creates a model composed of a generator and a predictor."""
-        super(BasicModel, self).__init__(BasicGenerator(u_dim=1, du_dim=3, y_dim=1, h_dim=5),
-                                         BasicPredictor(y_dim=1, d_dim=3, h_dim=3))
 
+        # getting shape info from attributes (it is needed to build the generator/predictor)
+        assert len(attributes) == 2, "Only two attributes are supported/expected (about y and d)"
+        u_shape = attributes[0].shape
+        d_dim = attributes[1].shape.numel()
+        y_dim = attributes[0].shape.numel()
+
+        # creating the model (superclass)
+        super(BasicModel, self).__init__(BasicGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=5),
+                                         BasicPredictor(y_dim=y_dim, d_dim=d_dim, h_dim=3),
+                                         attributes)
+
+        # extra stuff
         self.optim = torch.optim.SGD(list(self.generator.parameters()) + list(self.predictor.parameters()), lr=lr)
         self.loss_gen = torch.nn.functional.mse_loss
         self.loss_pred = torch.nn.functional.mse_loss

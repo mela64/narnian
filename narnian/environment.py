@@ -1,8 +1,10 @@
+import torch
 import inspect
 import threading
 from .agent import Agent
-from .streams import Stream
 from .fsm import FiniteStateMachine
+from .streams import Stream, Attributes
+import torchvision.transforms as transforms
 
 
 class Environment:
@@ -19,6 +21,7 @@ class Environment:
         self.step_event = None  # event that triggers a new step (manipulated by the server)
         self.wait_event = None  # event that triggers a new "wait-for-step-event" case (manipulated by the server)
         self.skip_clear_for = 0
+        self.shared_attributes = None
         self.step = 0
         self.steps = None
         self.output_messages = [""] * 20
@@ -54,11 +57,33 @@ class Environment:
         """Add a new agent to this environment."""
 
         self.agents[agent.name] = agent
+        agent.env = self  # telling the agent what environment he is joining
 
     def add_stream(self, stream: Stream):
         """Add a new stream to this environment."""
 
+        # adding the new stream
         self.streams[stream.get_hash()] = stream
+
+    def share_attributes(self):
+        """Merge the labels of the descriptor components, across all streams, sharing them."""
+
+        # initializing empty attributes for signal and descriptor
+        self.shared_attributes = [Attributes((0,), None),
+                                  Attributes((0,), None)]
+
+        # finding the whole list of labels
+        sample_stream = None
+        for stream_name, stream in self.streams.items():
+            assert sample_stream is None or sample_stream.attributes[0].shape == stream.attributes[0].shape, \
+                "Cannot merge stream with different attributes"
+            self.shared_attributes[1].merge(stream.attributes[1])
+            sample_stream = stream
+        self.shared_attributes[0] = sample_stream.attributes[0]
+
+        # telling each stream in which positions their labels fall
+        for stream_name, stream in self.streams.items():
+            stream.attributes[1].interleave_with(self.shared_attributes[1])
 
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""
@@ -69,7 +94,7 @@ class Environment:
         if show_act:
             caller = str(inspect.stack()[1].function)
             i = 0
-            while str(caller).startswith("__"):
+            while str(caller).startswith("__") or str(caller).startswith("err"):
                 i += 1
                 caller = str(inspect.stack()[1 + i].function)
             args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)

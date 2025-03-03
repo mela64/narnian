@@ -109,16 +109,16 @@ class BasicAgent(Agent):
             self.err(f"Unable to confirm engagement with {agent.name}")
             return False
 
-    def gen(self, u_hash: str | None = None, du_hash: str | None = None, steps: int = 100) -> bool:
+    def gen(self, dhat_hash: str, u_hash: str | None = None, du_hash: str | None = None, steps: int = 100) -> bool:
         """Generate a signal."""
 
         self.out(f"Generating signal")
         return self.__process_streams(u_hash=u_hash, du_hash=du_hash,
-                                      yhat_hash=None, dhat_hash=None,
+                                      yhat_hash=None, dhat_hash=dhat_hash,
                                       skip_gen=False, skip_pred=True,
                                       steps=steps)
 
-    def ask_gen(self, u_hash: str | None = None, du_hash: str | None = None, ask_steps: int = 100):
+    def ask_gen(self, dhat_hash: str, u_hash: str | None = None, du_hash: str | None = None, ask_steps: int = 100):
         """Asking for generation."""
 
         if self.engaged_agent is None:
@@ -128,17 +128,17 @@ class BasicAgent(Agent):
         self.out(f"Asking {self.engaged_agent.name} to generate signal")
         return self.__ask(for_what="gen", agent=self.engaged_agent,
                           u_hash=u_hash, du_hash=du_hash,
-                          yhat_hash=None, dhat_hash=None,
+                          yhat_hash=None, dhat_hash=dhat_hash,
                           steps=ask_steps)
 
-    def do_gen(self, u_hash: str | None = None, du_hash: str | None = None, steps: int = 100) -> bool:
+    def do_gen(self, dhat_hash: str, u_hash: str | None = None, du_hash: str | None = None, steps: int = 100) -> bool:
         """Generate a signal."""
 
         if self.engaged_agent is None:
             self.err("Not engaged to any agents")
             return False
 
-        ret = self.gen(u_hash, du_hash, steps)
+        ret = self.gen(dhat_hash, u_hash, du_hash, steps)
         return self.__complete_do("gen", self.engaged_agent, ret) \
             if self.get_action_step() == steps - 1 else ret
 
@@ -239,17 +239,17 @@ class BasicAgent(Agent):
         self.out(f"Agent {self.engaged_agent.name} finished generation and prediction of descriptor")
         return self.__done(streams)
 
-    def learn_gen(self, yhat_hash: str, u_hash: str | None = None, du_hash: str | None = None,
+    def learn_gen(self, yhat_hash: str, dhat_hash: str, u_hash: str | None = None, du_hash: str | None = None,
                   steps: int = 100) -> bool:
         """Learn to generate a signal."""
 
         self.out(f"Learning to generate signal")
         return self.__process_streams(u_hash=u_hash, du_hash=du_hash,
-                                      yhat_hash=yhat_hash, dhat_hash=None,
+                                      yhat_hash=yhat_hash, dhat_hash=dhat_hash,
                                       skip_gen=False, skip_pred=True,
                                       steps=steps)
 
-    def ask_learn_gen(self, yhat_hash: str, u_hash: str | None = None, du_hash: str | None = None,
+    def ask_learn_gen(self, yhat_hash: str, dhat_hash:str, u_hash: str | None = None, du_hash: str | None = None,
                       ask_steps: int = 100):
         """Asking for learning to generate."""
 
@@ -260,10 +260,10 @@ class BasicAgent(Agent):
         self.out(f"Asking {self.engaged_agent.name} to learn to generate signal")
         return self.__ask(for_what="learn_gen", agent=self.engaged_agent,
                           u_hash=u_hash, du_hash=du_hash,
-                          yhat_hash=yhat_hash, dhat_hash=None,
+                          yhat_hash=yhat_hash, dhat_hash=dhat_hash,
                           steps=ask_steps)
 
-    def do_learn_gen(self, yhat_hash: str,
+    def do_learn_gen(self, yhat_hash: str, dhat_hash: str,
                      u_hash: str | None = None, du_hash: str | None = None, steps: int = 100) -> bool:
         """Learn to generate a signal."""
 
@@ -271,7 +271,7 @@ class BasicAgent(Agent):
             self.err("Not engaged to any agents")
             return False
 
-        ret = self.learn_gen(yhat_hash, u_hash, du_hash, steps)
+        ret = self.learn_gen(yhat_hash, dhat_hash, u_hash, du_hash, steps)
         return self.__complete_do("learn_gen", self.engaged_agent, ret) \
             if self.get_action_step() == steps - 1 else ret
 
@@ -487,6 +487,7 @@ class BasicAgent(Agent):
             if agent.behav.set_next_action("do_gen"):
                 agent.behav.set_buffer_param_value("u_hash", u_hash)
                 agent.behav.set_buffer_param_value("du_hash", du_hash)
+                agent.behav.set_buffer_param_value("dhat_hash", dhat_hash)
                 agent.behav.set_buffer_param_value("steps", steps)
                 return True
             else:
@@ -514,6 +515,7 @@ class BasicAgent(Agent):
                 agent.behav.set_buffer_param_value("u_hash", u_hash)
                 agent.behav.set_buffer_param_value("du_hash", du_hash)
                 agent.behav.set_buffer_param_value("yhat_hash", yhat_hash)
+                agent.behav.set_buffer_param_value("dhat_hash", dhat_hash)
                 agent.behav.set_buffer_param_value("steps", steps)
                 return True
             else:
@@ -593,47 +595,63 @@ class BasicAgent(Agent):
                 self.err(f"Invalid request: you are asking to skip_gen by either not providing a yhat-stream or "
                          f"providing a u-stream/du_hash (that would not be used).")
                 return False
-            if skip_pred and dhat_hash is not None:
-                self.err(f"Invalid request: you are asking to skip_pred by providing "
-                         f"a dhat-stream (that would not be used).")
+            if skip_pred and dhat_hash is None:
+                self.err(f"Invalid request: you are asking to skip_pred but not providing "
+                         f"a dhat-stream (that is needed, since it will be copied in place of the predictor).")
                 return False
 
             if steps <= 0:
                 self.err(f"Invalid number of steps: {steps}")
                 return False
 
+            # getting existing streams
+            u_stream = self.known_streams[u_hash] if u_hash is not None else None
+            du_stream = self.known_streams[du_hash] if du_hash is not None else None
+            yhat_stream = self.known_streams[yhat_hash] if yhat_hash is not None else None
+            dhat_stream = self.known_streams[dhat_hash] if dhat_hash is not None else None
+
             # creating new buffered streams to store the data received as inputs (for visualization purposes only)
             vis_udu_stream = BufferedStream()
             vis_udu_stream.set_name("vis-udu")
             vis_udu_stream.set_creator(f"{self.name}")
             vis_udu_stream.set_meta("Visualization purposes only: the y-part is the u-input used in a generation "
-                                    "procedure, while the d-part is the descriptor used an input")
+                                    "procedure, while the d-part is the descriptor used as input")
+            vis_udu_stream.attributes[0] = u_stream.attributes[0] \
+                if u_stream is not None else vis_udu_stream.attributes[0]
+            vis_udu_stream.attributes[1] = du_stream.attributes[1] \
+                if du_stream is not None else vis_udu_stream.attributes[1]
 
             vis_yhatdhat_stream = BufferedStream()
             vis_yhatdhat_stream.set_name("vis-yhatdhat")
             vis_yhatdhat_stream.set_creator(f"{self.name}")
             vis_yhatdhat_stream.set_meta("Visualization purposes only: the yhat and dhat data used in a "
                                          "generation procedure")
+            vis_yhatdhat_stream.attributes[0] = yhat_stream.attributes[0] \
+                if yhat_stream is not None else vis_yhatdhat_stream.attributes[0]
+            vis_yhatdhat_stream.attributes[1] = dhat_stream.attributes[1] \
+                if dhat_stream is not None else vis_yhatdhat_stream.attributes[1]
 
             # creating a new buffered stream to store the data that will be generated
             yd_stream = BufferedStream()
             yd_stream.set_name("generated")
             yd_stream.set_creator(f"{self.name}")
             yd_stream.set_meta("Stream generated by the agent")
+            yd_stream.attributes = self.model.attributes  # getting attributes from the model
 
             # storing a reference to the just generated streams
             self.known_streams[vis_udu_stream.get_hash()] = vis_udu_stream
             self.known_streams[vis_yhatdhat_stream.get_hash()] = vis_yhatdhat_stream
             self.known_streams[yd_stream.get_hash()] = yd_stream
+        else:
 
-        # getting streams
-        u_stream = self.known_streams[u_hash] if u_hash is not None else None
-        du_stream = self.known_streams[du_hash] if du_hash is not None else None
-        yhat_stream = self.known_streams[yhat_hash] if yhat_hash is not None else None
-        dhat_stream = self.known_streams[dhat_hash] if dhat_hash is not None else None
-        vis_udu_stream = self.known_streams[Stream.build_hash("vis-udu", self.name)]
-        vis_yhatdhat_stream = self.known_streams[Stream.build_hash("vis-yhatdhat", self.name)]
-        yd_stream = self.known_streams[Stream.build_hash("generated", self.name)]
+            # just getting all streams
+            u_stream = self.known_streams[u_hash] if u_hash is not None else None
+            du_stream = self.known_streams[du_hash] if du_hash is not None else None
+            yhat_stream = self.known_streams[yhat_hash] if yhat_hash is not None else None
+            dhat_stream = self.known_streams[dhat_hash] if dhat_hash is not None else None
+            vis_udu_stream = self.known_streams[Stream.build_hash("vis-udu", self.name)]
+            vis_yhatdhat_stream = self.known_streams[Stream.build_hash("vis-yhatdhat", self.name)]
+            yd_stream = self.known_streams[Stream.build_hash("generated", self.name)]
 
         # streams at current time
         u = u_stream[u_stream.k][0] if u_stream is not None else None

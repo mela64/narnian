@@ -1,5 +1,6 @@
 from narnian.agent import Agent
 from narnian.environment import Environment
+from narnian.streams import Stream
 
 
 class BasicEnvironment(Environment):
@@ -44,3 +45,11 @@ class BasicEnvironment(Environment):
         # ask (don't wait), do (wait), done (wait)
         agent.behav.wait_for_all_action_that_start_with("do_")
         agent.behav.wait_for_all_action_that_start_with("done_")
+
+    def add_stream(self, stream: Stream):
+        """Add a stream and create a unique, long, set of merged descriptor component labels (attribute labels)."""
+
+        super().add_stream(stream)
+
+        # merging descriptor labels (attribute labels) and sharing them with all streams
+        self.share_attributes()

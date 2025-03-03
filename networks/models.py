@@ -1,11 +1,15 @@
 import torch
+import torchvision
 import torch.nn.functional as F
 
 
 class BasicGenerator(torch.nn.Module):
 
-    def __init__(self, u_dim: int, du_dim: int, y_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
         super(BasicGenerator, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
@@ -24,6 +28,8 @@ class BasicGenerator(torch.nn.Module):
     def forward(self, u, du, first=False):
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
+        else:
+            u = u.flatten(1)
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
         h = self.h.detach()
@@ -282,12 +288,111 @@ class BasicPredictor(torch.nn.Module):
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False)
         self.B = torch.nn.Linear(y_dim, h_dim, bias=False)
         self.C = torch.nn.Linear(h_dim, d_dim, bias=False)
-        self.h = torch.randn((h_dim, h_dim))  # initial state
+        self.h = torch.randn((1, h_dim))  # initial state
         self.h_init = self.h.clone()
 
     def forward(self, y, first=False):
         if first:
             self.h = self.h_init
+        h = self.A(self.h) + self.B(y)
+        d = self.C(torch.tanh(h))
+        self.h = h.detach()
+        return d
+
+
+class BasicImagePredictor(torch.nn.Module):
+
+    def __init__(self, d_dim: int):
+        super(BasicImagePredictor, self).__init__()
+
+        self.transforms = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(32),
+            torchvision.transforms.CenterCrop(32),
+            torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])
+        ])
+
+        self.net = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 64, kernel_size=5, stride=1, padding=2),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.Conv2d(64, 128, kernel_size=5, padding=2),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.Flatten(),
+            torch.nn.Linear(256 * 3 * 3, 2048),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Linear(2048, d_dim),
+            torch.nn.Sigmoid()
+        )
+
+    def forward(self, y, first=False):
+        return self.net(self.transforms(y))
+
+
+class BasicTokenGenerator(torch.nn.Module):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu")):
+        super(BasicTokenGenerator, self).__init__()
+
+        u_dim = emb_dim
+        du_dim = d_dim
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
+        self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
+        self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # initial state (first dimension is batch dim)
+        self.h_init = self.h.clone()
+        self.dh = torch.zeros_like(self.h)
+        self.u_dim = u_dim
+        self.du_dim = du_dim
+        self.device = device
+        self.delta = 1.     # already defined in discrete time
+
+    @torch.no_grad()
+    def adjust_eigs(self, delta=0.01):
+        pass
+
+    def forward(self, u, du, first=False):
+        if u is None:
+            u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
+        else:
+            u = self.embeddings(u)  # added this
+        if du is None:
+            du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
+        h = self.h.detach()
+        if first:
+            h = self.h_init
+        self.h = self.A(h) + self.B(torch.cat([du, u], dim=1))
+        y = self.C(torch.tanh(self.h))
+        self.dh = (self.h - h) / self.delta
+        self.h.retain_grad()
+        return y
+
+
+class BasicTokenPredictor(torch.nn.Module):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int):
+        super(BasicTokenPredictor, self).__init__()
+
+        y_dim = emb_dim
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False)
+        self.B = torch.nn.Linear(y_dim, h_dim, bias=False)
+        self.C = torch.nn.Linear(h_dim, d_dim, bias=False)
+        self.h = torch.randn((1, h_dim))  # initial state
+        self.h_init = self.h.clone()
+
+    def forward(self, y, first=False):
+        if first:
+            self.h = self.h_init
+        y = self.embeddings(y)  # added this
         h = self.A(self.h) + self.B(y)
         d = self.C(torch.tanh(h))
         self.h = h.detach()

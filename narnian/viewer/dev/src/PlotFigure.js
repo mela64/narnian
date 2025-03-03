@@ -30,6 +30,12 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
     // the whole data plotted in this figure, and array like "emptyPlotData" above, where the "x" and "y" fields grow
     const [allPlotData, setAllPlotData] = useState(emptyPlotData);
     const allPlotDataRef = useRef(allPlotData);
+    const [allPlotPNGs, setAllPlotPNGs] = useState([]);
+    const [allPlotTexts, setAllPlotTexts] = useState([]);
+
+    // limits of the current axes
+    const limitToLastN = useRef(false);
+    const minMaxRef = useRef({xMin: 0, yMin: 0, xMax: 0, yMax: 0})
 
     // largest time step "k" on the whole plot (i.e., the max "k" among all the plotted signals of this figure)
     const [lastStoredStep, setLastStoredStep] = useState(-1);
@@ -46,6 +52,8 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
     if (_streamName_ !== streamName) {
         setStreamName(_streamName_);
         setAllPlotData(emptyPlotData);
+        setAllPlotPNGs([]);
+        setAllPlotTexts([]);
         setLastStoredStep(-1);
     }
     
@@ -78,14 +86,19 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
         // store/add new plot data to one of the existing plots of the figure or add a fully new plot
         // (_newPlotDataStorage_ is a (usually empty) map (plotIdx -> plot structure) that gets populated by calling
         // this function several times)
-        function storeNewPlotData(_name_, _xData_, _yData_, _newPlotDataStorage_) {
+        function storeNewPlotData(_name_, _xData_, _yData_,
+                                  _newPlotDataStorage_, _newPlotPNGsStorage_, _newPlotTextsStorage_) {
             if (_xData_ == null || _yData_ == null || _xData_.length <= 0 || _yData_.length <= 0) {
                 return;
             }
-            const numVecComponents = _yData_[0].length;
+
+            const PNGDetected = (typeof _yData_[0] === 'string' && _yData_[0].startsWith("data:image/png;base64"))
+            const textDetected = (typeof _yData_[0] === 'string' && !_yData_[0].startsWith("data:image/png;base64"))
+            const numVecComponents = PNGDetected || textDetected ? 1 : _yData_[0].length;
 
             // for each vector component on the _yData_ ...
-            for (let vecComponentIdx = 0; vecComponentIdx < Math.min(numVecComponents, maxVecComponentsPerSignal);
+            for (let vecComponentIdx = 0;
+                 vecComponentIdx < Math.min(numVecComponents, maxVecComponentsPerSignal);
                  vecComponentIdx++) {
 
                 // check if we reached the max plot size
@@ -103,12 +116,14 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                 if (plotIdx === -1) {
 
                     // new plot with its own plotIdx (the negative index was temporary)
-                    plotIdx = -_newPlotDataStorage_.size;
+                    plotIdx = _newPlotDataStorage_.size;
 
                     // this map is plotIdx -> plot data struct (see the "emptyPlotData" at the top of this file)
                     _newPlotDataStorage_.set(plotIdx, {
                         x: _xData_,
-                        y: _yData_.map(my_y_data_array => my_y_data_array[vecComponentIdx]), // keep only 1 component
+                        y: !PNGDetected && !textDetected ?
+                            _yData_.map(my_y_data_array => my_y_data_array[vecComponentIdx])  // keep only 1 component
+                            : Array(_xData_.length).fill(plotIdx),  // plot PNG images and text annotations at y=plotIdx
                         type: "scatter",
                         mode: "lines",
                         name: plotName
@@ -118,8 +133,47 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                     // augmenting an existing plot, for which there was already a mapping plotIdx -> plot in the map
                     _newPlotDataStorage_.set(plotIdx, {
                         new_x: _xData_,
-                        new_y: _yData_.map(my_y_data_array => my_y_data_array[vecComponentIdx]) // keep only 1 component
+                        new_y: !PNGDetected && !textDetected ?
+                            _yData_.map(my_y_data_array => my_y_data_array[vecComponentIdx])  // keep only 1 component
+                            : Array(_xData_.length).fill(plotIdx),  // plot PNG images and text annotations at y=plotIdx
                     });
+                }
+
+                // this is the set of PNG images received by the single/multiple call(s) to get_stream
+                if (PNGDetected) {
+                    _newPlotPNGsStorage_.push(..._yData_.map((pngImageBase64, index) => ({
+                        source: pngImageBase64, // base64 image source
+                        x: _xData_[index],
+                        y: plotIdx, // fixed
+                        sizex: 1.0, // size of the image in x-direction
+                        sizey: 1.0, // size of the image in y-direction
+                        xanchor: "center",
+                        yanchor: "bottom", // "middle",
+                        layer: "above", // ensure images are on top of markers
+                        xref: 'x', // use the x-axis scale (data coordinates)
+                        yref: 'y' // use the y-axis scale (data coordinates)
+                    })));
+
+                    limitToLastN.current = true; // this marks that we want to see only a small set of recent samples
+
+                // this is the set of text annotations (words) received by the single/multiple call(s) to get_stream
+                } else if (textDetected) {
+                    _newPlotTextsStorage_.push(..._yData_.map((textAnnotation, index) => ({
+                        text: textAnnotation, // text
+                        x: _xData_[index],
+                        y: plotIdx, // fixed
+                        showarrow: true,
+                        font: {
+                            family: 'Arial, sans-serif',
+                            size: 14,
+                            color: 'black',
+                            //weight: 'bold'
+                        },
+                        xanchor: "center",
+                        yanchor: "middle",
+                    })));
+
+                    limitToLastN.current = true; // this marks that we want to see only a small set of recent samples
                 }
             }
         }
@@ -128,6 +182,8 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
         const unmergedStreamNames = _streamName_.split(' + ').map(item => item.trim());
         const numMergedStreams = unmergedStreamNames.length;
         const newPlotDataStorage = new Map(); // created as empty map, populated by storeNewPlotData(...)
+        const newPlotPNGsStorage = []; // created as empty array, populated by storeNewPlotData(...)
+        const newPlotTextsStorage = []; // created as empty array, populated by storeNewPlotData(...)
         returnedAPICallsRef.current = 0; // we will count how many of the merged stream return data and what fails
         updatedLastStoredStepRef.current = lastStoredStepRef.current;
 
@@ -148,7 +204,8 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                     const numNewPlotsCurrentlyStored = newPlotDataStorage.size;
 
                     // here we store the received data into the temporary storage
-                    storeNewPlotData(unmergedStreamNames[j], x.ks, x.data, newPlotDataStorage);
+                    storeNewPlotData(unmergedStreamNames[j], x.ks, x.data,
+                        newPlotDataStorage, newPlotPNGsStorage, newPlotTextsStorage);
 
                     // if the temporary map size did not change, we reached the max number of plots and skipped this one
                     if (newPlotDataStorage.size > numNewPlotsCurrentlyStored) {
@@ -178,17 +235,49 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
 
                             // purging streams that are not part of this figure anymore (due to unmerging)
                             // and returning the current "purged" data
-                            return curAllPlotData.filter((plotDataStruct) => {
+                            const curAllPlotDataFiltered = curAllPlotData.filter((plotDataStruct) => {
                                 const delimiterIndex = plotDataStruct.name.lastIndexOf("~");
-                                const _stream_name = delimiterIndex !== -1 ?
+                                const _streamName = delimiterIndex !== -1 ?
                                     plotDataStruct.name.substring(0, delimiterIndex) : plotDataStruct.name;
-                                return unmergedStreamNames.includes(_stream_name);
+                                return unmergedStreamNames.includes(_streamName);
                             });
+
+                            // estimating min and max of the whole data
+                            curAllPlotDataFiltered.forEach(trace => {
+                                const xValues = trace.x;
+                                const yValues = trace.y;
+                                minMaxRef.current.xMin = Math.min(minMaxRef.current.xMin, ...xValues);
+                                minMaxRef.current.xMax = Math.max(minMaxRef.current.xMax, ...xValues);
+                                minMaxRef.current.yMin = Math.min(minMaxRef.current.yMin, ...yValues);
+                                minMaxRef.current.yMax = Math.max(minMaxRef.current.yMax, ...yValues);
+                            });
+
+                            return curAllPlotDataFiltered;
                         });
 
+                        // here we augment the current set of images with the newly received ones
+                        if (newPlotPNGsStorage.length > 0) {
+                            setAllPlotPNGs((prevAllPlotPNGs) => {
+                                const curAllPlotPNGs = [...prevAllPlotPNGs]; // clone
+                                curAllPlotPNGs.push(...newPlotPNGsStorage); // add newly received PNGs
+                                return curAllPlotPNGs;
+                            });
+                        }
+
+                        // here we augment the current set of text annotations with the newly received ones
+                        if (newPlotTextsStorage.length > 0) {
+                            setAllPlotTexts((prevAllPlotTexts) => {
+                                const curAllPlotTexts = [...prevAllPlotTexts]; // clone
+                                curAllPlotTexts.push(...newPlotTextsStorage); // add newly received PNGs
+                                return curAllPlotTexts;
+                            });
+                        }
+
                         // save the largest x-value, it will be used in the future to ask for new data
-                        setLastStoredStep((prevStep) =>
-                            Math.max(prevStep, updatedLastStoredStepRef.current));
+                        setLastStoredStep((prevStep) => {
+                            const newMax = Math.max(prevStep, updatedLastStoredStepRef.current);
+                            return newMax;
+                        })
 
                         // this will trigger an update of the plot graphic
                         // (Plotly is listening to changes to this counter)
@@ -215,12 +304,17 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
         plot_bgcolor: 'rgba(0, 0, 0, 0)', // transparent plot area
         paper_bgcolor: 'rgba(0, 0, 0, 0)', // transparent entire figure
         margin: { t: 0, b: 'auto', l: 40, r: 40 }, // reduce margins
+        images: allPlotPNGs, // array of images, if any
+        annotations: allPlotTexts, // array of textual annotations (e.g., words), if any
         xaxis: {
+            range: [!limitToLastN.current ? minMaxRef.current.xMin : minMaxRef.current.xMax - 5.5,
+                !limitToLastN.current ? minMaxRef.current.xMax : minMaxRef.current.xMax + 0.5],
             title: "Time",
             type: "category", // this is fine when the x-axis component are explicitly provided
         },
         yaxis: {
-            title: "Amplitude",
+            range: [minMaxRef.current.yMin, minMaxRef.current.yMax],
+            title: "",
         },
         legend: {
             orientation: 'h', // horizontal legend

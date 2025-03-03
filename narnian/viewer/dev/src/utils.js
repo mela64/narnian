@@ -64,6 +64,12 @@ function unpack_data(received_data) {
                     const new_key = key.substring(0, key.lastIndexOf("-"));
                     data[new_key] = data[key].map(list_elem => base64ToTypedArray(list_elem, tensor_type));
                     delete data[key];
+
+                // value: PNG image or list of PNG images (just updating the key)
+                } else if (key.endsWith("-png") || key.endsWith("-list_png")) {
+                    const new_key = key.substring(0, key.lastIndexOf("-"));
+                    data[new_key] = data[key];
+                    delete data[key];
                 }
             }
         }
@@ -106,10 +112,32 @@ export function callAPI(api_name, params, fcn, fcn_error, fcn_finally) {
                 fcn_error();
             }
             //alert(err_msg);
+            showError(err_msg);
         })
         .finally(() => {
             if (fcn_finally != null) {
                 fcn_finally();
             }
         });
+}
+
+function showError(message) {
+    let toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.position = 'fixed';
+    toast.style.top = '50%';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.backgroundColor = '#ff4d4d';
+    toast.style.color = 'white';
+    toast.style.padding = '12px 20px';
+    toast.style.borderRadius = '5px';
+    toast.style.boxShadow = '0 8px 12px rgba(0,0,0,0.1)';
+    toast.style.transition = 'opacity 0.3s ease-in-out';
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 5000);
 }

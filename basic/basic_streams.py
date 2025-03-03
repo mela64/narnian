@@ -1,6 +1,23 @@
 import math
 import torch
 from narnian.streams import Stream
+from narnian.attributes import Attributes
+
+
+class Random(Stream):
+
+    def __init__(self, std: float, shape: tuple[int]):
+        super().__init__()
+        self.std = std
+        self.shape = torch.Size(shape)
+        self.attributes = [Attributes((1,), None),
+                           Attributes((1,), [self.__class__.__name__.lower()])]
+        self.static_d = torch.ones(self.attributes[1].shape)
+
+    def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
+        y = self.std * torch.rand((1,) + self.shape)
+        d = self.static_d.unsqueeze(0)
+        return self.adapt_to_attributes(y, d)
 
 
 class Sin(Stream):
@@ -11,15 +28,17 @@ class Sin(Stream):
         self.phase = phase
         self.delta = delta
         self.period = 1. / self.freq
+        self.attributes = [Attributes((1,), None),
+                           Attributes((1,), [self.__class__.__name__.lower()])]
+        self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         if step == -1:
             step = self.k
         t = step * self.delta + self.phase * self.period
         y = torch.sin(torch.tensor([[2. * math.pi * self.freq * t]]))
-        d = torch.nn.functional.one_hot(torch.LongTensor([self.id]),
-                                        num_classes=len(Stream.registered_streams)).to(torch.float32)
-        return y, d
+        d = self.static_d
+        return self.adapt_to_attributes(y, d)
 
 
 class Square(Stream):
@@ -30,15 +49,17 @@ class Square(Stream):
         self.phase = phase
         self.delta = delta
         self.period = 1. / self.freq
+        self.attributes = [Attributes((1,), None),
+                           Attributes((1,), [self.__class__.__name__.lower()])]
+        self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         if step == -1:
             step = self.k
         t = step * self.delta + self.phase * self.period
         y = torch.tensor([[(-1.) ** (math.floor(2. * self.freq * t))]])
-        d = torch.nn.functional.one_hot(torch.LongTensor([self.id]),
-                                        num_classes=len(Stream.registered_streams)).to(torch.float32)
-        return y, d
+        d = self.static_d
+        return self.adapt_to_attributes(y, d)
 
 
 class CombSin(Stream):
@@ -57,12 +78,14 @@ class CombSin(Stream):
         self.phases = math.pi * (2 * torch.rand(order) - 1)
         self.coeffs = c_cap * (2 * torch.rand(order) - 1)
         self.delta = delta
+        self.attributes = [Attributes((1,), None),
+                           Attributes((1,), [self.__class__.__name__.lower()])]
+        self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         """returns the input/output pair of sequences and the boolean masks."""
         step += self.k
         t = step * self.delta
         y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases))
-        d = torch.nn.functional.one_hot(torch.LongTensor([self.id]),
-                                        num_classes=len(Stream.registered_streams)).to(torch.float32)
-        return y, d
+        d = self.static_d
+        return self.adapt_to_attributes(y, d)

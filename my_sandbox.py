@@ -28,7 +28,7 @@ env.behav.save(f"{env.name}.json")
 env.behav.save_pdf(f"{env.name}.pdf")
 
 # creating teacher agent
-ag = BasicAgent("teacher", model=BasicModel(lr=0.), authority=1.0)
+ag = BasicAgent("teacher", model=BasicModel(attributes=env.shared_attributes, lr=0.), authority=1.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
 ag.behav.add_transit("got_agents", "playlist_ready", action="set_pref_streams",
@@ -38,9 +38,11 @@ ag.behav.add_transit("playlist_ready", "student_found", action="send_engagement"
 ag.behav.add_transit("student_found", "playlist_ready", action="nop")
 ag.behav.add_transit("student_found", "student_engaged", action="got_engagement")
 ag.behav.add_transit("student_engaged", "asked_learn", action="ask_learn_gen",
-                     args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "ask_steps": 200})
+                     args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>",
+                           "ask_steps": 200})
 ag.behav.add_transit("asked_learn", "done_learn", action="done_learn_gen")
-ag.behav.add_transit("done_learn", "asked_gen", action="ask_gen", args={"du_hash": "<playlist>", "ask_steps": 50})
+ag.behav.add_transit("done_learn", "asked_gen", action="ask_gen",
+                     args={"du_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": 50})
 ag.behav.add_transit("asked_gen", "done_gen", action="done_gen")
 ag.behav.add_state_action("done_gen", action="eval", args={"stream_hash": "<playlist>", "what": "y", "steps": 50})
 ag.behav.add_transit("done_gen", "student_engaged", action="compare_eval", args={"cmp": "<", "thres": 0.5})
@@ -56,7 +58,7 @@ ag.behav.save_pdf(f"{ag.name}.pdf")
 env.add_agent(ag)
 
 # creating student agent
-ag = BasicAgent("student", model=BasicModel(lr=0.0001), authority=0.0)
+ag = BasicAgent("student", model=BasicModel(attributes=env.shared_attributes, lr=0.), authority=0.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
 ag.behav.add_transit("got_agents", "teacher_engaged", action="get_engagement", args={"min_auth": 1.0, "max_auth": 1.0})

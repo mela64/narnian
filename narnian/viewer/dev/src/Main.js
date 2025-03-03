@@ -396,13 +396,13 @@ export default function Main() {
         function timerTriggeredFcn() {
             getAndUpdatePlayPauseStatus(() =>
             {
-                // "if playing" callback
+                // "if playing" callback (if it is "paused" this will not be called, so it will stop)
                 delay = Math.min(delay * 2, maxDelay);  // increase delay
                 setTimeout(timerTriggeredFcn, delay);  // try again
             }, () =>
             {
                 // "if error" callback
-                setTimeout(timerTriggeredFcn, delay);  // try again
+                //setTimeout(timerTriggeredFcn, delay);  // try again
             });
         }
 

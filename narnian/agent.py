@@ -18,6 +18,7 @@ class Agent:
         self.known_streams = {}  # streams that are known to this agent
         self.known_agents = {}  # other agents that are known to this agent
         self.print_enabled = True  # if output should be printed to screen
+        self.env = None  # environment where the agent is currently living (it will be set when joining the environment)
         self.output_messages = [""] * 20
         self.output_messages_ids = [-1] * 20
         self.output_messages_count = 0
@@ -63,7 +64,7 @@ class Agent:
         if show_act:
             caller = str(inspect.stack()[1].function)
             i = 0
-            while str(caller).startswith("__"):
+            while str(caller).startswith("__") or str(caller).startswith("err"):
                 i += 1
                 caller = str(inspect.stack()[1 + i].function)
             args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
