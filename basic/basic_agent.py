@@ -389,9 +389,9 @@ class BasicAgent(Agent):
             stream_hash = self.preferred_streams[self.cur_preferred_stream]
 
         self.out(f"Comparing {self.received_hash} with {stream_hash} ({what})")
-        self.eval_result = self.__compare_streams(stream_a_hash=self.received_hash,
-                                                  stream_b_hash=stream_hash, what=what, steps=steps)
-        return True if self.eval_result >= 0. else False
+        self.eval_result, ret = self.__compare_streams(stream_a_hash=self.received_hash,
+                                                       stream_b_hash=stream_hash, what=what, steps=steps)
+        return ret
 
     def compare_eval(self, cmp: str, thres: float) -> bool:
         """After having completed an evaluation."""
@@ -449,14 +449,15 @@ class BasicAgent(Agent):
         elif what == "not_last":
             return self.cur_preferred_stream != len(self.preferred_streams) - 1
 
-    def set_pref_streams(self, stream_hashes: list[str]):
+    def set_pref_streams(self, stream_hashes: list[str], repeat: int = 1):
         """Fill a list with preferred streams."""
 
         self.out(f"Setting up a list of {len(stream_hashes)} preferred streams")
         self.cur_preferred_stream = 0
         self.preferred_streams = []
-        for stream_hash in stream_hashes:
-            self.preferred_streams.append(stream_hash)
+        for i in range(0, repeat):
+            for stream_hash in stream_hashes:
+                self.preferred_streams.append(stream_hash)
         return True
 
     def share_streams(self):
@@ -782,35 +783,36 @@ class BasicAgent(Agent):
 
         return True
 
-    def __compare_streams(self, stream_a_hash: str, stream_b_hash: str, what: str = "y", steps: int = 100) -> float:
+    def __compare_streams(self, stream_a_hash: str, stream_b_hash: str, what: str = "y", steps: int = 100) \
+            -> tuple[float, bool]:
         """Loop on two -buffered- data streams, for comparison purposes, returning a value in [0,1]."""
 
         if stream_a_hash not in self.known_streams:
             self.err(f"Unknown stream (stream_a_hash): {stream_a_hash}")
-            return -1.
+            return -1., False
 
         if stream_b_hash not in self.known_streams:
             self.err(f"Unknown stream (stream_b_hash): {stream_b_hash}")
-            return -1.
+            return -1., False
 
         if what not in ["y", "d"]:
             self.err(f"Only two types of information can be compared: 'y' and 'd' (unknown: {what})")
-            return -1.
+            return -1., False
 
         if steps <= 0:
             self.err(f"Invalid number of steps: {steps}")
-            return -1.
+            return -1., False
 
         stream_a = self.known_streams[stream_a_hash]
         stream_b = self.known_streams[stream_b_hash]
 
         if not isinstance(stream_a, BufferedStream):
             self.err(f"Can only compare buffered streams and {stream_a_hash} is not buffered")
-            return -1.
+            return -1., False
 
         if not isinstance(stream_b, BufferedStream):
             self.err(f"Can only compare buffered streams and {stream_b_hash} is not buffered")
-            return -1.
+            return -1., False
 
         if steps > len(stream_a) or steps > len(stream_a):
             self.err(f"Cannot compare streams for {steps} steps, since at least one of them is shorter")
@@ -831,7 +833,7 @@ class BasicAgent(Agent):
             # checking
             if a is None or b is None:
                 self.err("Cannot compare signals/descriptors if one or both of them are None")
-                return -1.
+                return -1., False
 
             # comparing
             if z == 0:
@@ -839,7 +841,7 @@ class BasicAgent(Agent):
             else:
                 o += self.model.compare_d(a, b)
 
-        return o / steps
+        return o / steps, True
 
     def __complete_do(self, do_what: str, agent: Self, returned: bool):
         """Post action to run after at the end of a do_something call, to confirm it."""
