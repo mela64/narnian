@@ -33,8 +33,6 @@ class Sin(Stream):
         self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
-        if step == -1:
-            step = self.k
         t = step * self.delta + self.phase * self.period
         y = torch.sin(torch.tensor([[2. * math.pi * self.freq * t]]))
         d = self.static_d
@@ -54,8 +52,6 @@ class Square(Stream):
         self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
-        if step == -1:
-            step = self.k
         t = step * self.delta + self.phase * self.period
         y = torch.tensor([[(-1.) ** (math.floor(2. * self.freq * t))]])
         d = self.static_d
@@ -84,9 +80,7 @@ class CombSin(Stream):
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         """returns the input/output pair of sequences and the boolean masks."""
-        if step == -1:
-            step = self.k
         t = step * self.delta
-        y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases))
+        y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases)).view(1, 1)
         d = self.static_d
         return self.adapt_to_attributes(y, d)

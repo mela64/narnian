@@ -243,8 +243,14 @@ class AntisymmetricExpGenerator(torch.nn.Module):
         u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
-        # Reset hidden state if first step
-        h = self.h_init if first else self.h.detach()
+        # # Reset hidden state if first step
+        # h = self.h_init if first else self.h.detach()
+        if first:
+            # h = self.h_init
+            with torch.no_grad():
+                h = self.B(torch.cat([du, u], dim=1)).detach()  # this is the init
+        else:
+            h = self.h.detach()
 
         # Antisymmetric matrix construction
         A = 0.5 * (self.W.weight - self.W.weight.t())
