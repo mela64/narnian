@@ -17,6 +17,7 @@ class BasicAgent(Agent):
         self.received_hash = None  # stream sent (e.g., generated) by another agent
         self.eval_result = None  # result of the last evaluation
         self.preferred_streams = []  # list of preferred streams
+        self.repeat = 1     # number of repetitions of the playlist
         self.cur_preferred_stream = 0  # id of the current preferred stream from the list
         self.last_recorded_stream_num = 0  # numerical index of to the last recorded stream, if any (1: first)
         self.last_generated_stream_num = 0  # numerical index of to the last geenerate stream, if any (1: first)
@@ -436,7 +437,7 @@ class BasicAgent(Agent):
     def check_pref_stream(self, what: str = "last") -> bool:
         """Check the current preferred stream."""
 
-        valid = ['first', 'last', 'not_first', 'not_last']
+        valid = ['first', 'last', 'not_first', 'not_last', 'last_round', 'not_last_round']
         assert what in valid, f"The what argument can only be one of {valid}"
 
         self.out(f"Checking if the current preferred playlist item is the '{what}' one")
@@ -448,6 +449,10 @@ class BasicAgent(Agent):
             return self.cur_preferred_stream != 0
         elif what == "not_last":
             return self.cur_preferred_stream != len(self.preferred_streams) - 1
+        elif what == "last_round":
+            return self.cur_preferred_stream + len(self.preferred_streams) // self.repeat >= len(self.preferred_streams)
+        elif what == "not_last_round":
+            return self.cur_preferred_stream + len(self.preferred_streams) // self.repeat < len(self.preferred_streams)
 
     def set_pref_streams(self, stream_hashes: list[str], repeat: int = 1):
         """Fill a list with preferred streams."""
@@ -455,7 +460,8 @@ class BasicAgent(Agent):
         self.out(f"Setting up a list of {len(stream_hashes)} preferred streams")
         self.cur_preferred_stream = 0
         self.preferred_streams = []
-        for i in range(0, repeat):
+        self.repeat = repeat
+        for i in range(0, self.repeat):
             for stream_hash in stream_hashes:
                 self.preferred_streams.append(stream_hash)
         return True

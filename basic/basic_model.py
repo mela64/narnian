@@ -16,7 +16,7 @@ class BasicModel(Model):
         y_dim = attributes[0].shape.numel()
 
         # creating the model (superclass)
-        super(BasicModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=100, delta=0.1),
+        super(BasicModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150, delta=0.1),
                                          BasicPredictor(y_dim=y_dim, d_dim=d_dim, h_dim=3),
                                          attributes)
 

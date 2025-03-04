@@ -63,11 +63,11 @@ class BasicGenerator(torch.nn.Module):
         return y
 
 
-class DiagReal(torch.nn.Module):
+class _DiagR(torch.nn.Module):
     """ Diagonal matrix-based generator with real-valued transformations """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu")):
-        super(DiagReal, self).__init__()
+        super(_DiagR, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -121,11 +121,11 @@ class DiagReal(torch.nn.Module):
         return y
 
 
-class DiagCompl(torch.nn.Module):
+class _DiagC(torch.nn.Module):
     """ Diagonal matrix-based generator with complex-valued transformations """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu")):
-        super(DiagCompl, self).__init__()
+        super(_DiagC, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -183,7 +183,7 @@ class DiagCompl(torch.nn.Module):
         return y
 
 
-class AntisymmetricExpGenerator(torch.nn.Module):
+class _CTE(torch.nn.Module):
     """Antisymmetric Matrix Exponential Generator implementing continuous-time dynamics.
 
     Uses antisymmetric weight matrix with matrix exponential for stable hidden state evolution.
@@ -199,7 +199,7 @@ class AntisymmetricExpGenerator(torch.nn.Module):
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
                  device: torch.device = torch.device("cpu")):
-        super(AntisymmetricExpGenerator, self).__init__()
+        super(_CTE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -228,6 +228,14 @@ class AntisymmetricExpGenerator(torch.nn.Module):
         """Placeholder for eigenvalue adjustment method"""
         pass
 
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.h_init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        # in the general case DO NOTHING
+        return u, du
+
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through the system dynamics.
 
@@ -243,15 +251,12 @@ class AntisymmetricExpGenerator(torch.nn.Module):
         u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
-        # # Reset hidden state if first step
-        # h = self.h_init if first else self.h.detach()
-        if first:
-            # h = self.h_init
-            with torch.no_grad():
-                h = self.B(torch.cat([du, u], dim=1)).detach()  # this is the init
-        else:
-            h = self.h.detach()
+        # Reset hidden state if first step
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h.detach()
+        # handle inputs
+        u, du = self.handle_inputs(u, du)
 
+        # du = torch.zeros((1, self.du_dim), device=self.device)
         # Antisymmetric matrix construction
         A = 0.5 * (self.W.weight - self.W.weight.t())
         A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
@@ -274,7 +279,34 @@ class AntisymmetricExpGenerator(torch.nn.Module):
         return y
 
 
-class BlockAntisymmetricGenerator(torch.nn.Module):
+class AntisymmetricExpGenerator(_CTE):
+    """Antisymmetric Matrix Exponential Generator implementing continuous-time dynamics.
+
+    Uses antisymmetric weight matrix with matrix exponential for stable hidden state evolution.
+
+    Args:
+        u_shape: Input shape (tuple of integers)
+        d_dim: Input descriptor dimension
+        y_dim: Output dimension
+        h_dim: Hidden state dimension
+        delta: Time step for discrete approximation
+        device: Computation device (CPU/GPU)
+    """
+
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
+                 device: torch.device = torch.device("cpu")):
+        super(AntisymmetricExpGenerator, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, device)
+
+    @torch.no_grad()
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.B(udu).detach()  # this is the init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        return torch.zeros_like(u), torch.zeros_like(du)
+
+
+class _CTB(torch.nn.Module):
     """Block Antisymmetric Generator using 2x2 parameterized rotation blocks.
 
     Implements structured antisymmetric dynamics through learnable rotational frequencies.
@@ -291,7 +323,7 @@ class BlockAntisymmetricGenerator(torch.nn.Module):
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float = None,
                  alpha: float = 0., device: torch.device = torch.device("cpu")):
-        super(BlockAntisymmetricGenerator, self).__init__()
+        super(_CTB, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -378,7 +410,7 @@ class BlockAntisymmetricGenerator(torch.nn.Module):
         return y
 
 
-class BlockAntisymmetricExpGenerator(torch.nn.Module):
+class _CTBE(torch.nn.Module):
     """Antisymmetric Generator with Exact Matrix Exponential Blocks.
 
     Implements precise rotational dynamics using trigonometric parameterization.
@@ -394,7 +426,7 @@ class BlockAntisymmetricExpGenerator(torch.nn.Module):
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
                  device: torch.device = torch.device("cpu")):
-        super(BlockAntisymmetricExpGenerator, self).__init__()
+        super(_CTBE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim

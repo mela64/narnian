@@ -84,3 +84,13 @@ class CombSin(Stream):
         y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases)).view(1, 1)
         d = self.static_d
         return self.adapt_to_attributes(y, d)
+
+
+class CombSin3(CombSin):
+    def __init__(self, f_cap: float, c_cap: float, delta: float):
+        super().__init__(f_cap, c_cap, 3, delta)
+
+
+class CombSin6(CombSin):
+    def __init__(self, f_cap: float, c_cap: float, delta: float):
+        super().__init__(f_cap, c_cap, 6, delta)
