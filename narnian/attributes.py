@@ -116,6 +116,7 @@ class Attributes:
             assert data.ndim == 2, "Only 2d tensors are expected for labeled attributes (1st dimension is batch dim)"
             assert self.data_type != "token_ids" or data.shape[1] == 1, \
                 f"Invalid shape {data[0].shape} (we discarded the 1st dimension here) for data of type token_ids"
+
             assert self.data_type == "token_ids" or data.shape[1] == len(self), (
                 f"Expected data with {len(self)} components (ignoring the 1st dimension), "
                 f"got {data[0].numel()}")
@@ -139,16 +140,19 @@ class Attributes:
 
         assert data.shape[0] == 1, f"Code designed for a batch of only 1 element, got {data.shape[0]}"
 
+        # if super-set labels exists, we look into them, otherwise we keep searching in "self.labels"
+        label_set = self.superset_labels if self.superset_labels is not None else self.labels
+
         if self.data_type == "token_ids":
-            text = self.superset_labels[data[0][0].item()]
+            text = label_set[data[0][0].item()]
         elif self.data_type == "misc":
             if self.labeling_rule == "max":
                 j = torch.argmax(data, dim=1)
-                text = self.superset_labels[j.item()]  # warning: does not work for mini-batches
+                text = label_set[j.item()]  # warning: does not work for mini-batches
             elif self.labeling_rule.startswith("geq"):
                 thres = float(self.labeling_rule[3:])
                 jj = torch.where(data >= thres)[1]  # warning: does not work for mini-batches
-                text = ", ".join(self.superset_labels[j] for j in jj.tolist())
+                text = ", ".join(label_set[j] for j in jj.tolist())
             else:
                 raise ValueError(f"Unknown data-to-text rule: {self.labeling_rule}")
         else:

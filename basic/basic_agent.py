@@ -18,6 +18,8 @@ class BasicAgent(Agent):
         self.eval_result = None  # result of the last evaluation
         self.preferred_streams = []  # list of preferred streams
         self.cur_preferred_stream = 0  # id of the current preferred stream from the list
+        self.last_recorded_stream_num = 0  # numerical index of to the last recorded stream, if any (1: first)
+        self.last_generated_stream_num = 0  # numerical index of to the last geenerate stream, if any (1: first)
         self.commands_to_send.append("stop_current_action")
         self.commands_to_send.append("kill")
         self.commands_to_receive.append("stop_current_action")
@@ -249,7 +251,7 @@ class BasicAgent(Agent):
                                       skip_gen=False, skip_pred=True,
                                       steps=steps)
 
-    def ask_learn_gen(self, yhat_hash: str, dhat_hash:str, u_hash: str | None = None, du_hash: str | None = None,
+    def ask_learn_gen(self, yhat_hash: str, dhat_hash: str, u_hash: str | None = None, du_hash: str | None = None,
                       ask_steps: int = 100):
         """Asking for learning to generate."""
 
@@ -387,8 +389,8 @@ class BasicAgent(Agent):
             stream_hash = self.preferred_streams[self.cur_preferred_stream]
 
         self.out(f"Comparing {self.received_hash} with {stream_hash} ({what})")
-        self.eval_result = self.__compare_streams(stream_a_name=self.received_hash,
-                                                  stream_b_name=stream_hash, what=what, steps=steps)
+        self.eval_result = self.__compare_streams(stream_a_hash=self.received_hash,
+                                                  stream_b_hash=stream_hash, what=what, steps=steps)
         return True if self.eval_result >= 0. else False
 
     def compare_eval(self, cmp: str, thres: float) -> bool:
@@ -437,7 +439,7 @@ class BasicAgent(Agent):
         valid = ['first', 'last', 'not_first', 'not_last']
         assert what in valid, f"The what argument can only be one of {valid}"
 
-        self.out(f"Checking if the current preferred playlist item is the {what} one")
+        self.out(f"Checking if the current preferred playlist item is the '{what}' one")
         if what == "first":
             return self.cur_preferred_stream == 0
         elif what == "last":
@@ -456,6 +458,62 @@ class BasicAgent(Agent):
         for stream_hash in stream_hashes:
             self.preferred_streams.append(stream_hash)
         return True
+
+    def share_streams(self):
+        """Share streams with the currently engaged agent."""
+
+        return self.send_streams(self.engaged_agent)
+
+    def record(self, stream_hash: str, steps: int = 100):
+        """Record a stream."""
+
+        self.out(f"Recording stream {stream_hash}")
+        if self.get_action_step() == 0:
+
+            if stream_hash not in self.known_streams:
+                self.err(f"Unknown stream (stream_hash): {stream_hash}")
+                return False
+
+            if steps <= 0:
+                "Invalid number of steps to record: " + str(steps)
+                return False
+
+            stream_src = self.known_streams[stream_hash]
+
+            # new recorded stream
+            self.last_recorded_stream_num += 1
+
+            # creating the new recorded stream
+            stream_dest = BufferedStream()
+            stream_dest.set_name("recorded" + str(self.last_recorded_stream_num))
+            stream_dest.set_creator(f"{self.name}")
+            stream_dest.set_meta("Recorded stream: " + stream_hash)
+            stream_dest.attributes[0] = stream_src.attributes[0]
+            stream_dest.attributes[1] = stream_src.attributes[1]
+            self.known_streams[stream_dest.get_hash()] = stream_dest
+        else:
+
+            # retrieving the stream(s)
+            stream_dest = self.known_streams[Stream.build_hash("recorded" + str(self.last_recorded_stream_num),
+                                                               self.name)]
+            stream_src = self.known_streams[stream_hash]
+
+        # recording
+        y, d = stream_src[stream_src.k]
+        stream_dest.append_data(y, d)
+
+        return True
+
+    def __done(self, streams: dict):
+        """Confirming generation, prediction, learning."""
+
+        assert len(streams) == 1, f"Only one stream is expected (got {len(streams)})"
+
+        # checking confirmation and saving streams
+        for stream_hash, stream in streams.items():
+            self.known_streams[stream_hash] = stream
+            self.received_hash = stream_hash
+            return True
 
     def __ask(self, for_what: str, agent: Self,
               u_hash: str | None, du_hash: str | None,
@@ -610,9 +668,38 @@ class BasicAgent(Agent):
             yhat_stream = self.known_streams[yhat_hash] if yhat_hash is not None else None
             dhat_stream = self.known_streams[dhat_hash] if dhat_hash is not None else None
 
+            # getting right offsets for buffered streams
+            offset_u = 0
+            offset_du = 0
+            offset_yhat = 0
+            offset_dhat = 0
+            if u_stream is not None and isinstance(u_stream, BufferedStream):
+                if steps > len(u_stream):
+                    self.err(f"Cannot process stream {u_stream} for {steps} steps, since it is is shorter")
+                offset_u = u_stream.get_first_step_offset_given_current_step()
+                self.buffered_streams_offsets[u_stream.get_hash()] = offset_u
+            if du_stream is not None and isinstance(du_stream, BufferedStream):
+                if steps > len(du_stream):
+                    self.err(f"Cannot process stream {du_stream} for {steps} steps, since it is is shorter")
+                offset_du = du_stream.get_first_step_offset_given_current_step()
+                self.buffered_streams_offsets[du_stream.get_hash()] = offset_du
+            if yhat_stream is not None and isinstance(yhat_stream, BufferedStream):
+                if steps > len(yhat_stream):
+                    self.err(f"Cannot process stream {yhat_stream} for {steps} steps, since it is is shorter")
+                offset_yhat = yhat_stream.get_first_step_offset_given_current_step()
+                self.buffered_streams_offsets[yhat_stream.get_hash()] = offset_yhat
+            if dhat_stream is not None and isinstance(dhat_stream, BufferedStream):
+                if steps > len(dhat_stream):
+                    self.err(f"Cannot process stream {dhat_stream} for {steps} steps, since it is is shorter")
+                offset_dhat = dhat_stream.get_first_step_offset_given_current_step()
+                self.buffered_streams_offsets[dhat_stream.get_hash()] = offset_dhat
+
+            # increasing the number of the last generated stream ("generated1", "generated2", ...)
+            self.last_generated_stream_num += 1
+
             # creating new buffered streams to store the data received as inputs (for visualization purposes only)
             vis_udu_stream = BufferedStream()
-            vis_udu_stream.set_name("vis-udu")
+            vis_udu_stream.set_name("vis-udu" + str(self.last_generated_stream_num))
             vis_udu_stream.set_creator(f"{self.name}")
             vis_udu_stream.set_meta("Visualization purposes only: the y-part is the u-input used in a generation "
                                     "procedure, while the d-part is the descriptor used as input")
@@ -622,7 +709,7 @@ class BasicAgent(Agent):
                 if du_stream is not None else vis_udu_stream.attributes[1]
 
             vis_yhatdhat_stream = BufferedStream()
-            vis_yhatdhat_stream.set_name("vis-yhatdhat")
+            vis_yhatdhat_stream.set_name("vis-yhatdhat" + str(self.last_generated_stream_num))
             vis_yhatdhat_stream.set_creator(f"{self.name}")
             vis_yhatdhat_stream.set_meta("Visualization purposes only: the yhat and dhat data used in a "
                                          "generation procedure")
@@ -633,7 +720,7 @@ class BasicAgent(Agent):
 
             # creating a new buffered stream to store the data that will be generated
             yd_stream = BufferedStream()
-            yd_stream.set_name("generated")
+            yd_stream.set_name("generated" + str(self.last_generated_stream_num))
             yd_stream.set_creator(f"{self.name}")
             yd_stream.set_meta("Stream generated by the agent")
             yd_stream.attributes = self.model.attributes  # getting attributes from the model
@@ -649,15 +736,32 @@ class BasicAgent(Agent):
             du_stream = self.known_streams[du_hash] if du_hash is not None else None
             yhat_stream = self.known_streams[yhat_hash] if yhat_hash is not None else None
             dhat_stream = self.known_streams[dhat_hash] if dhat_hash is not None else None
-            vis_udu_stream = self.known_streams[Stream.build_hash("vis-udu", self.name)]
-            vis_yhatdhat_stream = self.known_streams[Stream.build_hash("vis-yhatdhat", self.name)]
-            yd_stream = self.known_streams[Stream.build_hash("generated", self.name)]
+            vis_udu_stream = (
+                self.known_streams)[Stream.build_hash("vis-udu" + str(self.last_generated_stream_num), self.name)]
+            vis_yhatdhat_stream = (
+                self.known_streams)[Stream.build_hash("vis-yhatdhat" + str(self.last_generated_stream_num), self.name)]
+            yd_stream = (
+                self.known_streams)[Stream.build_hash("generated" + str(self.last_generated_stream_num), self.name)]
+
+            # getting right offsets for buffered streams
+            offset_u = 0
+            offset_du = 0
+            offset_yhat = 0
+            offset_dhat = 0
+            if u_stream is not None and isinstance(u_stream, BufferedStream):
+                offset_u = self.buffered_streams_offsets[u_stream.get_hash()]
+            if du_stream is not None and isinstance(du_stream, BufferedStream):
+                offset_du = self.buffered_streams_offsets[du_stream.get_hash()]
+            if yhat_stream is not None and isinstance(yhat_stream, BufferedStream):
+                offset_yhat = self.buffered_streams_offsets[yhat_stream.get_hash()]
+            if dhat_stream is not None and isinstance(dhat_stream, BufferedStream):
+                offset_dhat = self.buffered_streams_offsets[dhat_stream.get_hash()]
 
         # streams at current time
-        u = u_stream[u_stream.k][0] if u_stream is not None else None
-        du = du_stream[du_stream.k][1] if du_stream is not None else None
-        yhat = yhat_stream[yhat_stream.k][0] if yhat_stream is not None else None
-        dhat = dhat_stream[dhat_stream.k][1] if dhat_stream is not None else None
+        u = u_stream[u_stream.k + offset_u][0] if u_stream is not None else None
+        du = du_stream[du_stream.k + offset_du][1] if du_stream is not None else None
+        yhat = yhat_stream[yhat_stream.k + offset_yhat][0] if yhat_stream is not None else None
+        dhat = dhat_stream[dhat_stream.k + offset_dhat][1] if dhat_stream is not None else None
 
         # generate output
         y, d = self.model(u=u, du=du,
@@ -672,37 +776,21 @@ class BasicAgent(Agent):
         yd_stream.append_data(y.detach(),
                               d.detach())
 
-        # increasing step index of buffered streams (step index starts at -1)
-        vis_udu_stream.next_step()
-        vis_yhatdhat_stream.next_step()
-        yd_stream.next_step()
-
         # learn
         if (not skip_gen and yhat_stream is not None) or (not skip_pred and dhat_stream is not None):
             self.model.learn(y=y, yhat=yhat, d=d, dhat=dhat)
 
         return True
 
-    def __done(self, streams: dict):
-        """Confirming generation, prediction, learning."""
+    def __compare_streams(self, stream_a_hash: str, stream_b_hash: str, what: str = "y", steps: int = 100) -> float:
+        """Loop on two -buffered- data streams, for comparison purposes, returning a value in [0,1]."""
 
-        assert len(streams) == 1, f"Only one stream is expected (got {len(streams)})"
-
-        # checking confirmation and saving streams
-        for stream_hash, stream in streams.items():
-            self.known_streams[stream_hash] = stream
-            self.received_hash = stream_hash
-            return True
-
-    def __compare_streams(self, stream_a_name: str, stream_b_name: str, what: str = "y", steps: int = 100) -> float:
-        """Loop on two data stream, for comparison purposes, returning a value in [0,1]."""
-
-        if stream_a_name not in self.known_streams:
-            self.err(f"Unknown stream (stream_a_name): {stream_a_name}")
+        if stream_a_hash not in self.known_streams:
+            self.err(f"Unknown stream (stream_a_hash): {stream_a_hash}")
             return -1.
 
-        if stream_b_name not in self.known_streams:
-            self.err(f"Unknown stream (stream_b_name): {stream_b_name}")
+        if stream_b_hash not in self.known_streams:
+            self.err(f"Unknown stream (stream_b_hash): {stream_b_hash}")
             return -1.
 
         if what not in ["y", "d"]:
@@ -713,8 +801,22 @@ class BasicAgent(Agent):
             self.err(f"Invalid number of steps: {steps}")
             return -1.
 
-        stream_a = self.known_streams[stream_a_name]
-        stream_b = self.known_streams[stream_b_name]
+        stream_a = self.known_streams[stream_a_hash]
+        stream_b = self.known_streams[stream_b_hash]
+
+        if not isinstance(stream_a, BufferedStream):
+            self.err(f"Can only compare buffered streams and {stream_a_hash} is not buffered")
+            return -1.
+
+        if not isinstance(stream_b, BufferedStream):
+            self.err(f"Can only compare buffered streams and {stream_b_hash} is not buffered")
+            return -1.
+
+        if steps > len(stream_a) or steps > len(stream_a):
+            self.err(f"Cannot compare streams for {steps} steps, since at least one of them is shorter")
+
+        a_first_k = stream_a.get_first_step()
+        b_first_k = stream_b.get_first_step()
 
         z = 0 if what == "y" else 1
 
@@ -723,8 +825,8 @@ class BasicAgent(Agent):
         for k in range(0, steps):
 
             # signals or descriptors
-            a = stream_a[k][z]
-            b = stream_b[k][z]
+            a = stream_a[a_first_k + k][z]
+            b = stream_b[b_first_k + k][z]
 
             # checking
             if a is None or b is None:
@@ -747,7 +849,7 @@ class BasicAgent(Agent):
         if returned is True:
 
             # getting generated stream
-            stream_hash = Stream.build_hash("generated", self.name)
+            stream_hash = Stream.build_hash("generated" + str(self.last_generated_stream_num), self.name)
 
             if stream_hash not in self.known_streams:
                 self.err(f"Unknown stream: {stream_hash}")

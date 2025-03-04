@@ -1,10 +1,8 @@
-import torch
 import inspect
 import threading
 from .agent import Agent
 from .fsm import FiniteStateMachine
 from .streams import Stream, Attributes
-import torchvision.transforms as transforms
 
 
 class Environment:
@@ -139,9 +137,8 @@ class Environment:
                 self.step_event.wait()
                 self.wait_event.clear()
 
-            # increase the step index (keep it here, after "wait", even if it sounds odd)
-            for _, stream in self.streams.items():
-                stream.next_step()
+            # increase the step index of all existing streams (keep it here, after "wait", even if it sounds odd)
+            Stream.next_step()
 
             self.out(f">>> Running step {self.step} <<<", show_state=False, show_act=False)
 

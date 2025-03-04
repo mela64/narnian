@@ -13,12 +13,12 @@ from .attributes import Attributes
 class Stream(torch.utils.data.Dataset):
     registered_streams = {}
     __registration_id = 0
+    k = -1
 
     def __init__(self):
         self.name = "unk"
         self.id = -1
         self.enabled = True
-        self.k = -1
         self.ctime = datetime.datetime.now()
         self.meta = "none"
         self.creator = "unk"
@@ -31,6 +31,10 @@ class Stream(torch.utils.data.Dataset):
     def disable(self):
         self.enabled = False
 
+    @staticmethod
+    def reset_step_index():
+        Stream.k = -1
+
     def set_name(self, name: str):
         assert name.find('_') == -1, "Underscores are not allowed in name string"
         self.name = name
@@ -40,12 +44,14 @@ class Stream(torch.utils.data.Dataset):
         assert meta.find('_') == -1, "Underscores are not allowed in meta string"
         self.meta = meta
 
-    def set_step(self, k: int):
+    @staticmethod
+    def set_step(k: int):
         assert k >= 0, f"Invalid step {k} (it must be >= 0)"
-        self.k = k
+        Stream.k = k
 
-    def next_step(self):
-        self.k += 1
+    @staticmethod
+    def next_step():
+        Stream.k += 1
 
     def set_creator(self, creator: str):
         self.creator = creator
@@ -55,24 +61,24 @@ class Stream(torch.utils.data.Dataset):
 
     def get_description_string(self):
         return (f"name=[{self.name}]_creator=[{self.creator}]"
-                f"_step=[{self.k}]_ctime=[{str(self.ctime)}]_meta=[{self.meta}]")
+                f"_step=[{Stream.k}]_ctime=[{str(self.ctime)}]_meta=[{self.meta}]")
 
     def __getitem__(self, step: int) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         raise NotImplementedError("Subclasses must implement __getitem__")
 
-    def get_since(self, step: int, data_id: int = 0) -> (
+    def get_since(self, since_what_step: int, data_id: int = 0) -> (
             tuple)[list[int] | None, list[torch.Tensor | None] | None, int, Attributes | None]:
         assert data_id >= 0, f"Invalid get_since request with data_id = {data_id}"
 
-        if self.k < 0 or not self.enabled:
+        if Stream.k < 0 or not self.enabled:
             return None, None, -1, None
 
-        step = max(step, 0)
-        steps = self.k - step + 1
+        step = max(since_what_step, 0)
+        num_steps = Stream.k - step + 1
         ret_ks = []
         ret_data = []
-        for k in range(0, steps):
-            _k = self.k - steps + 1 + k
+        for k in range(0, num_steps):
+            _k = since_what_step + k
             data = self[_k]
 
             if data[data_id] is not None:
@@ -153,7 +159,8 @@ class BufferedStream(Stream):
         self.last_added_step = -1
         self.last_added_pos = -1
         self.use_static_descriptor = use_static_descriptor
-        self.k = -1  # since it is empty
+        self.first_k = Stream.k  # birthday
+        self.last_k = self.first_k - 1  # last added step
 
         if self.max_len is None:
             self.data_y = []
@@ -163,7 +170,16 @@ class BufferedStream(Stream):
             self.data_y = [torch.empty(1)] * self.max_len
             self.data_d = [torch.empty(1)] * self.max_len
 
+    def get_first_step_offset_given_current_step(self):
+        """Additive offset to go from the current step index (Stream.k) to the first step"""
+        return self.first_k - Stream.k
+
+    def get_first_step(self):
+        return self.first_k
+
     def append_data(self, y: torch.Tensor, d: torch.Tensor | None):
+        assert Stream.k == (self.last_k + 1), \
+            "BufferedStream can only store data over a single contiguous time interval"
 
         # switching from probabilities to token indices
         if self.attributes[0].data_type == "token_ids" and y.shape[1] > 1:
@@ -182,31 +198,20 @@ class BufferedStream(Stream):
             if not self.use_static_descriptor or self.last_added_step == 0:
                 self.data_d[self.last_added_pos] = d
 
-    def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
-        if step == -1:
-            step = self.k if self.k >= 0 else self.last_added_step
-        if self.max_len is None:
-            if step <= len(self.data_y):
-                return self.adapt_to_attributes(self.data_y[step],
-                                                self.data_d[step]
-                                                if not self.use_static_descriptor else self.data_d[0])
-            else:
-                raise ValueError(f"Unavailable step for buffered stream: {step} "
-                                 f"(last added step: {self.last_added_step}, max length: {self.max_len})")
-        else:
-            if step > self.last_added_step or (self.last_added_step - step) >= self.max_len:
-                raise ValueError(f"Unavailable step for buffered stream: {step} "
-                                 f"(last added step: {self.last_added_step}, max length: {self.max_len})")
-            else:
-                gap = self.last_added_step - step
-                step = (self.last_added_pos - gap) % self.max_len
+        self.last_k += 1
 
-                return self.adapt_to_attributes(self.data_y[step],
-                                                self.data_d[step]
-                                                 if not self.use_static_descriptor else self.data_d[0])
+    def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
+
+        # if out of the buffered interval...
+        if step > self.last_k or step < self.first_k:
+            return None, None
+
+        # otherwise, let's fix indices
+        j = step - self.first_k
+        return self.data_y[j], self.data_d[j] if not self.use_static_descriptor else self.data_d[0]
 
     def __len__(self):
-        return len(self.data_y) if self.max_len is None else min(self.last_added_step + 1, self.max_len)
+        return self.last_k - self.first_k + 1
 
 
 class Empty(Stream):

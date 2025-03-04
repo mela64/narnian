@@ -19,6 +19,7 @@ class Agent:
         self.known_agents = {}  # other agents that are known to this agent
         self.print_enabled = True  # if output should be printed to screen
         self.env = None  # environment where the agent is currently living (it will be set when joining the environment)
+        self.buffered_streams_offsets = {}  # from buffered-stream hash to offset to apply
         self.output_messages = [""] * 20
         self.output_messages_ids = [-1] * 20
         self.output_messages_count = 0
@@ -196,7 +197,7 @@ class Agent:
 
         self.out(f"Getting {len(streams)} streams from {agent.name if agent is not None else 'the environment'}")
 
-        if agent is not None and agent not in self.known_agents:
+        if agent is not None and agent.name not in self.known_agents:
             self.out(f"Unknown agent: {agent.name}")
             return False
 

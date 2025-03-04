@@ -84,7 +84,8 @@ class CombSin(Stream):
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         """returns the input/output pair of sequences and the boolean masks."""
-        step += self.k
+        if step == -1:
+            step = self.k
         t = step * self.delta
         y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases))
         d = self.static_d
