@@ -9,15 +9,10 @@ from basic.basic_environment import BasicEnvironment
 # creating environment
 env = BasicEnvironment("sandbox")
 
-# registering streams
-Stream.register(name="sin", stream_class=Sin, stream_class_args={"freq": 0.159, "phase": 0.5, "delta": 0.1})
-Stream.register(name="square", stream_class=Square, stream_class_args={"freq": 0.159, "phase": 0.5, "delta": 0.1})
-Stream.register(name="random", stream_class=Random, stream_class_args={"std": 1.0, "shape": (1,)})
-
 # adding streams to the environment
-env.add_stream(Stream.create(name="sin", creator="envir"))
-env.add_stream(Stream.create(name="square", creator="envir"))
-env.add_stream(Stream.create(name="random", creator="envir"))
+env.add_stream(Stream.create(name="sin", creator="envir", stream=Sin(freq=0.159, phase=0.5, delta=0.1)))
+env.add_stream(Stream.create(name="square", creator="envir", stream=Square(freq=0.159, phase=0.5, delta=0.1)))
+env.add_stream(Stream.create(name="random", creator="envir", stream=Random(std=1.0, shape=(1,))))
 
 # modeling behaviour of the environment
 env.behav.add_transit("init", "streams_enabled", action="enable_all_streams")

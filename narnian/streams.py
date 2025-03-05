@@ -6,13 +6,11 @@ import torch
 import datetime
 import torchvision
 from PIL import Image
-from typing import Type
+from typing_extensions import Self
 from .attributes import Attributes
 
 
 class Stream(torch.utils.data.Dataset):
-    registered_streams = {}
-    __registration_id = 0
     k = -1
 
     def __init__(self):
@@ -109,28 +107,9 @@ class Stream(torch.utils.data.Dataset):
         return f"{creator}:{name}"
 
     @staticmethod
-    def register(name: str, stream_class: Type["Stream"], stream_class_args: dict):
-        if name in Stream.registered_streams:
-            raise ValueError("Stream name " + name + " already registered")
-
-        Stream.registered_streams[name] = {
-            "id": Stream.__registration_id,
-            "class": stream_class,
-            "class_name": stream_class.__name__,
-            "args": stream_class_args,
-        }
-        Stream.__registration_id += 1
-
-    @staticmethod
-    def create(name: str | None, creator: str | None = None):
-        try:
-            stream = (Stream.registered_streams[name]["class"](**Stream.registered_streams[name]["args"]))
-        except KeyError as _:
-            raise ValueError("Unknown stream or stream processing error: " + name) from None
+    def create(name: str, creator: str, stream: Self = None):
         stream.name = name
-        stream.id = Stream.registered_streams[name]["id"]
-        if creator is not None:
-            stream.creator = creator
+        stream.creator = creator
         return stream
 
 
