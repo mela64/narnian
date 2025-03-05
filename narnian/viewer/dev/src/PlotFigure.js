@@ -249,6 +249,10 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                             TEXTs.current.push(...newTEXTsStorage); // add newly received PNGs
                         }
 
+                        console.log(JSON.stringify(XYs))
+                        console.log(JSON.stringify(PNGs))
+
+
                         // now we update the state
                         setAllPlotData((prev) => {
                             return {

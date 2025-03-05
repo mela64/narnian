@@ -785,7 +785,8 @@ class BasicAgent(Agent):
 
         # learn
         if (not skip_gen and yhat_stream is not None) or (not skip_pred and dhat_stream is not None):
-            self.model.learn(y=y, yhat=yhat, d=d, dhat=dhat)
+            self.model.learn(y=y, yhat=yhat if not skip_pred else None,
+                             d=d, dhat=dhat if not skip_gen else None)
 
         return True
 
