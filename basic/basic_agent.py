@@ -705,25 +705,15 @@ class BasicAgent(Agent):
             self.last_generated_stream_num += 1
 
             # creating new buffered streams to store the data received as inputs (for visualization purposes only)
-            vis_udu_stream = BufferedStream()
-            vis_udu_stream.set_name("vis-udu" + str(self.last_generated_stream_num))
-            vis_udu_stream.set_creator(f"{self.name}")
-            vis_udu_stream.set_meta("Visualization purposes only: the y-part is the u-input used in a generation "
-                                    "procedure, while the d-part is the descriptor used as input")
-            vis_udu_stream.attributes[0] = u_stream.attributes[0] \
-                if u_stream is not None else vis_udu_stream.attributes[0]
-            vis_udu_stream.attributes[1] = du_stream.attributes[1] \
-                if du_stream is not None else vis_udu_stream.attributes[1]
-
-            vis_yhatdhat_stream = BufferedStream()
-            vis_yhatdhat_stream.set_name("vis-yhatdhat" + str(self.last_generated_stream_num))
-            vis_yhatdhat_stream.set_creator(f"{self.name}")
-            vis_yhatdhat_stream.set_meta("Visualization purposes only: the yhat and dhat data used in a "
-                                         "generation procedure")
-            vis_yhatdhat_stream.attributes[0] = yhat_stream.attributes[0] \
-                if yhat_stream is not None else vis_yhatdhat_stream.attributes[0]
-            vis_yhatdhat_stream.attributes[1] = dhat_stream.attributes[1] \
-                if dhat_stream is not None else vis_yhatdhat_stream.attributes[1]
+            yhatdhat_stream = BufferedStream()
+            yhatdhat_stream.set_name("target" + str(self.last_generated_stream_num))
+            yhatdhat_stream.set_creator(f"{self.name}")
+            yhatdhat_stream.set_meta("Visualization purposes only: the yhat and dhat data used in a "
+                                     "generation procedure")
+            yhatdhat_stream.attributes[0] = yhat_stream.attributes[0] \
+                if yhat_stream is not None else yhatdhat_stream.attributes[0]
+            yhatdhat_stream.attributes[1] = dhat_stream.attributes[1] \
+                if dhat_stream is not None else yhatdhat_stream.attributes[1]
 
             # creating a new buffered stream to store the data that will be generated
             yd_stream = BufferedStream()
@@ -733,8 +723,7 @@ class BasicAgent(Agent):
             yd_stream.attributes = self.model.attributes  # getting attributes from the model
 
             # storing a reference to the just generated streams
-            self.known_streams[vis_udu_stream.get_hash()] = vis_udu_stream
-            self.known_streams[vis_yhatdhat_stream.get_hash()] = vis_yhatdhat_stream
+            self.known_streams[yhatdhat_stream.get_hash()] = yhatdhat_stream
             self.known_streams[yd_stream.get_hash()] = yd_stream
         else:
 
@@ -743,10 +732,8 @@ class BasicAgent(Agent):
             du_stream = self.known_streams[du_hash] if du_hash is not None else None
             yhat_stream = self.known_streams[yhat_hash] if yhat_hash is not None else None
             dhat_stream = self.known_streams[dhat_hash] if dhat_hash is not None else None
-            vis_udu_stream = (
-                self.known_streams)[Stream.build_hash("vis-udu" + str(self.last_generated_stream_num), self.name)]
-            vis_yhatdhat_stream = (
-                self.known_streams)[Stream.build_hash("vis-yhatdhat" + str(self.last_generated_stream_num), self.name)]
+            yhatdhat_stream = (
+                self.known_streams)[Stream.build_hash("target" + str(self.last_generated_stream_num), self.name)]
             yd_stream = (
                 self.known_streams)[Stream.build_hash("generated" + str(self.last_generated_stream_num), self.name)]
 
@@ -776,10 +763,8 @@ class BasicAgent(Agent):
                           first=(k == 0))
 
         # buffer data to the streams
-        vis_udu_stream.append_data(u.detach() if u is not None else None,
-                                   du.detach() if du is not None else None)
-        vis_yhatdhat_stream.append_data(yhat.detach() if yhat is not None else None,
-                                        dhat.detach() if dhat is not None else None)
+        yhatdhat_stream.append_data(yhat.detach() if yhat is not None and not skip_gen else None,
+                                    dhat.detach() if dhat is not None and not skip_pred else None)
         yd_stream.append_data(y.detach(),
                               d.detach())
 
