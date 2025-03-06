@@ -146,9 +146,9 @@ class Environment:
             for agent in sorted_agents:
                 agent.behav.act_states()
 
-            self.behav.act_transitions()
+            state_changed = self.behav.act_transitions()
             for agent in sorted_agents:
-                agent.behav.act_transitions()
+                state_changed = agent.behav.act_transitions() or state_changed
 
             self.step += 1
             if self.steps is not None and self.step == self.steps:
@@ -156,8 +156,13 @@ class Environment:
 
             # in step mode, we clear the external event to be able to wait for a new one
             if self.using_server:
-                if self.skip_clear_for <= 0:
+                if self.skip_clear_for == 0:
                     self.step_event.clear()
+                elif self.skip_clear_for == -2:  # infinite play
+                    pass
+                elif self.skip_clear_for == -1:  # play until next state
+                    if state_changed:
+                        self.step_event.clear()
                 else:
                     self.skip_clear_for -= 1
 

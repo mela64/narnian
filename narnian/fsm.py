@@ -276,7 +276,7 @@ class FiniteStateMachine:
                     if ret:
                         self.action_step += 1
                         if self.action_step < actual_params['steps']:
-                            return  # early stop without clearing the action or changing state, prev_state, etc...
+                            return False  # early stop without clearing the action or changing state, prev_state, etc...
                 else:
                     ret = action(**actual_params)  # instantaneous action
             else:
@@ -310,6 +310,7 @@ class FiniteStateMachine:
 
                 if len(actions_list) == 0:
                     self.__act_transitions_status = None
+                return False
             else:
 
                 # transition
@@ -317,7 +318,7 @@ class FiniteStateMachine:
                 self.state = to_state_list[idx]
                 self.limbo_state = None
                 self.__act_transitions_status = None
-                return
+                return True
 
     def clear_param_buffer(self):
         self.param_buffer = {}

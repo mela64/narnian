@@ -180,7 +180,10 @@ class Server:
 
     def ask_to_play(self):
         steps = int(request.args.get('steps'))
-        self.env.skip_clear_for = steps - 1
+        if steps >= 0:
+            self.env.skip_clear_for = steps - 1
+        else:
+            self.env.skip_clear_for = steps
         self.env.step_event.set()
         return Server.pack_data(self.env.step)
 

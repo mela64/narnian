@@ -62,8 +62,8 @@ export default function Main() {
     // flag that tells if the environment is in pause mode
     const [isPaused, setIsPaused] = useState(false);
 
-    // the value of the selected play option: 1, 10, 100, 1k, 10k, 100k ...
-    const [selectedPlayOption, setSelectedPlayOption] = useState("1");
+    // the value of the selected play option: \u221E (inf), 1S, 1, 100, 1k, 100k
+    const [selectedPlayOption, setSelectedPlayOption] = useState("1S");
 
     // references to "streamButtons" above and "openStreamPanels" above, used in click (and similar) callbacks
     const streamButtonsRef = useRef(streamButtons);
@@ -233,7 +233,7 @@ export default function Main() {
                     btn.id !== _streamButtonIdOfDropped_ // discarding original dragged button
             );
 
-            // adding the new meged button to the already-filtered set of buttons
+            // adding the new merged button to the already-filtered set of buttons
             return {
                 ...prevStreamButtons,
                 [agentButtonId]: [...curStreamButtons, newStreamButton], // Add the merged button to the specific panel
@@ -299,24 +299,25 @@ export default function Main() {
         }));
     }, []);
 
-    function isGenerated(label) {
-        const match = label.match(/generated(\d+)/);
-        if (match) {
-            return parseInt(match[1], 10);
-        }
-        return null;
-    }
-
-    function isTarget(label) {
-        const match = label.match(/target(\d+)/);
-        if (match) {
-            return parseInt(match[1], 10);
-        }
-        return null;
-    }
-
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
     function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _streamButtons_) {
+
+        function isGenerated(label) {
+            const match = label.match(/generated(\d+)/);
+            if (match) {
+                return parseInt(match[1], 10);
+            }
+            return null;
+        }
+
+        function isTarget(label) {
+            const match = label.match(/target(\d+)/);
+            if (match) {
+                return parseInt(match[1], 10);
+            }
+            return null;
+        }
+
         callAPI('/get_list_of_streams', "agent_name=" + _agentName_,
             (x) => {
 
@@ -356,11 +357,6 @@ export default function Main() {
                 // merging buttons that are about generated data and target data (e.g., "generated1" and "target1")
                 const alteredNewStreamButtons = [];
                 for (let z = 0; z < newStreamButtons.length; z++) {
-                    let generatedNum = -1;
-                    let targetNum = -1;
-                    let generatedZ = -1;
-                    let targetZ = -1;
-                    let suffix = "";
                     let isPaired = false;
 
                     // let's skip buttons that were filtered out (see the end of this loop)
@@ -369,16 +365,14 @@ export default function Main() {
                     }
 
                     // check stream name: is it a generated/target stream?
-                    generatedNum = isGenerated(newStreamButtons[z].mergedLabels[0]);
-                    if (!generatedNum) {
-                        targetNum = isTarget(newStreamButtons[z].mergedLabels[0]);
-                    }
+                    const generatedNum = isGenerated(newStreamButtons[z].mergedLabels[0]);
+                    const targetNum = isTarget(newStreamButtons[z].mergedLabels[0]);
 
                     // if the name of the stream is "generatedX" or "targetX", we check if we find the paired stream
                     if (generatedNum || targetNum) {
 
                         // altering case: we need to merge "generatedX" and "targetX", let's search for the other guy
-                        suffix = newStreamButtons[z].mergedLabels[0].slice(-3) // get "[y]" or "[d]"
+                        const suffix = newStreamButtons[z].mergedLabels[0].slice(-3) // get "[y]" or "[d]"
                         for (let zz = z + 1; zz < newStreamButtons.length; zz++) {
 
                             // let's skip buttons that were filtered out (see the end of this loop)
@@ -393,18 +387,21 @@ export default function Main() {
 
                             // looking for the other stream of the pair
                             if (generatedNum && generatedNum >= 0) {
-                                generatedZ = z;
-                                targetZ = zz;
-                                targetNum = isTarget(newStreamButtons[zz].mergedLabels[0]);
+
+                                // given "generatedX", we want a target that ends with the same "X", and vice-versa
+                                if (generatedNum !== isTarget(newStreamButtons[zz].mergedLabels[0])) {
+                                    continue;
+                                }
                             } else {
-                                generatedZ = zz;
-                                targetZ = z;
-                                generatedNum = isGenerated(newStreamButtons[zz].mergedLabels[0]);
+
+                                // given "generatedX", we want a target that ends with the same "X", and vice-versa
+                                if (targetNum !== isGenerated(newStreamButtons[zz].mergedLabels[0])) {
+                                    continue;
+                                }
                             }
 
-                            // given "generatedX", we want a target that ends with the same "X", and vice-versa
-                            if (!targetNum || !generatedNum || targetNum !== generatedNum)
-                                continue;
+                            const generatedZ = (generatedNum && generatedNum >= 0) ? z : zz;
+                            const targetZ = (generatedNum && generatedNum >= 0) ? zz : z;
 
                             // if a pair "generatedX" and "targetX" was found... merge!
                             const mergedIds =
@@ -525,7 +522,7 @@ export default function Main() {
             // getting play options (number of steps to run)
             const steps = selectedPlayOption.endsWith("k") ?
                 parseInt(selectedPlayOption.replace('k', '')) * 1000 :
-                parseInt(selectedPlayOption)
+                selectedPlayOption === "1S" ? -1 : selectedPlayOption === "\u221E" ? -2 : parseInt(selectedPlayOption)
 
             // asking to play
             out("[Main] *** fetching data (ask-to-play for " + steps + " steps) ***");
@@ -633,7 +630,7 @@ export default function Main() {
 
                     <div className="flex gap-2 items-center"
                          style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
-                        {["1", "10", "100", "1k", "10k", "100k"].map((option) => (
+                        {["\u221E", "1S", "1", "100", "1k", "100k"].map((option) => (
                             <button key={option} onClick={() => setSelectedPlayOption(option)}
                                 className={selectedPlayOption === option ? "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
                                     "px-2 py-0 rounded-2xl" : "h-6 text-sm bg-gray-100 hover:bg-gray-200 px-2 py-0 " +
@@ -731,7 +728,9 @@ export default function Main() {
                                             ))}
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                                        <div className={`grid gap-4 mt-6 
+                                        ${openStreamPanels[agent_button.id]?.length <= 2 ? 
+                                            "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
                                             {openStreamPanels[agent_button.id]?.map((id) => {
                                                 const streamButton = streamButtons[agent_button.id]?.find(
                                                     (btn) => btn.id === id
@@ -740,7 +739,10 @@ export default function Main() {
                                                     <div key={id}
                                                         className="min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
                                                             rounded-xl shadow text-center">
-                                                        <h3 className="font-medium">{streamButton?.label}</h3>
+                                                        <h3 className="font-medium flex items-center justify-center">
+                                                            <span className="w-5 h-5">{streamButton?.icon}</span>
+                                                            <span className="ml-1">{streamButton?.label}</span>
+                                                        </h3>
                                                         <PlotFigure _agentName_={agent_button.label}
                                                                     _streamStruct_={streamButton}
                                                                     _isPaused_={isPaused}
