@@ -4,11 +4,23 @@ import {callAPI, out} from "./utils";
 
 const maxTotalPlots = 8; // customizable (total number of plots in the same figure)
 const maxVecComponentsPerSignal = 6; // customizable (max number of components from a vectorial signal)
+const id2Color = { // plot colors
+    0: "#1F77B4", // light blue
+    1: "#FF7F0E", // orange
+    2: "#2CA02C", // green
+    3: "#D62728", // red
+    4: "#9467BD", // purple
+    5: "#8C564B", // brown
+    6: "#E377C2", // pink
+    7: "#7F7F7F", // gray
+    8: "#BCBD22", // olive
+    9: "#17BECF" // cyan
+}
 
-export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _setBusy_ }) {
+export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _setBusy_ }) {
     out("[PlotFigure] " +
         "_agentName_: " + _agentName_ + ", " +
-        "_streamName_: " + _streamName_ + ", " +
+        "_streamStruct_: " + JSON.stringify(_streamStruct_) + ", " +
         "_isPaused_: " + _isPaused_);
 
     // basic structure of the data that will be plotted: it is an array where each element is the data of a single plot
@@ -20,6 +32,7 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
             y: [],
             type: "scatter",
             mode: "lines",
+            line: { color: id2Color[0] },
             name: null,
         })
     );
@@ -37,9 +50,9 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
         version: 0,
     }
 
-    // the name of the stream of this figure (it can be a plain name, such as "sin", or the name of a merged signal,
-    // such as "sin + cos" or similar things, and it can change over time due to drag and drop operations)
-    const [streamName, setStreamName] = useState(_streamName_);
+    // the name, ids, of the streams in this figure (it can be about a single or a merged signal,
+    // and it can change over time due to drag and drop operations)
+    const [streamStruct, setStreamStruct] = useState(_streamStruct_);
 
     // the whole data plotted in this figure, and array like "emptyPlotData" above, where the "x" and "y" fields grow
     const XYs = useRef(emptyXYs);
@@ -52,9 +65,11 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
     // these will only be used to store the values of multiple API calls to stream data, when stream is merged
     const returnedAPICallsRef = useRef(0);
 
-    // when the stream name changes, it means that some merge operations happened, thus we have to reset the plot
-    if (_streamName_ !== streamName) {
-        setStreamName(_streamName_);
+    // when the stream struct changes, it means that some merge operations happened, thus we have to reset the plot
+    if (_streamStruct_.mergedIds.length !== streamStruct.mergedIds.length ||
+        !(_streamStruct_.mergedIds.every((value, index) =>
+            value === streamStruct.mergedIds[index]))) {
+        setStreamStruct(_streamStruct_);
         setAllPlotData(emptyPlotData);
     }
 
@@ -72,7 +87,7 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
 
         if (!_isPaused_) {
             out("[PlotFigure] useEffect *** fetching data " +
-                "(agent_name: " + _agentName_ + ", stream_name (before un-merging): " + _streamName_ + "', " +
+                "(agent_name: " + _agentName_ + ", stream_name (before un-merging): " + _streamStruct_.label + "', " +
                 "since_step: " + (MIMAXs.current.xMax + 1) + " *** (skipping, not paused)");
             return;
         }
@@ -84,7 +99,7 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
         // store/add new plot data to one of the existing plots of the figure or add a fully new plot
         // (_nexXYsStorage_ is a (usually empty) map (plotIdx -> plot structure) that gets populated by calling
         // this function several times)
-        function storeNewPlotData(_name_, _xData_, _yData_,
+        function storeNewPlotData(_colorId_, _name_, _xData_, _yData_,
                                   _nexXYsStorage_, _newPNGsStorage_, _newTEXTsStorage_) {
             if (_xData_ == null || _yData_ == null || _xData_.length <= 0 || _yData_.length <= 0) {
                 return;
@@ -124,6 +139,7 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                             : Array(_xData_.length).fill(plotIdx),  // plot PNG images and text annotations at y=plotIdx
                         type: "scatter",
                         mode: "lines",
+                        line: { color: id2Color[_colorId_] },
                         name: plotName
                     });
                 } else {
@@ -177,38 +193,39 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
         }
 
         // fetching data from a single stream or, if merged, from multiple streams
-        const unmergedStreamNames = _streamName_.split(' + ').map(item => item.trim());
-        const numMergedStreams = unmergedStreamNames.length;
+        const streamIDs = _streamStruct_.mergedIds;
+        const streamNames = _streamStruct_.mergedLabels;
+        const numStreams = streamIDs.length;
         const nexXYsStorage = new Map(); // created as empty map, populated by storeNewPlotData(...)
         const newPNGsStorage = []; // created as empty array, populated by storeNewPlotData(...)
         const newTEXTsStorage = []; // created as empty array, populated by storeNewPlotData(...)
         returnedAPICallsRef.current = 0; // we will count how many of the merged stream return data and what fails
         limitToLastN.current = false;
 
-        for (let j = 0; j < numMergedStreams; j++) {
+        for (let j = 0; j < numStreams; j++) {
 
-            out("[PlotFigure] useEffect *** fetching stream data " + (j+1) + "/" + numMergedStreams + " " +
-                "(agent_name: " + _agentName_ + ", stream_name: " + unmergedStreamNames[j] + "', " +
+            out("[PlotFigure] useEffect *** fetching stream data " + (j+1) + "/" + numStreams + " " +
+                "(agent_name: " + _agentName_ + ", stream_name: " + streamNames[j] + "', " +
                 "since_step: " + (MIMAXs.current.xMax + 1));
 
             callAPI('/get_stream', {
                     agent_name: _agentName_,
-                    stream_name: unmergedStreamNames[j],
+                    stream_name: streamNames[j],
                     since_step: MIMAXs.current.xMax + 1
                 },
                 (x) => {
 
                     // here we store the received data into the temporary storage
-                    storeNewPlotData(unmergedStreamNames[j], x.ks, x.data,
+                    storeNewPlotData(j, streamNames[j], x.ks, x.data,
                         nexXYsStorage, newPNGsStorage, newTEXTsStorage);
 
                     // we actually change the real-plot-object data using the temporarily stored plots
                     // only when getting data from the API call about the last merged stream (if one fails, we do not
-                    // update anything, since we will never reach the numMergedStreams number)
+                    // update anything, since we will never reach the numStreams number)
                     returnedAPICallsRef.current++;
 
                     // when reaching the last stream...
-                    if (returnedAPICallsRef.current === numMergedStreams && nexXYsStorage.size > 0) {
+                    if (returnedAPICallsRef.current === numStreams && nexXYsStorage.size > 0) {
 
                         // here we change the real-plot-object data, either adding new plots or augmenting others
                         for (const [plotIdx, plotData] of nexXYsStorage.entries()) {
@@ -226,7 +243,7 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                             const delimiterIndex = plotDataStruct.name.lastIndexOf("~");
                             const _streamName = delimiterIndex !== -1 ?
                                 plotDataStruct.name.substring(0, delimiterIndex) : plotDataStruct.name;
-                            return unmergedStreamNames.includes(_streamName);
+                            return streamNames.includes(_streamName);
                         });
 
                         // estimating min and max of the whole data
@@ -241,17 +258,23 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
 
                         // here we augment the current set of images with the newly received ones
                         if (newPNGsStorage.length > 0) {
+
+                            // we assume PNG plots to be at y-coordinates that are 0, 1, 2... and we assume they are
+                            // "tall" 1.0
+                            MIMAXs.current.yMax = Math.max(MIMAXs.current.yMax, XYs.current.length - 1 + 1.0);
+                            MIMAXs.current.yMin = Math.min(MIMAXs.current.yMin, 0.);
                             PNGs.current.push(...newPNGsStorage); // add newly received PNGs
                         }
 
                         // here we augment the current set of text annotations with the newly received ones
                         if (newTEXTsStorage.length > 0) {
+
+                            // we assume PNG plots to be at y-coordinates that are 0, 1, 2... and we assume they are
+                            // "tall" 1.0
+                            MIMAXs.current.yMax = Math.max(MIMAXs.current.yMax, XYs.current.length - 1 + 1.0);
+                            MIMAXs.current.yMin = Math.min(MIMAXs.current.yMin, 0.);
                             TEXTs.current.push(...newTEXTsStorage); // add newly received PNGs
                         }
-
-                        console.log(JSON.stringify(XYs))
-                        console.log(JSON.stringify(PNGs))
-
 
                         // now we update the state
                         setAllPlotData((prev) => {
@@ -270,15 +293,15 @@ export default function PlotFigure({ _agentName_, _streamName_, _isPaused_, _set
                     setAllPlotData((prevData) => (prevData));
                 },
                 () => {
-                    if (returnedAPICallsRef.current === numMergedStreams) {
+                    if (returnedAPICallsRef.current === numStreams) {
                         // this will tell the parent that this component is now ready
                         _setBusy_(false);
                     }
                 }
             );
         }
-    }, [_isPaused_, _streamName_, _agentName_, _setBusy_]);
-    // _isPaused_ is what we care, while _streamName_ changes due to merge/unmerge (_agentName_, _setBusy_ are constant)
+    }, [_isPaused_, _streamStruct_, _agentName_, _setBusy_]);
+    // _isPaused_ is what we care, while _streamStruct_ changes due to (un)merge (_agentName_, _setBusy_ are constant)
 
     // returning the <div>...</div> that will be displayed
     return (

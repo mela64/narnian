@@ -9,13 +9,11 @@ from torchvision import transforms
 # creating environment
 env = BasicEnvironment("sandbox")
 
-# registering streams
-Stream.register(name="animals", stream_class=ImageDataset,
-                stream_class_args={"image_dir": "./data/animals", "label_file_csv": "./data/animals/labels.csv",
-                                   "circular": True})
 
 # adding streams to the environment
-env.add_stream(Stream.create(name="animals", creator="envir"))
+env.add_stream(Stream.create(name="animals", creator="envir",
+                             stream=ImageDataset(image_dir="./data/animals", label_file_csv="./data/animals/labels.csv",
+                                                 circular=True)))
 
 # modeling behaviour of the environment
 env.behav.add_transit("init", "streams_enabled", action="enable_all_streams")

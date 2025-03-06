@@ -202,25 +202,19 @@ export default function Main() {
         const targetButton = streamButtonsRef.current[_agentButtonIdOfDropped_]
             .find((sp) => sp.id === _streamButtonIdOfTarget_);
 
-        // merging the lists of IDs of the two buttons
-        const mergedIds = Array.from(
-            new Set([
-                ...targetButton.mergedIds, // Existing merged ids from the target button
-                ...draggedButton.mergedIds,  // Existing merged ids from the dragged item
-            ])
-        );
-
-        // building the new label
-        const mergedLabel = mergedIds
-            .map((id) => streamButtonsRef.current[agentButtonId].find((sp) => sp.id === id)?.label || "")
-            .filter(Boolean).join(" + ");  // "name1 + name2"
+        // merging the lists of IDs/labels of the two buttons (warning: assuming there are no duplicate IDs!)
+        // we preserve the order of the IDs, giving priority to the target button IDs
+        const mergedIds = [...targetButton.mergedIds, ...draggedButton.mergedIds];
+        const mergedLabels = [...targetButton.mergedLabels, ...draggedButton.mergedLabels];
 
         // creating the new button about the merged streams
         const newStreamButton = {
             id: _streamButtonIdOfTarget_,  // we keep the ID of the target button, that will be replaced by this one
-            label: mergedLabel,
+            label: mergedLabels.join(" + "),
             icon: targetButton.icon,
             mergedIds: mergedIds,
+            mergedLabels: mergedLabels,
+            mergedButtons: [targetButton, draggedButton],
             agentButtonId: agentButtonId
         };
 
@@ -282,46 +276,12 @@ export default function Main() {
             .find((sp) => sp.id === _streamButtonIdOfClicked_);
 
         // if there is nothing to un-merge, stop here
-        if ((streamButtonClicked.mergedIds?.length ?? 1) <= 1) {
+        if (streamButtonClicked.mergedButtons.length === 0) {
             return;
         }
 
-        // given a "merged-label" we get back the array with the original "single stream labels"
-        const restoredButtonsLabels = streamButtonClicked.label.split(" + ").map(item => item.trim());
-
         // preparing data for the un-merge operation
-        const mergedIds = [...streamButtonClicked.mergedIds]; // copy! (important)
-        const restoredButtons = [];
-
-        // for each IDs in the merged ID list...
-        for (let i = 0; i < mergedIds.length; i++) {
-            const id = mergedIds[i];  // get single-stream button ID
-            const label = restoredButtonsLabels[i];  // get single-stream label
-
-            // checking if the single-stream button ID is already in an existing button:
-            // if so, it is due to the fact that the merged-button inherits the ID of one of the
-            // initial single stream buttons
-            const but = streamButtonsRef.current[_agentButtonIdOfClicked_].find((sp) => sp.id === id);
-
-            if (but === undefined) {
-
-                // here we re-create a single-stream button
-                restoredButtons.push({
-                    id: id,
-                    label: label,
-                    icon: streamButtonClicked.icon, // ops, we are not saving and then restoring the right icon...
-                    mergedIds: [id],
-                    agentButtonId: _agentButtonIdOfClicked_
-                });
-            } else {
-
-                // here we just update the already-existing button (i.e., we turn the merged button into the
-                // single-stream button over which we created the merged one)
-                but.label = label;
-                but.mergedIds = [id];
-                restoredButtons.push(but);
-            }
-        }
+        const restoredButtons = [...streamButtonClicked.mergedButtons]; // copy! (important)
 
         // if the stream panel of the merged-button was open, we close it
         if (openStreamPanelsRef.current[_agentButtonIdOfClicked_]?.includes(_streamButtonIdOfClicked_)) {
@@ -339,6 +299,21 @@ export default function Main() {
         }));
     }, []);
 
+    function isGenerated(label) {
+        const match = label.match(/generated(\d+)/);
+        if (match) {
+            return parseInt(match[1], 10);
+        }
+        return null;
+    }
+
+    function isTarget(label) {
+        const match = label.match(/target(\d+)/);
+        if (match) {
+            return parseInt(match[1], 10);
+        }
+        return null;
+    }
 
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
     function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _streamButtons_) {
@@ -355,6 +330,8 @@ export default function Main() {
                             streamButton.label === streamName  // single stream name
                             || streamButton.label.includes(streamName + " + ")  // merged stream names!
                             || streamButton.label.includes(" + " + streamName))   // merged streams names!
+                            || (Array.isArray(streamButton.mergedLabels) &&
+                                streamButton.mergedLabels.includes(streamName))
                         )
                 );
 
@@ -374,13 +351,106 @@ export default function Main() {
                     label: streamName,
                     icon: streamButtonIcons[(index + maxStreamButtonId) % streamButtonIcons.length],
                     mergedIds: [index + maxStreamButtonId + 1],
+                    mergedLabels: [streamName],
+                    mergedButtons: [],
                     agentButtonId: _agentButtonId_
                 }));
+
+                // altering the just created buttons
+                // merging buttons that are about generated data and target data (e.g., "generated1" and "target1")
+                const alteredNewStreamButtons = [];
+                for (let z = 0; z < newStreamButtons.length; z++) {
+                    let generatedNum = -1;
+                    let targetNum = -1;
+                    let generatedZ = -1;
+                    let targetZ = -1;
+                    let suffix = "";
+                    let isPaired = false;
+
+                    // let's skip buttons that were filtered out (see the end of this loop)
+                    if (!newStreamButtons[z]) {
+                        continue;
+                    }
+
+                    // check stream name: is it a generated/target stream?
+                    generatedNum = isGenerated(newStreamButtons[z].label);
+                    if (!generatedNum) {
+                        targetNum = isTarget(newStreamButtons[z].label);
+                    }
+
+                    // if the name of the stream is "generatedX" or "targetX", we check if we find the paired stream
+                    if (generatedNum || targetNum) {
+
+                        // altering case: we need to merge "generatedX" and "targetX", let's search for the other guy
+                        suffix = newStreamButtons[z].label.slice(-3) // get "[y]" or "[d]"
+                        for (let zz = z + 1; zz < newStreamButtons.length; zz++) {
+
+                            // let's skip buttons that were filtered out (see the end of this loop)
+                            if (!newStreamButtons[zz]) {
+                                continue;
+                            }
+
+                            // excluding not-matching "[y]" or "[d]"
+                            if (!newStreamButtons[zz].label.endsWith(suffix)) {
+                                continue;
+                            }
+
+                            // looking for the other stream of the pair
+                            if (generatedNum && generatedNum >= 0) {
+                                generatedZ = z;
+                                targetZ = zz;
+                                targetNum = isTarget(newStreamButtons[zz].label);
+                            } else {
+                                generatedZ = zz;
+                                targetZ = z;
+                                generatedNum = isGenerated(newStreamButtons[zz].label);
+                            }
+
+                            // given "generatedX", we want a target that ends with the same "X", and vice-versa
+                            if (!targetNum || !generatedNum || targetNum !== generatedNum)
+                                continue;
+
+                            // if a pair "generatedX" and "targetX" was found... merge!
+                            const mergedIds =
+                                [...newStreamButtons[generatedZ].mergedIds,
+                                    ...newStreamButtons[targetZ].mergedIds];
+                            const mergedLabels =
+                                [...newStreamButtons[generatedZ].mergedLabels,
+                                    ...newStreamButtons[targetZ].mergedLabels];
+
+                            // creating the new button about the merged streams
+                            const newStreamButton = {
+                                id: newStreamButtons[generatedZ].id,
+                                label: newStreamButtons[generatedZ].label,
+                                icon: newStreamButtons[generatedZ].icon,
+                                mergedIds: mergedIds,
+                                mergedLabels: mergedLabels,
+                                mergedButtons: [],
+                                agentButtonId: newStreamButtons[generatedZ].agentButtonId
+                            };
+
+                            // saving
+                            alteredNewStreamButtons.push(newStreamButton);
+
+                            // let's avoid looking again for this button in the original array
+                            newStreamButtons[generatedZ] = null;
+                            newStreamButtons[targetZ] = null;
+                            isPaired = true;
+                            break; // stop searching
+                        }
+                    }
+
+                    if (!isPaired) {
+
+                        // simple case: nothing to alter, just get the button as it is
+                        alteredNewStreamButtons.push(newStreamButtons[z]);
+                    }
+                }
 
                 // updating the current buttons with the newly created ones
                 setStreamButtons((prevStreamButtons) => ({
                     ...prevStreamButtons,
-                    [_agentButtonId_]: [...(prevStreamButtons[_agentButtonId_] || []), ...newStreamButtons],
+                    [_agentButtonId_]: [...(prevStreamButtons[_agentButtonId_] || []), ...alteredNewStreamButtons],
                 }));
             },
             () => setStreamButtons((prev) => (prev)),
@@ -676,7 +746,7 @@ export default function Main() {
                                                             rounded-xl shadow text-center">
                                                         <h3 className="font-medium">{streamButton?.label}</h3>
                                                         <PlotFigure _agentName_={agent_button.label}
-                                                                    _streamName_={streamButton.label}
+                                                                    _streamStruct_={streamButton}
                                                                     _isPaused_={isPaused}
                                                                     _setBusy_={setIsPlotFigureBusy}
                                                         />
