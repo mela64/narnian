@@ -13,9 +13,9 @@ import {
     PanelRight,
     PanelTop,
     PanelBottom,
-    Square,
-    Circle,
-    Triangle,
+    Activity,
+    Search,
+    Waves,
 } from "lucide-react";
 
 let clickTimeout; // timer that triggers a reaction to the click action
@@ -23,7 +23,7 @@ let clickCount = 0;  // number of consecutive clicks (to distinguish clicks from
 
 // icons used in the agent buttons or stream buttons
 const agentButtonIcons = [<PanelLeft/>, <PanelRight/>, <PanelTop/>, <PanelBottom/>];
-const streamButtonIcons = [<Square/>, <Circle/>, <Triangle/>];
+const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 
 
 // the structure representing the play/pause status, in its initial (unknown) setting
@@ -210,8 +210,8 @@ export default function Main() {
         // creating the new button about the merged streams
         const newStreamButton = {
             id: _streamButtonIdOfTarget_,  // we keep the ID of the target button, that will be replaced by this one
-            label: mergedLabels.join(" + "),
-            icon: targetButton.icon,
+            label: targetButton.label + "+",
+            icon: streamButtonIcons[2],
             mergedIds: mergedIds,
             mergedLabels: mergedLabels,
             mergedButtons: [targetButton, draggedButton],
@@ -327,12 +327,8 @@ export default function Main() {
                         || !Array.isArray(_streamButtons_[_agentButtonId_])
                         || _streamButtons_[_agentButtonId_].length === 0
                         || !_streamButtons_[_agentButtonId_].some((streamButton) => (
-                            streamButton.label === streamName  // single stream name
-                            || streamButton.label.includes(streamName + " + ")  // merged stream names!
-                            || streamButton.label.includes(" + " + streamName))   // merged streams names!
-                            || (Array.isArray(streamButton.mergedLabels) &&
-                                streamButton.mergedLabels.includes(streamName))
-                        )
+                            (Array.isArray(streamButton.mergedLabels) && streamButton.mergedLabels.includes(streamName))
+                        ))
                 );
 
                 // finding the largest ID of the existing stream buttons, also looking inside the mergedIds array
@@ -348,8 +344,8 @@ export default function Main() {
                 // creating new stream buttons
                 const newStreamButtons = missingStreamNames.map((streamName, index) => ({
                     id: index + maxStreamButtonId + 1, // recall that button IDs start from 1
-                    label: streamName,
-                    icon: streamButtonIcons[(index + maxStreamButtonId) % streamButtonIcons.length],
+                    label: streamName.slice(0, -4),  // removing " [y]", and " [d]"
+                    icon: streamName.endsWith("[y]") ? streamButtonIcons[0] : streamButtonIcons[1],
                     mergedIds: [index + maxStreamButtonId + 1],
                     mergedLabels: [streamName],
                     mergedButtons: [],
@@ -373,16 +369,16 @@ export default function Main() {
                     }
 
                     // check stream name: is it a generated/target stream?
-                    generatedNum = isGenerated(newStreamButtons[z].label);
+                    generatedNum = isGenerated(newStreamButtons[z].mergedLabels[0]);
                     if (!generatedNum) {
-                        targetNum = isTarget(newStreamButtons[z].label);
+                        targetNum = isTarget(newStreamButtons[z].mergedLabels[0]);
                     }
 
                     // if the name of the stream is "generatedX" or "targetX", we check if we find the paired stream
                     if (generatedNum || targetNum) {
 
                         // altering case: we need to merge "generatedX" and "targetX", let's search for the other guy
-                        suffix = newStreamButtons[z].label.slice(-3) // get "[y]" or "[d]"
+                        suffix = newStreamButtons[z].mergedLabels[0].slice(-3) // get "[y]" or "[d]"
                         for (let zz = z + 1; zz < newStreamButtons.length; zz++) {
 
                             // let's skip buttons that were filtered out (see the end of this loop)
@@ -391,7 +387,7 @@ export default function Main() {
                             }
 
                             // excluding not-matching "[y]" or "[d]"
-                            if (!newStreamButtons[zz].label.endsWith(suffix)) {
+                            if (!newStreamButtons[zz].mergedLabels[0].endsWith(suffix)) {
                                 continue;
                             }
 
@@ -399,11 +395,11 @@ export default function Main() {
                             if (generatedNum && generatedNum >= 0) {
                                 generatedZ = z;
                                 targetZ = zz;
-                                targetNum = isTarget(newStreamButtons[zz].label);
+                                targetNum = isTarget(newStreamButtons[zz].mergedLabels[0]);
                             } else {
                                 generatedZ = zz;
                                 targetZ = z;
-                                generatedNum = isGenerated(newStreamButtons[zz].label);
+                                generatedNum = isGenerated(newStreamButtons[zz].mergedLabels[0]);
                             }
 
                             // given "generatedX", we want a target that ends with the same "X", and vice-versa
@@ -786,17 +782,16 @@ function DraggableStreamButton({_streamButton_, _onDrop_, _onDoubleClick_, _onCl
     // returning the <div>...</div> that will be displayed to represent the stream button
     return (
         <div
-            className={`flex items-center justify-center px-4 py-2 rounded-2xl shadow-md select-none cursor-move 
-            text-center transition-colors whitespace-nowrap ${
-                _checkIfActive_() ? "bg-blue-600 text-white" : 
-                    (_streamButton_.mergedIds?.length ?? 1) > 1 ? 
-                        "bg-green-500 text-white" : "bg-gray-100 hover:bg-gray-200"
+            className={`flex h-6 items-center justify-center px-3 py-4 rounded-2xl shadow-md select-none cursor-move 
+            text-center transition-colors whitespace-nowrap ${ 
+                _checkIfActive_() ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"
             } ${isDragging ? "opacity-50" : "opacity-100"}`}
             onClick={() => _onClick_(_streamButton_)}
             onDoubleClick={() => _onDoubleClick_(_streamButton_)}
             ref={(node) => { if (node) drag(drop(node)); }}
         >
-            {_streamButton_.icon}<span className="ml-2">{_streamButton_.label}</span>
+            <span className="w-5 h-5 flex items-center justify-center">{_streamButton_.icon}</span>
+            <span className="ml-1">{_streamButton_.label}</span>
         </div>
     );
 }
