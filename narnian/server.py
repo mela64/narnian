@@ -11,12 +11,13 @@ from flask import Flask, jsonify, request, send_from_directory
 
 class Server:
 
-    def __init__(self, env: Environment, root: str = 'viewer/www'):
+    def __init__(self, env: Environment, root: str = 'viewer/www', port: int = 5001):
         self.env = env
         self.env.using_server = True  # forcing
         self.root = root
         self.root_css = root + "/static/css"
         self.root_js = root + "/static/js"
+        self.port = port
         self.app = Flask(__name__, template_folder=self.root)
         CORS(self.app)  # to handle cross-origin requests (needed for development)
         self.register_routes()
@@ -27,7 +28,7 @@ class Server:
         thread.start()
 
     def __run_server(self):
-        self.app.run(host='0.0.0.0', port=5001, threaded=True, debug=False)  # Run Flask with threading enabled
+        self.app.run(host='0.0.0.0', port=self.port, threaded=True, debug=False)  # Run Flask with threading enabled
 
     def register_routes(self):
         self.app.add_url_rule('/', view_func=self.serve_index, methods=['GET'])

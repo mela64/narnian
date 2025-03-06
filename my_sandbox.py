@@ -78,7 +78,7 @@ for ag in env.agents.values():
     print(ag)
 
 # creating server
-Server(env=env)
+Server(env=env, port=5001)
 
 # running
 env.run()

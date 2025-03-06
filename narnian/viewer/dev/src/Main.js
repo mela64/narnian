@@ -9,10 +9,8 @@ import {callAPI, out} from "./utils";
 
 // icons
 import {
-    PanelLeft,
-    PanelRight,
-    PanelTop,
-    PanelBottom,
+    Settings,
+    Bot,
     Activity,
     Search,
     Waves,
@@ -22,7 +20,7 @@ let clickTimeout; // timer that triggers a reaction to the click action
 let clickCount = 0;  // number of consecutive clicks (to distinguish clicks from double clicks)
 
 // icons used in the agent buttons or stream buttons
-const agentButtonIcons = [<PanelLeft/>, <PanelRight/>, <PanelTop/>, <PanelBottom/>];
+const agentButtonIcons = [<Settings/>, <Bot/>];
 const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 
 
@@ -42,6 +40,10 @@ export default function Main() {
     // whenever an agent button is clicked, an agent panel is opened (with the FSM, console, streams, stream panels)
     const [agentButtons, setAgentButtons] = useState([]);
     const [openAgentPanels, setOpenAgentPanels] = useState([]);
+
+    // whenever the FSM or console buttons are clicked, they are shown or not
+    const [openFSMPanels, setOpenFSMPanels] = useState([]);
+    const [openConsolePanels, setOpenConsolePanels] = useState([]);
 
     // whenever a stream button is clicked, a stream panel is opened (the one with the plot figure)
     const [streamButtons, setStreamButtons] = useState([]);
@@ -116,8 +118,10 @@ export default function Main() {
                 const agent_buttons = x.map((label, index) => ({
                     id: index + 1,  // button indices start from 1
                     label,
-                    icon: agentButtonIcons[index % agentButtonIcons.length],
+                    icon: index === 0 ? agentButtonIcons[0] : agentButtonIcons[1],
                 }));
+                setOpenFSMPanels(agent_buttons.map(agent_button => agent_button.id));
+                setOpenConsolePanels(agent_buttons.map(agent_button => agent_button.id));
                 setAgentButtons(agent_buttons);
             },
             () => setAgentButtons([]),
@@ -184,6 +188,28 @@ export default function Main() {
                 ? currentStreamButtonsInCurrentAgentPanel.filter((id) => id !== _streamButtonId_)
                 : [...currentStreamButtonsInCurrentAgentPanel, _streamButtonId_];
             return {...prevOpenStreamPanels, [_agentButtonId_]: newStreamButtonsInCurrentAgentPanel};
+        });
+    };
+
+    // open a new FSM (agent-related) panel or closes an already opened one
+    const toggleFSMPanel = (_agentButtonId_) => {
+        setOpenFSMPanels((prev) => {
+            if (prev.includes(_agentButtonId_)) {
+                return prev.filter((pid) => pid !== _agentButtonId_);
+            } else {
+                return [...prev, _agentButtonId_];
+            }
+        });
+    };
+
+    // open a new console (agent-related) panel or closes an already opened one
+    const toggleConsolePanel = (_agentButtonId_) => {
+        setOpenConsolePanels((prev) => {
+            if (prev.includes(_agentButtonId_)) {
+                return prev.filter((pid) => pid !== _agentButtonId_);
+            } else {
+                return [...prev, _agentButtonId_];
+            }
         });
     };
 
@@ -660,37 +686,57 @@ export default function Main() {
                             openAgentPanels.includes(agent_button.id) &&
                             (  // **** big thing opening here.... ***
                                 <AnimatePresence key={agent_button.id}>
-                                    <motion.div initial={{opacity: 0, height: 0}} animate={{opacity: 1, height: "auto"}}
-                                        exit={{opacity: 0, height: 0}} transition={{duration: 0.3}}
-                                        className="w-full p-4 bg-white rounded-2xl shadow-lg border space-y-6">
+                                    <motion.div initial={{opacity: 0, height: 0}}
+                                                animate={{opacity: 1, height: "auto"}}
+                                                exit={{opacity: 0, height: 0}}
+                                                transition={{duration: 0.3}}
+                                                className="w-full p-4 bg-white rounded-2xl shadow-lg border space-y-6">
 
-                                        <h2 className="font-medium text-lg text-center">
-                                            {agent_button.label}
+                                        <h2 className="font-medium text-lg flex items-center justify-center">
+                                            <span className="mr-1">{agent_button.label}</span>
+                                            <button
+                                                className="w-6 h-6 bg-green-200 rounded-full flex items-center
+                                                justify-center ml-2"
+                                                onClick={() => toggleFSMPanel(agent_button.id)}>
+                                                B
+                                            </button>
+                                            <button
+                                                className="w-6 h-6 bg-blue-200 rounded-full flex items-center
+                                                justify-center ml-2"
+                                                onClick={() => toggleConsolePanel(agent_button.id)}>
+                                                C
+                                            </button>
                                         </h2>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className={`grid grid-cols-1 ${(openFSMPanels.includes(agent_button.id) &&
+                                            openConsolePanels.includes(agent_button.id)) ?
+                                            "sm:grid-cols-2" : "sm:grid-cols-1"} gap-4`}>
 
-                                            <div className="h-[400px] w-full flex justify-center">
+                                            {openFSMPanels.includes(agent_button.id) &&
+                                                <div className="h-[400px] w-full flex justify-center">
                                                 <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
-                                                    rounded-xl shadow text-center">
-                                                    <h3 className="font-medium">Behaviour</h3>
-                                                    <FSM _agentName_={agent_button.label}
-                                                         _isPaused_={isPaused}
-                                                         _setBusy_={setIsFSMBusy}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="h-[400px] w-full flex justify-center">
-                                                <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
-                                                    rounded-xl shadow text-center">
-                                                    <h3 className="font-medium">Console</h3>
-                                                    <Console _agentName_={agent_button.label}
+                                                        rounded-xl shadow text-center">
+                                                        <h3 className="font-medium">Behaviour</h3>
+                                                        <FSM _agentName_={agent_button.label}
                                                              _isPaused_={isPaused}
-                                                             _setBusy_={setIsConsoleBusy}
-                                                    />
+                                                             _setBusy_={setIsFSMBusy}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            }
+
+                                            {openConsolePanels.includes(agent_button.id) &&
+                                                <div className="h-[400px] w-full flex justify-center">
+                                                    <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
+                                                        rounded-xl shadow text-center">
+                                                        <h3 className="font-medium">Console</h3>
+                                                        <Console _agentName_={agent_button.label}
+                                                                 _isPaused_={isPaused}
+                                                                 _setBusy_={setIsConsoleBusy}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            }
 
                                         </div>
 
@@ -728,16 +774,18 @@ export default function Main() {
                                             ))}
                                         </div>
 
-                                        <div className={`grid gap-4 mt-6 
-                                        ${openStreamPanels[agent_button.id]?.length <= 2 ? 
-                                            "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+                                        <div className={`gap-4 mt-6r  
+                                        ${openStreamPanels[agent_button.id]?.length <= 2 ?
+                                            (openStreamPanels[agent_button.id]?.length <= 1 ? 
+                                                " grid sm:grid-cols-1 max-w-[900px] mx-auto" 
+                                                : "grid sm:grid-cols-2") : "grid sm:grid-cols-3"}`}>
                                             {openStreamPanels[agent_button.id]?.map((id) => {
                                                 const streamButton = streamButtons[agent_button.id]?.find(
                                                     (btn) => btn.id === id
                                                 );
                                                 return (
                                                     <div key={id}
-                                                        className="min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
+                                                         className="min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
                                                             rounded-xl shadow text-center">
                                                         <h3 className="font-medium flex items-center justify-center">
                                                             <span className="w-5 h-5">{streamButton?.icon}</span>
