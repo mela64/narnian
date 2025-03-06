@@ -11,7 +11,7 @@ class Random(Stream):
         self.std = std
         self.shape = torch.Size(shape)
         self.attributes = [Attributes((1,), None),
-                           Attributes((1,), [self.__class__.__name__.lower()])]
+                           Attributes((1,), [self.name.lower()])]
         self.static_d = torch.ones(self.attributes[1].shape)
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
@@ -29,7 +29,7 @@ class Sin(Stream):
         self.delta = delta
         self.period = 1. / self.freq
         self.attributes = [Attributes((1,), None),
-                           Attributes((1,), [self.__class__.__name__.lower()])]
+                           Attributes((1,), [self.name.lower()])]
         self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
@@ -48,7 +48,7 @@ class Square(Stream):
         self.delta = delta
         self.period = 1. / self.freq
         self.attributes = [Attributes((1,), None),
-                           Attributes((1,), [self.__class__.__name__.lower()])]
+                           Attributes((1,), [self.name.lower()])]
         self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
@@ -75,7 +75,7 @@ class CombSin(Stream):
         self.coeffs = c_cap * (2 * torch.rand(order) - 1)
         self.delta = delta
         self.attributes = [Attributes((1,), None),
-                           Attributes((1,), [self.__class__.__name__.lower()])]
+                           Attributes((1,), [self.name.lower()])]
         self.static_d = torch.ones((1, 1))
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:

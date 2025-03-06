@@ -110,6 +110,8 @@ class Stream(torch.utils.data.Dataset):
     def create(name: str, creator: str, stream: Self = None):
         stream.name = name
         stream.creator = creator
+        if stream.attributes[1].labels[0] == 'unk' and len(stream.attributes[1]) == 1:
+            stream.attributes[1].labels[0] = name
         return stream
 
 
