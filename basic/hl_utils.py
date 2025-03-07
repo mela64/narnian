@@ -53,22 +53,24 @@ def _euler_step(o: torch.Tensor | Dict[str, torch.Tensor], do: torch.Tensor | Di
                     o[k].add_(do[k], alpha=step_size)
                 else:
                     o[k].mul_(1. - decay).add_(do[k], alpha=step_size)
-        if not in_place:
-            return oo
     elif isinstance(o, torch.Tensor):
         if not in_place:
             if decay is None or decay == 0.:
                 oo = o + step_size * do
             else:
                 oo = (1. - decay) * o + step_size * do
-            return oo
         else:
             if decay is None or decay == 0.:
                 o.add_(do, alpha=step_size)
             else:
                 o.mul_(1. - decay).add_(do, alpha=step_size)
     else:
-        raise Exception(f'Input to this function should be either list or dict, got {type(o)}.')
+        raise Exception(f'Input to this function should be either tensor or dict, got {type(o)}.')
+
+    if not in_place:
+        return oo
+    else:
+        return o
 
 
 def _init(val: float | str, data_shape: torch.Size, device, dtype: torch.dtype, non_negative: bool = False) -> torch.Tensor:
@@ -321,7 +323,8 @@ def _detach(tensors: torch.Tensor | Dict[str, torch.Tensor]) -> torch.Tensor | D
 
 class HL:
     def __init__(self, models: torch.nn.Module | Iterable[Dict[str, torch.nn.Module | Any]], *,
-                 gamma=1., flip=-1., theta=0.1, beta=1., reset_neuron_costate=False, reset_weight_costate=False):
+                 gamma=1., flip=-1., theta=0.1, beta=1., reset_neuron_costate=False, reset_weight_costate=False,
+                 local=True):
         """
         Args:
             models (list of dict): List of parameter groups, each containing:
@@ -330,7 +333,8 @@ class HL:
         """
         # set defaults
         defaults = dict(params=None, gamma=gamma, flip=flip, theta=theta, beta=beta,
-                        reset_neuron_costate=reset_neuron_costate, reset_weight_costate=reset_weight_costate)
+                        reset_neuron_costate=reset_neuron_costate, reset_weight_costate=reset_weight_costate,
+                        local=local)
         # Ensure models is a list of dicts and assign the specified values
         if isinstance(models, torch.nn.Module):
             models = [{**defaults, 'params': models}]
@@ -351,27 +355,29 @@ class HL:
             delta = model.delta
 
             # copy the state (of the model) just to track it during the optimization and get the costate
-            state['x']['xi'] = model.h.detach().clone()
+            # the locality of these operations is handled by the model
+            state['x']['xi'] = model.h
             dp_xi = _get_grad(model.h)
+            _euler_step(state['p']['xi'], dp_xi, step_size=-delta * group['flip'],
+                        decay=-group['flip'] * group['theta'], in_place=True)
 
             # copy the weights from the network just to track it during the optimization and get the costates
             dp_w = {}
             for name, param in model.named_parameters():
-                state['x']['w'][name] = param.detach().clone()
+                state['x']['w'][name] = param
                 dp_w[name] = _get_grad(param)
 
-            # Costate update
-            _euler_step(state['p']['xi'], dp_xi, step_size=-delta*group['flip'],
-                        decay=-group['flip']*group['theta'], in_place=True)
-            _euler_step(state['p']['w'], dp_w, step_size=-delta*group['flip'],
-                        decay=-group['flip']*group['theta'], in_place=True)
-
-            # Weights update
-            _euler_step(state['x']['w'], state['p']['w'], step_size=-delta*group['beta'], decay=None, in_place=True)
-
-            # Copy weights back into the model
-            for name, param in model.named_parameters():
-                param.copy_(state['x']['w'][name])
+            if group['local']:
+                # local HL uses the old costates to update the weights
+                d_w = state['p']['w']
+                _euler_step(state['x']['w'], d_w, step_size=-delta*group['beta'], decay=None, in_place=True)
+                _euler_step(state['p']['w'], dp_w, step_size=-delta*group['flip'],
+                            decay=-group['flip']*group['theta'], in_place=True)
+            else:
+                # non-local HL updates the costates before updating the weights
+                d_w = _euler_step(state['p']['w'], dp_w, step_size=-delta * group['flip'],
+                                  decay=-group['flip'] * group['theta'], in_place=True)
+                _euler_step(state['x']['w'], d_w, step_size=-delta * group['beta'], decay=None, in_place=True)
 
     def compute_hamiltonian(self, *potential_terms: torch.Tensor) -> torch.Tensor:
         """Computes the Hamiltonian for all models."""
@@ -396,64 +402,3 @@ class HL:
                 _zero_inplace(state['p']['xi'], detach=True)
             if group['reset_weight_costate']:
                 _zero_inplace(state['p']['w'], detach=True)
-
-
-# class HL:
-#     def __init__(self, model: nn.Module, *, gamma=1., flip=-1., theta=0.1, beta=1.,
-#                  reset_neuron_costate=False, reset_weight_costate=False):
-#         # Initialize the optimizer
-#         # Model here is your neural network instance, which you will access during optimization
-#         self.model = model
-#         self.delta = self.model.delta
-#
-#         if gamma < 0.0:
-#             raise ValueError(f"Invalid gamma: {gamma}, should be >= 0.")
-#         if beta < 0.0:
-#             raise ValueError(f"Invalid beta value: {beta}, should be >= 0.")
-#         if 0.0 < theta or theta > 1.0:
-#             raise ValueError(f"Invalid theta value: {theta}, should be in [0., 1.]")
-#
-#         # HL parameters
-#         defaults = dict(gamma=gamma, flip=flip, theta=theta, beta=beta,
-#                         reset_neuron_costate=reset_neuron_costate, reset_weight_costate=reset_weight_costate)
-#         for key, value in defaults.items():
-#             setattr(self, key, value)
-#         # state and costate initialization
-#         self.x, self.p = _init_state_and_costate(self.model)
-#
-#     @torch.no_grad()
-#     def step(self):
-#         # copy the state just to track it during the optimization and get the costate
-#         self.x['xi'] = self.model.h.detach().clone()
-#         dp_xi = _get_grad(self.model.h)
-#         # copy the weights from the network just to track it during the optimization and get the costates
-#         dp_w = {}
-#         for name, param in self.model.named_parameters():
-#             self.x['w'][name] = param.detach().clone()
-#             dp_w[name] = _get_grad(param)
-#
-#         # update the costates
-#         _euler_step(self.p['xi'], dp_xi, step_size=-self.delta * self.flip, decay=self.flip * self.theta, in_place=True)
-#         _euler_step(self.p['w'], dp_w, step_size=-self.delta * self.flip, decay=self.flip * self.theta, in_place=True)
-#
-#         # update the weights
-#         _euler_step(self.x['w'], self.p['w'], step_size=-self.delta * self.beta, decay=None, in_place=True)
-#
-#         # copy back the weights into the network
-#         for name, param in self.model.named_parameters():
-#             param.copy_(self.x['w'][name])
-#
-#     def compute_hamiltonian(self, potential_term: torch.Tensor) -> torch.Tensor:
-#         """Computes the reduced hamiltonian when provided with the potential term ("""
-#         return self.gamma * potential_term + torch.dot(self.model.dh.view(-1), self.p['xi'].view(-1)).real
-#
-#     def zero_grad(self, set_to_none: bool = False) -> None:
-#         """Zeroes the gradients of interest and eventually resets the co-states. This last operation requires us
-#         to call zero_grad AFTER the backward pass."""
-#         _zero_grad(self.model.h, set_to_none)
-#         for param in self.model.parameters():
-#             _zero_grad(param, set_to_none)
-#         if self.reset_neuron_costate:
-#             _zero_inplace(self.p['xi'], detach=True)
-#         if self.reset_weight_costate:
-#             _zero_inplace(self.p['w'], detach=True)

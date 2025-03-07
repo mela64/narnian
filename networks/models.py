@@ -1,12 +1,17 @@
 import torch
 import torchvision
 import torch.nn.functional as F
+from typing import Callable
+
+
+def hard_tanh(x: torch.Tensor) -> torch.Tensor:
+    return torch.clamp(x, min=-1., max=1.)
 
 
 class BasicGenerator(torch.nn.Module):
     """ Basic generator model with linear transformations and a recurrent hidden state """
-    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = F.tanh,
+                 local: bool = False, device: torch.device = torch.device("cpu")):
         super(BasicGenerator, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -21,17 +26,27 @@ class BasicGenerator(torch.nn.Module):
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True)  # Trainable hidden state
         self.h_init = self.h.clone()  # Store initial hidden state
         self.dh = torch.zeros_like(self.h)  # Store hidden state derivative
+        self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.device = device
         self.delta = 1.  # Discrete time step
+        self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     @torch.no_grad()
     def adjust_eigs(self, delta=0.01):
-        """ Placeholder for adjusting eigenvalues, not necessary in this case. """
+        """Placeholder for eigenvalue adjustment method"""
         pass
+
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.h_init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        # in the general case DO NOTHING
+        return u, du
 
     def forward(self, u, du, first=False):
         """ Forward pass that updates the hidden state and computes the output. """
@@ -44,15 +59,19 @@ class BasicGenerator(torch.nn.Module):
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
 
-        h = self.h.detach()  # Detach previous hidden state from computation graph
-        if first:
-            h = self.h_init  # Reset hidden state if we want to do so at the first step
+        # Reset hidden state if first step
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h.detach()
+        # handle inputs
+        u, du = self.handle_inputs(u, du)
 
         # Update hidden state based on input and previous hidden state
         self.h = self.A(h) + self.B(torch.cat([du, u], dim=1))
 
         # Compute output using a nonlinear activation function
-        y = self.C(torch.tanh(self.h))
+        if self.local:
+            y = self.C(self.sigma(h))
+        else:
+            y = self.C(self.sigma(self.h))
 
         # Compute hidden state derivative
         self.dh = (self.h - h) / self.delta
@@ -65,8 +84,8 @@ class BasicGenerator(torch.nn.Module):
 
 class _DiagR(torch.nn.Module):
     """ Diagonal matrix-based generator with real-valued transformations """
-    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = lambda x: x,
+                 local: bool = False, device: torch.device = torch.device("cpu")):
         super(_DiagR, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -81,17 +100,27 @@ class _DiagR(torch.nn.Module):
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
+        self.sigma = sigma
 
         # Store input dimensions and device
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.device = device
         self.delta = 1.
+        self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     @torch.no_grad()
     def adjust_eigs(self, delta=0.01):
         """ Normalize the diagonal weight matrix by setting signs. """
         self.diag.weight.copy_(torch.sign(self.diag.weight))
+
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.h_init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        # in the general case DO NOTHING
+        return u, du
 
     def forward(self, u, du, first=False):
         """ Forward pass with diagonal transformation. """
@@ -111,8 +140,11 @@ class _DiagR(torch.nn.Module):
         # Apply diagonal transformation to hidden state
         self.h = self.diag.weight.view(self.diag.out_features) * h + self.B(torch.cat([du, u], dim=1))
 
-        # Compute output
-        y = self.C(torch.tanh(self.h))
+        # Compute output using a nonlinear activation function
+        if self.local:
+            y = self.C(self.sigma(h))
+        else:
+            y = self.C(self.sigma(self.h))
 
         # Compute hidden state derivative
         self.dh = (self.h - h) / self.delta
@@ -123,8 +155,8 @@ class _DiagR(torch.nn.Module):
 
 class _DiagC(torch.nn.Module):
     """ Diagonal matrix-based generator with complex-valued transformations """
-    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu")):
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = lambda x: x,
+                 local: bool = False, device: torch.device = torch.device("cpu")):
         super(_DiagC, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -139,17 +171,27 @@ class _DiagC(torch.nn.Module):
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True, dtype=torch.cfloat)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
+        self.sigma = sigma
 
         # Store input dimensions and device
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.device = device
         self.delta = 1.
+        self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     @torch.no_grad()
     def adjust_eigs(self, delta=0.01):
         """ Normalize the diagonal weight matrix by dividing by its magnitude. """
         self.diag.weight.div_(self.diag.weight.abs())
+
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.h_init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        # in the general case DO NOTHING
+        return u, du
 
     def forward(self, u, du, first=False):
         """ Forward pass with complex-valued transformation. """
@@ -173,8 +215,11 @@ class _DiagC(torch.nn.Module):
         # Apply complex diagonal transformation
         self.h = self.diag.weight.view(self.diag.out_features) * h + self.B(torch.cat([du, u], dim=1))
 
-        # Compute real-valued output
-        y = self.C(torch.tanh(self.h)).real
+        # Compute output using a nonlinear activation function
+        if self.local:
+            y = self.C(self.sigma(h)).real
+        else:
+            y = self.C(self.sigma(self.h)).real
 
         # Compute hidden state derivative
         self.dh = (self.h - h) / self.delta
@@ -198,7 +243,7 @@ class _CTE(torch.nn.Module):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 device: torch.device = torch.device("cpu")):
+                 sigma: Callable = lambda x: x, local: bool = False, device: torch.device = torch.device("cpu")):
         super(_CTE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -216,12 +261,14 @@ class _CTE(torch.nn.Module):
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
         self.h_init = self.h.clone()  # save the initial state
         self.dh = torch.zeros_like(self.h)  # Hidden state derivative
+        self.sigma = sigma  # the non-linear activation function
 
         # System parameters
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.device = device
         self.delta = delta
+        self.local = local
 
     @torch.no_grad()
     def adjust_eigs(self, delta=0.01):
@@ -256,7 +303,6 @@ class _CTE(torch.nn.Module):
         # handle inputs
         u, du = self.handle_inputs(u, du)
 
-        # du = torch.zeros((1, self.du_dim), device=self.device)
         # Antisymmetric matrix construction
         A = 0.5 * (self.W.weight - self.W.weight.t())
         A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
@@ -270,7 +316,11 @@ class _CTE(torch.nn.Module):
 
         # Update hidden state
         self.h = rec + inp.squeeze(-1)
-        y = self.C(self.h)  # Linear output projection
+        # Compute output using a nonlinear activation function
+        if self.local:
+            y = self.C(self.sigma(h))
+        else:
+            y = self.C(self.sigma(self.h))
 
         # Compute hidden state derivative
         self.dh = (self.h - h) / self.delta
@@ -294,8 +344,8 @@ class AntisymmetricExpGenerator(_CTE):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 device: torch.device = torch.device("cpu")):
-        super(AntisymmetricExpGenerator, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, device)
+                 sigma: Callable = lambda x: x, local: bool = False, device: torch.device = torch.device("cpu")):
+        super(AntisymmetricExpGenerator, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, sigma, local, device)
 
     @torch.no_grad()
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
@@ -322,7 +372,8 @@ class _CTB(torch.nn.Module):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float = None,
-                 alpha: float = 0., device: torch.device = torch.device("cpu")):
+                 alpha: float = 0., sigma: Callable = lambda x: x, local: bool = False,
+                 device: torch.device = torch.device("cpu")):
         super(_CTB, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -356,12 +407,14 @@ class _CTB(torch.nn.Module):
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
+        self.sigma = sigma
 
         # System parameters
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.device = device
         self.delta = delta
+        self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -380,6 +433,14 @@ class _CTB(torch.nn.Module):
                 module = torch.sqrt(self.ones ** 2 + (self.delta * self.omega) ** 2)
                 self.omega.div_(module)
                 self.ones.div_(module)
+
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.h_init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        # in the general case DO NOTHING
+        return u, du
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through block-structured dynamics"""
@@ -401,7 +462,11 @@ class _CTB(torch.nn.Module):
 
         # State update
         self.h = rec + inp
-        y = self.C(self.h)
+        # Compute output using a nonlinear activation function
+        if self.local:
+            y = self.C(self.sigma(h))
+        else:
+            y = self.C(self.sigma(self.h))
 
         # Derivative calculation
         self.dh = (self.h - h) / self.delta
@@ -425,7 +490,7 @@ class _CTBE(torch.nn.Module):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 device: torch.device = torch.device("cpu")):
+                 sigma: Callable = lambda x: x, local: bool = False, device: torch.device = torch.device("cpu")):
         super(_CTBE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -443,12 +508,14 @@ class _CTBE(torch.nn.Module):
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
         self.h_init = self.h.clone()
         self.dh = torch.zeros_like(self.h)
+        self.sigma = sigma
 
         # System parameters
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.device = device
         self.delta = delta
+        self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -459,6 +526,14 @@ class _CTBE(torch.nn.Module):
     def adjust_eigs(self, delta=0.01):
         """Placeholder for eigenvalue adjustment"""
         pass
+
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.h_init
+
+    @staticmethod
+    def handle_inputs(u, du):
+        # in the general case DO NOTHING
+        return u, du
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Exact matrix exponential forward pass"""
@@ -487,7 +562,11 @@ class _CTBE(torch.nn.Module):
 
         # State update
         self.h = rec + inp
-        y = self.C(self.h)
+        # Compute output using a nonlinear activation function
+        if self.local:
+            y = self.C(self.sigma(h))
+        else:
+            y = self.C(self.sigma(self.h))
 
         # Derivative calculation
         self.dh = (self.h - h) / self.delta
@@ -515,6 +594,7 @@ class BasicPredictor(torch.nn.Module):
         # Hidden state
         self.h = torch.randn(1, h_dim)
         self.h_init = self.h.clone()
+        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Simple nonlinear prediction step"""
@@ -560,6 +640,8 @@ class BasicImagePredictor(torch.nn.Module):
             torch.nn.Sigmoid()
         )
 
+        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
+
     def forward(self, y, first=False):
         return self.net(self.transforms(y))
 
@@ -584,6 +666,7 @@ class BasicTokenGenerator(torch.nn.Module):
         self.du_dim = du_dim
         self.device = device
         self.delta = 1.     # already defined in discrete time
+        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     @torch.no_grad()
     def adjust_eigs(self, delta=0.01):
@@ -619,6 +702,7 @@ class BasicTokenPredictor(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, d_dim, bias=False)
         self.h = torch.randn((1, h_dim))  # initial state
         self.h_init = self.h.clone()
+        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y, first=False):
         if first:
