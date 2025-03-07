@@ -99,13 +99,13 @@ export default function Console({ _agentName_, _isPaused_, _setBusy_}) {
     // returning the <div>...</div> that will be displayed when the console is actually working
     return (
         <div className="flex items-start justify-start w-full h-full">
-            <div className="w-full h-full pb-2 pl-2 pr-2">
+            <div className="w-full h-full pb-2 pl-2 pr-2 pt-1">
                 <div className="overflow-y-auto h-full">
                     <ul>
                         {messages.map((message, index) => (
                             <li
                                 key={index}
-                                className={`text-left p-0 break-words ${index === messages.length - 1 ?
+                                className={`text-sm text-left p-0 pt-1 break-words ${index === messages.length - 1 ?
                                     'font-bold text-black' : 'text-gray-700'} hover:bg-gray-200 transition`}
                             >
                                 {message}

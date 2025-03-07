@@ -661,7 +661,7 @@ export default function Main() {
 
                     <div className="flex gap-2 items-center"
                          style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
-                        {["\u221E", "1S", "1", "100", "1k", "100k"].map((option) => (
+                        {["1S", "1", "100", "1k", "100k", "\u221E"].map((option) => (
                             <button key={option} onClick={() => setSelectedPlayOption(option)}
                                 className={selectedPlayOption === option ? "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
                                     "px-2 py-0 rounded-2xl" : "h-6 text-sm bg-gray-100 hover:bg-gray-200 px-2 py-0 " +
