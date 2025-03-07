@@ -700,14 +700,18 @@ export default function Main() {
                                         <h2 className="font-medium text-lg flex items-center justify-center">
                                             <span className="mr-1">{agent_button.label}</span>
                                             <button
-                                                className="w-6 h-6 bg-green-200 rounded-full flex items-center
-                                                justify-center ml-2"
+                                                className={`w-6 h-6 
+                                                ${openFSMPanels.includes(agent_button.id) ? 
+                                                    "bg-blue-600" : "bg-gray-200"} rounded-full flex items-center
+                                                justify-center ml-2`}
                                                 onClick={() => toggleFSMPanel(agent_button.id)}>
                                                 B
                                             </button>
                                             <button
-                                                className="w-6 h-6 bg-blue-200 rounded-full flex items-center
-                                                justify-center ml-2"
+                                                className={`w-6 h-6 
+                                                ${openConsolePanels.includes(agent_button.id) ? 
+                                                    "bg-blue-600" : "bg-gray-200"} rounded-full flex items-center
+                                                justify-center ml-2`}
                                                 onClick={() => toggleConsolePanel(agent_button.id)}>
                                                 C
                                             </button>
