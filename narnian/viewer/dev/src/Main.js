@@ -702,7 +702,7 @@ export default function Main() {
                                             <button
                                                 className={`w-6 h-6 
                                                 ${openFSMPanels.includes(agent_button.id) ? 
-                                                    "bg-blue-600" : "bg-gray-200"} rounded-full flex items-center
+                                                    "bg-blue-500" : "bg-gray-100"} rounded-full flex items-center
                                                 justify-center ml-2`}
                                                 onClick={() => toggleFSMPanel(agent_button.id)}>
                                                 B
@@ -710,7 +710,7 @@ export default function Main() {
                                             <button
                                                 className={`w-6 h-6 
                                                 ${openConsolePanels.includes(agent_button.id) ? 
-                                                    "bg-blue-600" : "bg-gray-200"} rounded-full flex items-center
+                                                    "bg-blue-500" : "bg-gray-100"} rounded-full flex items-center
                                                 justify-center ml-2`}
                                                 onClick={() => toggleConsolePanel(agent_button.id)}>
                                                 C
