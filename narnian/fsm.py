@@ -310,7 +310,6 @@ class FiniteStateMachine:
 
                 if len(actions_list) == 0:
                     self.__act_transitions_status = None
-                return False
             else:
 
                 # transition

@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react";
 import { select as d3_select, zoom as d3_zoom, zoomIdentity as d3_zoomIdentity, interrupt as d3_interrupt } from "d3";
 import { forceSimulation as d3_forceSimulation, forceLink as d3_forceLink, forceManyBody as d3_forceManyBody,
-    forceCenter as d3_forceCenter} from "d3-force";
+    forceCenter as d3_forceCenter, forceCollide as d3_forceCollide} from "d3-force";
 import { drag as d3_drag } from "d3-drag";
 import { read as dotRead } from "graphlib-dot"
 import {callAPI, out} from "./utils"
@@ -227,7 +227,8 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             const attributes = graph.node(nodeName);
             return {
                 name: nodeName,
-                id: attributes.id
+                id: attributes.id,
+                label: attributes.label.trim()
             };
         });
 
@@ -255,8 +256,9 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         // creating a new simulation (and stopping it, immediately)
         const sim = d3_forceSimulation(graphData.nodes)
             .force("link", d3_forceLink(graphData.links).id((d) => d.id).distance(100))
-            .force("charge", d3_forceManyBody().strength(-200))
+            .force("charge", d3_forceManyBody().strength(-150))
             .force("center", d3_forceCenter(width / 2, height / 2))
+            .force("collide", d3_forceCollide().radius(110))
             .stop();
 
         // saving the state with the new simulation (and possibly stopping an already running one)
@@ -307,20 +309,50 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             .attr("text-anchor", "middle")
             .style("font-size", "12px")
             .style("pointer-events", "none")
-            .attr("x", (d, i) => (d.source.x + d.target.x) / 2 + (i * 30))
-            .attr("y", (d, i) => (d.source.y + d.target.y) / 2 + (i * 30))
+            .attr("x", (d, i) => (d.source.x + d.target.x) / 2)
+            .attr("y", (d, i) => (d.source.y + d.target.y) / 2)
             .attr("id", (d) => (d.id))
             .style("cursor", "default")
-            .text((d) => d.label)
             .on("click", (event, d) => {
                 event.stopPropagation();
                 if (!event.isTrusted) {
                     highlightEdge(d);
                 }
+            }).each(function (d) {
+                const label = d3_select(this);
+                const pos = d.label.indexOf("(");
+                const mainText = d.label.slice(0, pos);
+                const subText = (pos === (d.label.length - 3)) ? "" : d.label.slice(pos);
+
+                const dy = d.target.y - d.source.y;
+                const relationLabelY = subText.length > 0 ? (-3 + (dy > 0 ? 5 : -5)) : (5 + (dy > 0 ? 5 : -5));
+
+                label.append("tspan")
+                    .text(mainText)
+                    .style("font-size", "12px")
+                    .attr("x", d3_select(this).attr("x"))
+                    .attr("dy", relationLabelY.toString());
+
+                if (subText.length > 0) {
+                    const subTexts = [];
+                    const maxLength = 35;
+                    for (let i = 0; i < subText.length; i += maxLength) {
+                        subTexts.push(subText.slice(i, i + maxLength));
+                    }
+                    subTexts.forEach((text, index) => {
+                        label.append("tspan")
+                            .text(text)
+                            .style("font-size", "6px")
+                            .attr("x", d3_select(this).attr("x"))
+                            .attr("dy", index === 0 ? "7" : "6");
+                    });
+                }
             });
 
           // dynamically update the width and height of the node based on the label's bounding box (used many times)
         function updateNodePositionsAndSizes() {
+
+            // update nodes
             node.each(function (d) {
                 const textElement = label.filter((ld) => ld.id === d.id).node();
                 if (textElement) {
@@ -332,6 +364,25 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
                 .attr("height", (d) => d.height)
                 .attr("x", (d) => d.x - d.width / 2)
                 .attr("y", (d) => d.y - d.height / 2);
+
+            // update also edge positions
+            link.attr("d", getLinkPath);
+
+            // update also edge labels' positions
+            edgeLabel.attr("x", (d) => (d.source.x + d.target.x) / 2)
+                .attr("y", (d) => (d.source.y + d.target.y) / 2)
+                .each(function (d) {
+                    const label = d3_select(this);
+                    label.selectAll("tspan").attr("x", d3_select(this).attr("x"));
+                });
+
+            // update node labels' positions to match the node's center
+            label.attr("x", d => d.x)
+                .attr("y", d => d.y)
+                .each(function (d) {
+                    const label = d3_select(this);
+                    label.selectAll("tspan").attr("x", d3_select(this).attr("x"));
+                });
         }
 
         // drag action, applied to nodes (will be provided as attribute in what follows)
@@ -341,9 +392,6 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
                 // fixing position of nodes and labels (to synch them at the beginning)
                 d.fx = d.x;
                 d.fy = d.y;
-                label.filter((ld) => ld.id === d.id)
-                    .attr("x", d.x)
-                    .attr("y", d.y);
             })
             .on("drag", (event, d) => {
 
@@ -356,21 +404,6 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
                 // running a simulation tick to let the other nodes/edges move in function of the current movement
                 sim.tick();
 
-                // update node position using the event data structure (now on the node)
-                node.attr("x", d => d.x - d.width / 2)
-                    .attr("y", d => d.y - d.height / 2);
-
-                // update edge positions during the drag
-                link.attr("d", getLinkPath);
-
-                // update edge labels' positions
-                edgeLabel.attr("x", (d) => (d.source.x + d.target.x) / 2)
-                    .attr("y", (d) => (d.source.y + d.target.y) / 2);
-
-                // update node labels' positions to match the node's center
-                label.attr("x", d => d.x)
-                    .attr("y", d => d.y);
-
                 // dynamically update the width and height of the node based on the label's bounding box
                 updateNodePositionsAndSizes();
             })
@@ -378,11 +411,6 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
 
                 // when drag ends, we do the same thing done above
                 updateNodePositionsAndSizes();
-
-                // update label position on drag end to align with the node
-                label.filter((ld) => ld.id === d.id)
-                    .attr("x", d.x)
-                    .attr("y", d.y);
 
                 // adding a weird condition on the simulation
                 if (!event.active) {
@@ -416,13 +444,32 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             .data(graphData.nodes)
             .enter()
             .append("text")
-            .text((d) => d.name)
             .attr("x", (d) => d.x)
             .attr("y", (d) => d.y)
             .attr("text-anchor", "middle")
             .attr("dominant-baseline", "middle")
             .style("font-size", "14px")
-            .style("pointer-events", "none");
+            .style("pointer-events", "none")
+            .each(function (d) {
+                const label = d3_select(this);
+                const pos = d.label.indexOf("\n");
+                const mainText = (pos > 0) ? d.label.slice(0, pos).trim() : d.label;
+                const subText = (pos > 0) ? d.label.slice(pos + 1).trim() : null;
+
+                label.append("tspan")
+                    .text(mainText)
+                    .style("font-size", "14px")
+                    .attr("x", d3_select(this).attr("x"))
+                    .attr("dy", (subText) ? "-2" : "0");
+
+                if (subText) {
+                    label.append("tspan")
+                        .text(subText)
+                        .style("font-size", "6px")
+                        .attr("x", d3_select(this).attr("x"))
+                        .attr("dy", "9");
+                }
+            });
 
         // dynamically update the width and height of the node based on the label's bounding box
         updateNodePositionsAndSizes();

@@ -608,12 +608,17 @@ export default function Main() {
                         <button
                             className={`relative flex items-center justify-center mr-1 pointer-events-none 
                             h-6 w-6 rounded-full 
-                            ${playPauseStatus.status === 'playing' 
-                            && playPauseStatus.still_to_play > 1 ? "bg-red-500" :
-                                playPauseStatus.status === 'playing' 
-                                && playPauseStatus.still_to_play === 1
-                                    ? "bg-orange-400" : playPauseStatus.status === 'paused' ? "bg-green-500" 
-                                        : "bg-gray-400"}`}
+                            ${playPauseStatus.status === 'paused' ? "bg-green-500" :
+                                    (playPauseStatus.status === 'ended' ? "bg-gray-400" :
+                                            (playPauseStatus.status === 'playing' ?
+                                                    (playPauseStatus.still_to_play === 1 ? "bg-orange-400" :
+                                                            (playPauseStatus.still_to_play !== 0 ? "bg-red-500" :
+                                                                   "bg-blue-400" // "unexpected value still_to_play!"
+                                                            )
+                                                    ) :  "bg-gray-400" // "unexpected status!"
+                                            )
+                                    )
+                            }`}
                         >
                         </button>
 
