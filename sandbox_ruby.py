@@ -5,7 +5,6 @@ from basic.basic_model import BasicModel
 from basic.basic_streams import Sin, Square
 from basic.basic_environment import BasicEnvironment
 
-
 # creating environment
 env = BasicEnvironment("Env", title="Ruby's Sandbox")
 
@@ -23,25 +22,25 @@ ag = BasicAgent("Teacher", model=BasicModel(attributes=env.shared_attributes, lr
 ag.add_transit("init", "got_streams", action="get_streams")
 ag.add_transit("got_streams", "got_agents", action="get_agents")
 ag.add_transit("got_agents", "recording1", action="record",
-                     args={"stream_hash": env.name + ":sin", "steps": 200})
+               args={"stream_hash": env.name + ":sin", "steps": 200})
 ag.add_transit("recording1", "recording2", action="record",
-                     args={"stream_hash": env.name + ":square", "steps": 200})
+               args={"stream_hash": env.name + ":square", "steps": 200})
 ag.add_transit("recording2", "playlist_ready", action="set_pref_streams",
-                     args={"stream_hashes": [ag.name + ":recorded1", ag.name + ":recorded2"], "repeat": 1})
+               args={"stream_hashes": [ag.name + ":recorded1", ag.name + ":recorded2"], "repeat": 1})
 ag.add_state_action("playlist_ready", action="find_agent_to_engage", args={"min_auth": 0.0, "max_auth": 0.0})
 ag.add_transit("playlist_ready", "student_found", action="send_engagement")
 ag.add_transit("student_found", "playlist_ready", action="nop")
 ag.add_transit("student_found", "student_engaged", action="got_engagement")
 ag.add_transit("student_engaged", "stream_shared", action="share_streams")
 ag.add_transit("stream_shared", "asked_learn", action="ask_learn_gen",
-                     args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>",
-                           "ask_steps": 200})
+               args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>",
+                     "ask_steps": 200})
 ag.add_transit("asked_learn", "done_learn", action="done_learn_gen")
 ag.add_transit("done_learn", "asked_gen", action="ask_gen",
-                     args={"du_hash": "<playlist>",  "dhat_hash": "<playlist>", "ask_steps": 200})
+               args={"du_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": 200})
 ag.add_transit("asked_gen", "done_gen", action="done_gen")
 ag.add_state_action("done_gen", action="eval",
-                          args={"stream_hash": "<playlist>", "what": "y", "how": "mse", "steps": 200})
+                    args={"stream_hash": "<playlist>", "what": "y", "how": "mse", "steps": 200})
 ag.add_transit("done_gen", "stream_shared", action="compare_eval", args={"cmp": ">", "thres": 0.5})
 ag.add_transit("done_gen", "good", action="compare_eval", args={"cmp": "<=", "thres": 0.5})
 ag.add_state_action("good", action="next_pref_stream")
