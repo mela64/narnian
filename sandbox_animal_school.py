@@ -33,8 +33,8 @@ ag.add_transit("got_agents", "exam_prepared", action="record",
                args={"stream_hash": env.name + ":all-ani", "steps": 70})
 
 # engaging students, teaching and, afterward, evaluating students
-ag.add_transit("exam_prepared", "basic/behaviours/teaching_and_evaluating_pred.json", action="set_pref_streams",
-               args={"stream_hashes": [env.name + ":3-ani", env.name + ":4-ani"]},
+ag.add_transit("exam_prepared", "basic/behaviours/teach-playlist_eval-recorded1_pred.json",
+               action="set_pref_streams", args={"stream_hashes": [env.name + ":3-ani", env.name + ":4-ani"]},
                wildcards={"<agent_name>": ag.name, "<learn_steps>": 160, "<eval_steps>": 70, "<cmp_thres>": 0.5})
 
 # promoting students that were positively evaluated

@@ -15,7 +15,7 @@
         "time_to_work": [null, null, 8],
         "asked_gen": [null, null, 9],
         "done_gen": [null, null, 10],
-        "time_to_eval": ["eval", {"stream_hash": "<playlist>", "what": "y", "how": "mse", "steps": "<eval_steps>"}, 11],
+        "time_to_eval": ["eval", {"stream_hash": "<agent_name>:recorded1", "what": "y", "how": "mse", "steps": "<eval_steps>"}, 11],
         "all_bad": [null, null, 12],
         "some_good": [null, null, 13]
     },
@@ -49,7 +49,7 @@
             "time_to_work": [["share_streams", {}, false, 11]]
         },
         "time_to_work": {
-            "asked_gen": [["ask_gen", {"du_hash": "<playlist>",  "dhat_hash": "<playlist>", "ask_steps": "<eval_steps>"}, false, 12]]
+            "asked_gen": [["ask_gen", {"du_hash": "<agent_name>:recorded1",  "dhat_hash": "<agent_name>:recorded1", "ask_steps": "<eval_steps>"}, false, 12]]
         },
         "asked_gen": {
             "done_gen": [["done_gen", {}, false, 13]]

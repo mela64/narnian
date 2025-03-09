@@ -12,8 +12,8 @@
     "transitions": {
         "teacher_engaged": {
             "got_more_streams": [["get_streams", {}, false, 0]],
-            "learned": [["do_learn_pred", {}, false, 1]],
-            "predicted": [["do_pred", {}, false, 2]]
+            "learned": [["do_learn_gen", {}, false, 1],["do_learn_pred", {}, false, 1],["do_learn_gen_and_pred", {}, false, 1]],
+            "predicted": [["do_gen", {}, false, 2],["do_pred", {}, false, 2],["do_gen_and_pred", {}, false, 2]]
         },
         "got_more_streams": {
             "teacher_engaged": [["nop", {}, false, 3]]
