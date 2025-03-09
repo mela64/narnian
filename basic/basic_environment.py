@@ -5,10 +5,10 @@ from narnian.streams import Stream
 
 class BasicEnvironment(Environment):
 
-    def __init__(self, name):
+    def __init__(self, name: str, title: str | None = None):
         """Create a new basic environment."""
 
-        super(BasicEnvironment, self).__init__(name)
+        super(BasicEnvironment, self).__init__(name, title)
         self.commands_to_send.append("kill")
         self.commands_to_receive.append("kill")
 
@@ -39,12 +39,12 @@ class BasicEnvironment(Environment):
         super().add_agent(agent)
 
         # send (don't wait), get (wait), got (wait)
-        agent.behav.wait_for_all_action_that_start_with("get_")
-        agent.behav.wait_for_all_action_that_start_with("got_")
+        agent.behav.wait_for_all_actions_that_start_with("get_")
+        agent.behav.wait_for_all_actions_that_start_with("got_")
 
         # ask (don't wait), do (wait), done (wait)
-        agent.behav.wait_for_all_action_that_start_with("do_")
-        agent.behav.wait_for_all_action_that_start_with("done_")
+        agent.behav.wait_for_all_actions_that_start_with("do_")
+        agent.behav.wait_for_all_actions_that_start_with("done_")
 
     def add_stream(self, stream: Stream):
         """Add a stream and create a unique, long, set of merged descriptor component labels (attribute labels)."""

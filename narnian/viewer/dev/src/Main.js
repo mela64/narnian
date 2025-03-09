@@ -14,13 +14,14 @@ import {
     Activity,
     Search,
     Waves,
+    GraduationCap
 } from "lucide-react";
 
 let clickTimeout; // timer that triggers a reaction to the click action
 let clickCount = 0;  // number of consecutive clicks (to distinguish clicks from double clicks)
 
 // icons used in the agent buttons or stream buttons
-const agentButtonIcons = [<Settings/>, <Bot/>];
+const agentButtonIcons = [<Settings/>, <Bot/>, <GraduationCap/>];
 const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 
 
@@ -54,6 +55,7 @@ export default function Main() {
 
     // the name of the environment (set to "?" if unknown)
     const [envName, setEnvName] = useState("?");
+    const [envTitle, setEnvTitle] = useState("?");
 
     // the structure with the current play/pause status of the environment (see "unknownPlayPauseStatus" above)
     const [playPauseStatus, setPlayPauseStatus] = useState(unknownPlayPauseStatus);
@@ -97,8 +99,8 @@ export default function Main() {
         out("[Main] useEffect *** fetching data (environment name) ***");
 
         callAPI('/get_env_name', null,
-            (x) => setEnvName(x),
-            () => setEnvName("?"),
+            (x) => { setEnvName(x.name); setEnvTitle(x.title) },
+            () => { setEnvName("?"); setEnvTitle("?") },
             () => {
             });
     }, []);
@@ -114,19 +116,40 @@ export default function Main() {
 
         callAPI('/get_list_of_agents', "agent_name=" + envName,
             (x) => {
-                x.unshift(envName); // adding the name of the environment as extra agent
-                const agent_buttons = x.map((label, index) => ({
-                    id: index + 1,  // button indices start from 1
-                    label,
-                    icon: index === 0 ? agentButtonIcons[0] : agentButtonIcons[1],
-                }));
-                setOpenFSMPanels(agent_buttons.map(agent_button => agent_button.id));
-                setOpenConsolePanels(agent_buttons.map(agent_button => agent_button.id));
-                setAgentButtons(agent_buttons);
+                const agent_names = x.agents;
+                const agent_authorities = x.authorities;
+
+                const firstTime = agentButtonsRef.current.length === 0;
+                const needToRefreshButtons = agent_names.some((name, i) =>
+                    agentButtonsRef.current.some(
+                        button => button.label === name && button.authority !== agent_authorities[i])
+                );
+
+                // if it is the first time, or if the authority changed...
+                if (firstTime || needToRefreshButtons) {
+                    agent_names.unshift(envName); // adding the name of the environment as extra agent
+                    agent_authorities.unshift(-1.); // fake authority for the environment
+                    const agent_buttons = agent_names.map((label, index) => ({
+                        id: index + 1,  // button indices start from 1
+                        label,
+                        authority: agent_authorities[index],
+                        icon: index === 0 ? agentButtonIcons[0] : (
+                            agent_authorities[index] < 1.0 ? agentButtonIcons[1] : agentButtonIcons[2]),
+                    }));
+
+                    // if it is the first time (only!), we collect the button IDs in the other panel-associated lists
+                    if (firstTime) {
+                        setOpenFSMPanels(agent_buttons.map(agent_button => agent_button.id));
+                        setOpenConsolePanels(agent_buttons.map(agent_button => agent_button.id));
+                    }
+
+                    setAgentButtons(agent_buttons);
+                }
             },
             () => setAgentButtons([]),
             () => {});
-    }, [envName]);  // when the status of the loading env name operation changes, we get the agent list
+    }, [envName, isPaused]);  // when the status of the loading env name operation changes, we get the agent list
+    // it the authority changed, we need to update button graphics, so we also call this API when isPaused
 
     // when paused, we get the list of streams for all the agents of the environment
     useEffect(() => {
@@ -590,7 +613,7 @@ export default function Main() {
                 <div className="flex flex-col items-center justify-center text-center">
                     <h1 className="text-2xl font-semibold mt-2">NARNIAN</h1>
                     <h1 className="text-2xl font-semibold mt-2">Environment:{" "}
-                        {envName}</h1>
+                        {envTitle}</h1>
                 </div>
 
                 <div className="flex flex-wrap gap-4 w-full justify-center">

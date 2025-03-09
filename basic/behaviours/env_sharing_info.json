@@ -1,0 +1,27 @@
+{
+    "initial_state": "ready_to_share",
+    "state": "ready_to_share",
+    "prev_state": null,
+    "limbo_state": null,
+    "state_actions": {
+        "ready_to_share": [null, null, 0],
+        "streams_enabled": [null, null, 1],
+        "streams_sent": [null, null, 2],
+        "contacts_shared": [null, null, 3]
+    },
+    "transitions": {
+        "ready_to_share": {
+            "streams_enabled": [["enable_all_streams", {}, false, 0]]
+        },
+        "streams_enabled": {
+            "streams_sent": [["send_streams_to_all", {}, false, 1]]
+        },
+        "streams_sent": {
+            "contacts_shared": [["send_agents_to_all", {}, false, 2]]
+        },
+        "contacts_shared": {}
+    },
+    "action": null,
+    "action_step": 0,
+    "param_buffer": {}
+}

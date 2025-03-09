@@ -104,19 +104,25 @@ class Model(torch.nn.Module):
         return mode
 
     # noinspection PyMethodMayBeStatic
-    def compare_y(self, y_a: torch.Tensor, y_b: torch.Tensor) -> float:
-        """Compare two samples of signals, returning a dissimilarity score in [0,1]."""
-        if y_a.dtype == torch.long and y_b.dtype == torch.long:  # token IDS
-            return float((y_a == y_b).item())  # accuracy
-        else:
-            mse = torch.nn.functional.mse_loss(y_a, y_b, reduction='mean')
-            return min(mse.item(), 1.0)   # MSE
+    def compare(self, a: torch.Tensor, b: torch.Tensor, how: str = "mse") -> float:
+        """Compare two samples of signals or descriptors, returning a dissimilarity score >= 0."""
 
-    # noinspection PyMethodMayBeStatic
-    def compare_d(self, d_a: torch.Tensor, d_b: torch.Tensor) -> float:
-        """Compare two samples of descriptors, returning a dissimilarity score in [0,1]."""
-        if d_a.dtype == torch.long and d_b.dtype == torch.long:  # token IDS
-            return float((d_a == d_b).item())  # accuracy
+        assert how in ['mse', 'max'] or how.startswith("geq"), f"Invalid comparison in terms of {how}"
+
+        if a.dtype == torch.long and b.dtype == torch.long:  # token IDS
+            return 1. - float((a == b).item())  # accuracy
+        elif how == "mse":
+            ret = torch.nn.functional.mse_loss(a, b, reduction='mean')
+        elif how == "max":
+            ret = 1. - float((torch.argmax(a) == torch.argmax(b)).item())
         else:
-            mse = torch.nn.functional.mse_loss(d_a, d_b, reduction='mean')
-            return min(mse.item(), 1.0)   # MSE
+            thres = float(how[3:])
+            ret = 1. - float(torch.sum((a > thres) == (b > thres)).item()) / a.numel()
+        return ret
+
+
+class EmptyModel(Model):
+    def __init__(self):
+        super(EmptyModel, self).__init__(generator=torch.nn.Identity(), predictor=torch.nn.Identity(),
+                                         attributes=[Attributes(shape=None, labels=None),
+                                                     Attributes(shape=None, labels=None)])

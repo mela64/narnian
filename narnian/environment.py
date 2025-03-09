@@ -1,3 +1,4 @@
+import os
 import inspect
 import threading
 from .agent import Agent
@@ -7,11 +8,12 @@ from .streams import Stream, Attributes
 
 class Environment:
 
-    def __init__(self, name):
+    def __init__(self, name: str, title: str | None = None):
         """Create a new environment."""
 
         self.name = name  # name of the environment (keep it unique)
-        self.behav = FiniteStateMachine(self, policy="sampling")  # FSM that describes the environment's behaviour
+        self.title = title if title is not None else name  # longer name
+        self.behav = FiniteStateMachine(self)  # FSM that describes the environment's behaviour
         self.streams = {}  # streams that are available in this environment
         self.agents = {}  # agents living in this environment
         self.print_enabled = True  # if output should be printed to screen
@@ -83,6 +85,17 @@ class Environment:
         for stream_name, stream in self.streams.items():
             stream.attributes[1].interleave_with(self.shared_attributes[1])
 
+    def add_transit(self, *args, **kwargs):
+        self.behav.add_transit(*args, **kwargs)
+
+    def save(self, where: str = "output"):
+        if not os.path.exists(where):
+            os.makedirs(where)
+        self.behav.save(os.path.join(where, f"{self.name}.json"))
+        self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))
+        for agent in self.agents.values():
+            agent.save(where)
+
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""
 
@@ -104,7 +117,7 @@ class Environment:
         self.output_messages_last_pos = (self.output_messages_last_pos + 1) % len(self.output_messages)
         self.output_messages_count = min(self.output_messages_count + 1, len(self.output_messages))
         self.output_messages_ids[self.output_messages_last_pos] = last_id + 1
-        self.output_messages[self.output_messages_last_pos] = s
+        self.output_messages[self.output_messages_last_pos] = msg
 
         if self.print_enabled:
             print(s)
@@ -140,7 +153,7 @@ class Environment:
             # increase the step index of all existing streams (keep it here, after "wait", even if it sounds odd)
             Stream.next_step()
 
-            self.out(f">>> Running step {self.step} <<<", show_state=False, show_act=False)
+            self.out(f">>> Clock step {self.step} <<<", show_state=False, show_act=False)
 
             self.behav.act_states()
             for agent in sorted_agents:

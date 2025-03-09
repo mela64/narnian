@@ -1,3 +1,4 @@
+import os
 import inspect
 from .model import Model
 from .streams import Stream
@@ -12,7 +13,7 @@ class Agent:
         """Create a new agent."""
 
         self.name = name  # name of the agent (keep it unique)
-        self.behav = FiniteStateMachine(self, policy="sampling")  # FSM that describes the agent's behaviour
+        self.behav = FiniteStateMachine(self)  # FSM that describes the agent's behaviour
         self.model = model  # the PyTorch module that implements the agent
         self.authority = authority  # authority level (right now assuming 0 = student and 1 = teacher)
         self.known_streams = {}  # streams that are known to this agent
@@ -77,7 +78,7 @@ class Agent:
         self.output_messages_last_pos = (self.output_messages_last_pos + 1) % len(self.output_messages)
         self.output_messages_count = min(self.output_messages_count + 1, len(self.output_messages))
         self.output_messages_ids[self.output_messages_last_pos] = last_id + 1
-        self.output_messages[self.output_messages_last_pos] = s
+        self.output_messages[self.output_messages_last_pos] = msg
 
         if self.print_enabled:
             print(s)
@@ -142,8 +143,18 @@ class Agent:
         else:
             return False
 
+    def add_transit(self, *args, wildcards: dict[str, str] | None = None, **kwargs):
+        self.behav.set_wildcards(wildcards)
+        self.behav.add_transit(*args, **kwargs)
+
     def get_action_step(self):
         return self.behav.action_step
+
+    def save(self, where: str = "output"):
+        if not os.path.exists(where):
+            os.makedirs(where)
+        self.behav.save(os.path.join(where, f"{self.name}.json"))
+        self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))
 
     def nop(self):
         """Do nothing."""
@@ -204,6 +215,9 @@ class Agent:
         for stream_name, stream in streams.items():
             self.known_streams[stream_name] = stream
         return True
+
+    def behave_as(self, agent: Self):
+        self.behav.include(agent.behav, copy=True)
 
     @staticmethod
     def __string_args(args, values):

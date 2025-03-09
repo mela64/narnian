@@ -228,7 +228,7 @@ class Dataset(Stream):
 class ImageDataset(Stream):
 
     def __init__(self, image_dir: str, label_file_csv: str,
-                 device: torch.device = None, circular: bool = False):
+                 device: torch.device = None, circular: bool = True):
         super().__init__()
         self.image_dir = image_dir
         self.device = device

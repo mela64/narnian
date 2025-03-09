@@ -17,7 +17,7 @@ class Attributes:
         if self.data_type == 'misc':
             assert inv_img_transform is None, "It does not make sense to specify an inv_img_transform for non-img data"
             self.inv_img_transform = None
-            self.shape = torch.Size(shape)
+            self.shape = torch.Size(shape) if shape is not None else None
 
         # the case of images
         elif self.data_type == 'img':
@@ -28,7 +28,7 @@ class Attributes:
         elif self.data_type == 'token_ids':
             assert inv_img_transform is None, "It does not make sense to specify an inv_img_transform for non-img data"
             self.inv_img_transform = None
-            self.shape = torch.Size(shape)
+            self.shape = torch.Size(shape) if shape is not None else None
 
         # labels are valid when the shape tells that the array is 1d
         self.labels = labels   # only in case of 1d arrays

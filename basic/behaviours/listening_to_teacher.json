@@ -1,0 +1,31 @@
+{
+    "initial_state": "teacher_engaged",
+    "state": "teacher_engaged",
+    "prev_state": null,
+    "limbo_state": null,
+    "state_actions": {
+        "teacher_engaged": [null, null, 0],
+        "got_more_streams": [null, null, 1],
+        "learned": [null, null, 2],
+        "predicted": [null, null, 3]
+    },
+    "transitions": {
+        "teacher_engaged": {
+            "got_more_streams": [["get_streams", {}, false, 0]],
+            "learned": [["do_learn_pred", {}, false, 1]],
+            "predicted": [["do_pred", {}, false, 2]]
+        },
+        "got_more_streams": {
+            "teacher_engaged": [["nop", {}, false, 3]]
+        },
+        "learned": {
+            "teacher_engaged": [["nop", {}, false, 4]]
+        },
+        "predicted": {
+            "teacher_engaged": [["nop", {}, false, 5]]
+        }
+    },
+    "action": null,
+    "action_step": 0,
+    "param_buffer": {}
+}

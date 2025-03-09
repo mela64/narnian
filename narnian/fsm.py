@@ -1,14 +1,15 @@
+import os
 import json
-import torch
 import inspect
 import graphviz
+from typing_extensions import Self
 from collections.abc import Iterable
 
 
 class FiniteStateMachine:
     DEBUG = True
 
-    def __init__(self, actionable: object, policy: str = "sampling"):
+    def __init__(self, actionable: object, wildcards: dict[str, str] | None = None):
         self.initial_state = None
         self.prev_state = None
         self.limbo_state = None
@@ -17,17 +18,14 @@ class FiniteStateMachine:
         self.transitions = {}
         self.source_state_and_action_to_id = {}
         self.actionable = actionable
+        self.wildcards = wildcards if wildcards is not None else {}
         self.param_buffer = {}  # dictionary of pre-buffered parameter names and their current value
         self.action_to_params = {}  # list of parameter names for each action
-        self.policy = policy
         self.action = None  # action that is being executed and its arguments
         self.action_step = 0
         self.__act_transitions_status = None
         self.__tot_states = 0
         self.__tot_actions = 0
-
-        assert self.policy in ["uniform", "sampling"], \
-            f"Invalid policy: {self.policy}, it must be in ['uniform', 'sampling']"
 
     def __str__(self):
 
@@ -36,10 +34,9 @@ class FiniteStateMachine:
             'state': self.state,
             'prev_state': self.prev_state,
             'limbo_state': self.limbo_state,
-            'policy': self.policy,
             'state_actions': {
                 state: str([state_action_tuple[0].__name__ if state_action_tuple[0] is not None else None,
-                            state_action_tuple[1]])
+                            state_action_tuple[1], state_action_tuple[2]])
                 for state, state_action_tuple in self.states.items() if state_action_tuple is not None
             },
             'transitions': {
@@ -60,12 +57,19 @@ class FiniteStateMachine:
         json_string = json_string.replace("]\"", "]")
         json_string = json_string.replace("'", "\"")
         json_string = json_string.replace("None", "null")
+        json_string = json_string.replace("False", "false")
+        json_string = json_string.replace("True", "true")
         return json_string
 
     def set_actionable(self, obj: object):
         """Set the object where actions should be found (as methods)."""
 
         self.actionable = obj
+
+    def set_wildcards(self, wildcards: dict[str, str] | None):
+        """Set the dictionary of wildcards used during the loading process."""
+
+        self.wildcards = wildcards if wildcards is not None else {}
 
     def add_state_action(self, state: str, action: str = None, args: dict | None = None, state_id: int | None = None):
         """Add an action (inner action) to an existing state (or creating it from scratch, if not existent)."""
@@ -88,12 +92,23 @@ class FiniteStateMachine:
                         param.default is not inspect.Parameter.empty}
             self.action_to_params[action_callable.__name__] = (params, defaults)
 
+            for k, v in args.items():
+                if isinstance(v, str):
+                    for wildcard_from, wildcard_to in self.wildcards.items():
+                        if wildcard_from == v and not isinstance(wildcard_to, str):
+                            args[k] = wildcard_to
+                        elif wildcard_from in v:
+                            args[k] = v.replace(wildcard_from, wildcard_to)
+
             # saving operation
             self.states[state] = (action_callable, args, state_id)
             self.__tot_states += 1
         else:
             self.states[state] = (None, None, state_id)
             self.__tot_states += 1
+
+        if len(self.states) == 1:
+            self.set_state(state)
 
     def get_state(self) -> str:
         """Returns the current state of the FSM."""
@@ -114,7 +129,7 @@ class FiniteStateMachine:
     def set_state(self, state: str):
         """Set the current state."""
 
-        if state in self.transitions:
+        if state in self.transitions or state in self.states:
             self.prev_state = self.state
             self.state = state
             if self.initial_state is None:
@@ -126,11 +141,66 @@ class FiniteStateMachine:
                     action: str, args: dict | None = None, wait: bool = False, act_id: int | None = None):
         """Define a transition between two states with an associated action."""
 
+        # plugging a previously loaded FSM
+        if os.path.exists(to_state):
+            file_name = to_state
+            fsm = FiniteStateMachine(self.actionable).load(file_name)
+
+            # first, we avoid name clashes, renaming already-used-state-names in original_name~1 (or ~2, or ~3, ...)
+            fsm_states = list(fsm.states.keys())  # keep it as a list, since the dictionary will change
+            for state in fsm_states:
+                renamed_state = state
+                i = 1
+                while renamed_state in self.states or (i > 1 and renamed_state in fsm.states.keys()):
+                    renamed_state = state + "." + str(i)
+                    i += 1
+
+                if fsm.initial_state == state:
+                    fsm.initial_state = renamed_state
+                if fsm.prev_state == state:
+                    fsm.prev_state = renamed_state
+                if fsm.state == state:
+                    fsm.state = renamed_state
+                if fsm.limbo_state == state:
+                    fsm.limbo_state = renamed_state
+
+                fsm.states[renamed_state] = fsm.states[state]
+                if renamed_state != state:
+                    del fsm.states[state]
+                fsm.transitions[renamed_state] = fsm.transitions[state]
+                if renamed_state != state:
+                    del fsm.transitions[state]
+
+                for to_states in fsm.transitions.values():
+                    if state in to_states:
+                        to_states[renamed_state] = to_states[state]
+                        if renamed_state != state:
+                            del to_states[state]
+
+            # saving
+            initial_state_was_set = self.initial_state is not None
+            state_was_set = self.state is not None
+
+            # include actions/states from another FSM
+            self.include(fsm)
+
+            # adding a transition to the initial state of the given FSM
+            self.add_transit(from_state=from_state, to_state=fsm.initial_state, action=action, args=args,
+                             wait=wait, act_id=None)
+
+            # restoring
+            self.initial_state = from_state if not initial_state_was_set else self.initial_state
+            self.state = from_state if not state_was_set else self.state
+            return
+
+        # adding a new transition
         if from_state not in self.transitions:
-            self.add_state_action(from_state, action=None)
+            if from_state not in self.states:
+                self.add_state_action(from_state, action=None)
             self.transitions[from_state] = {}
         if to_state not in self.transitions:
-            self.add_state_action(to_state, action=None)
+            if to_state not in self.states:
+                self.add_state_action(to_state, action=None)
             self.transitions[to_state] = {}
         if args is None:
             args = {}
@@ -149,6 +219,14 @@ class FiniteStateMachine:
                     param.default is not inspect.Parameter.empty}
         self.action_to_params[action_callable.__name__] = (params, defaults)
 
+        for k, v in args.items():
+            if isinstance(v, str):
+                for wildcard_from, wildcard_to in self.wildcards.items():
+                    if wildcard_from == v and not isinstance(wildcard_to, str):
+                        args[k] = wildcard_to
+                    elif wildcard_from in v:
+                        args[k] = v.replace(wildcard_from, wildcard_to)
+
         if to_state not in self.transitions[from_state]:
             self.transitions[from_state][to_state] = [(action_callable, args, wait, act_id)]
             self.__tot_actions += 1
@@ -158,6 +236,27 @@ class FiniteStateMachine:
                                  f"{(action, args, wait)}")
             self.transitions[from_state][to_state].append((action_callable, args, wait, act_id))
             self.__tot_actions += 1
+
+    def include(self, fsm, copy=False):
+
+        # adding states before adding transitions, so that we also add inner state actions, if any
+        for _state, (_action_callable, _args, _) in fsm.states.items():
+            self.add_state_action(state=_state,
+                                  action=_action_callable.__name__ if _action_callable is not None else None,
+                                  args=_args, state_id=None)
+
+        # copy all the transitions of the FSM
+        for _from_state, _to_states in fsm.transitions.items():
+            for _to_state, _action_tuples in _to_states.items():
+                for (_action_callable, _args, _wait, _) in _action_tuples:
+                    self.add_transit(from_state=_from_state, to_state=_to_state, action=_action_callable.__name__,
+                                     args=_args, wait=_wait, act_id=None)
+
+        if copy:
+            self.state = fsm.state
+            self.prev_state = fsm.state
+            self.initial_state = fsm.initial_state
+            self.limbo_state = fsm.limbo_state
 
     def set_buffer_param_value(self, param_name: str, param_value):
         """Add a new variable to the FSM."""
@@ -217,8 +316,6 @@ class FiniteStateMachine:
                             waits_list.append(wait)
                         else:
                             waits_list.append(wait[0])  # tmp value
-                    if isinstance(wait, tuple | list):
-                        action_tuples[i] = (action, args, wait[1], act_id)  # replace tmp with original (restore)
 
             if len(actions_list) > 0:
                 self.__act_transitions_status = {
@@ -239,11 +336,14 @@ class FiniteStateMachine:
             actions_ids = self.__act_transitions_status['actions_ids']
 
         # using the selected policy to decide what action to apply
+        dest_state = None
         while len(actions_list) > 0:
 
             # debug only
             _debug_printed = False
 
+            # it there was an already selected action (for example a multistep action), then continue with it,
+            # otherwise, select a new one following a certain policy (actually, first-come first-served)
             if self.action is None:
 
                 # naive policy: take the first action that is ready (i.e., not waiting)
@@ -251,6 +351,8 @@ class FiniteStateMachine:
                 for i, wait in enumerate(waits_list):
                     if wait is False:
                         idx = i
+                        if dest_state is None:
+                            dest_state = to_state_list[i]  # saving the dest state of the fist action
                         break
                 if idx == -1:
                     break
@@ -277,6 +379,9 @@ class FiniteStateMachine:
                         self.action_step += 1
                         if self.action_step < actual_params['steps']:
                             return False  # early stop without clearing the action or changing state, prev_state, etc...
+                    else:
+                        if self.action_step > 1:
+                            return False  # early stop without clearing the action or changing state, prev_state, etc...
                 else:
                     ret = action(**actual_params)  # instantaneous action
             else:
@@ -285,15 +390,9 @@ class FiniteStateMachine:
                     _debug_printed = True
                 ret = False
 
-            # clearing action
+            # clearing selected action, since it either completed or fully failed
             self.action = None
             self.action_step = 0
-
-            # clearing action-related arguments
-            if actual_params is not None:
-                for param in actual_params.keys():
-                    if param in self.param_buffer.keys():
-                        del self.param_buffer[param]
 
             # if the action failed, another one will be sampled
             if not ret:
@@ -317,7 +416,20 @@ class FiniteStateMachine:
                 self.state = to_state_list[idx]
                 self.limbo_state = None
                 self.__act_transitions_status = None
-                return True
+
+                # replacing temporary wait tuple with the original wait value
+                for to_state, action_tuples in self.transitions[self.state].items():
+                    for i, (action, args, wait, act_id) in enumerate(action_tuples):
+                        if isinstance(wait, tuple | list):
+                            action_tuples[i] = (action, args, wait[1], act_id)  # replace tmp with original (restore)
+
+                # clearing all action-related arguments
+                self.clear_param_buffer()
+
+                return True  # action done!
+
+        # no actions were applied
+        return False
 
     def clear_param_buffer(self):
         self.param_buffer = {}
@@ -341,19 +453,22 @@ class FiniteStateMachine:
             for i, (_action, _args, _wait, _act_id) in enumerate(self.transitions[from_state][to_state]):
                 if _action.__name__ == action_name and (args is None or _args == args):
                     for _to_state, _action_tuples in self.transitions[from_state].items():
-                        for j, (__action, __args, __wait, __act_id) \
-                                in enumerate(_action_tuples):
+                        for j, (__action, __args, __wait, __act_id) in enumerate(_action_tuples):
+
+                            if isinstance(__wait, tuple):
+                                return False  # some actions were already temporarily un-blocked or blocked!
+
                             if (__action.__name__ == action_name and
                                     (args is None or __args == args)):
                                 self.transitions[from_state][_to_state][j] = \
                                     (__action, __args, (False, __wait), __act_id)  # un-block action (make it ready!)
                             else:
                                 self.transitions[from_state][_to_state][j] = \
-                                    (__action, __args, (True, __wait), __act_id)  # block action
+                                    (__action, __args, (True, __wait), __act_id)  # block all other actions
                     return True
         return False
 
-    def wait_for_all_action_that_start_with(self, prefix):
+    def wait_for_all_actions_that_start_with(self, prefix):
         """Forces the wait flag to all actions whose name start with a given prefix."""
 
         for state, to_states in self.transitions.items():
@@ -363,13 +478,23 @@ class FiniteStateMachine:
                         wait = True
                         action_tuples[i] = (action, args, wait, act_id)
 
+    def wait_for_actions(self, from_state: str, to_state: str, wait: bool = True):
+        """Forces the wait flag to a specific action."""
+
+        if from_state not in self.transitions or to_state not in self.transitions[from_state]:
+            return False
+
+        for i, (action, args, _wait, act_id) in enumerate(self.transitions[from_state][to_state]):
+            self.transitions[from_state][to_state][i] = (action, args, wait, act_id)
+        return True
+
     def save(self, filename: str):
         """Save the FSM to a JSON file."""
 
         with (open(filename, 'w') as file):
             file.write(str(self))
 
-    def load(self, filename: str):
+    def load(self, filename: str) -> Self:
         """Load the FSM state from a JSON file and resolve actions."""
 
         with open(filename, 'r') as file:
@@ -379,21 +504,38 @@ class FiniteStateMachine:
         self.state = fsm_data['state']
         self.prev_state = fsm_data['prev_state']
         self.limbo_state = fsm_data['limbo_state']
-        self.policy = fsm_data['policy']
         self.param_buffer = fsm_data['param_buffer']
         self.action = (self.action_name_to_callable(fsm_data['action'][0]),
-                       fsm_data['action'][1] if fsm_data['action'] is not None else None)
+                       fsm_data['action'][1]) if fsm_data['action'] is not None else None
         self.action_step = fsm_data['action_step']
 
         self.states = {}
-        for state, (action_name, args, state_id) in fsm_data['states'].items():
+        for state, (action_name, args, state_id) in fsm_data['state_actions'].items():
+            if args is not None:
+                for k, v in args.items():
+                    if isinstance(v, str):
+                        for wildcard_from, wildcard_to in self.wildcards.items():
+                            if wildcard_from == v and not isinstance(wildcard_to, str):
+                                args[k] = wildcard_to
+                            elif wildcard_from in v:
+                                args[k] = v.replace(wildcard_from, wildcard_to)
             self.add_state_action(state, action=action_name, args=args, state_id=state_id)
 
         self.transitions = {}
         for from_state, to_states in fsm_data['transitions'].items():
             for to_state, action_tuples in to_states.items():
                 for action_name, args, wait, act_id in action_tuples:
+                    if args is not None:
+                        for k, v in args.items():
+                            if isinstance(v, str):
+                                for wildcard_from, wildcard_to in self.wildcards.items():
+                                    if wildcard_from == v and not isinstance(wildcard_to, str):
+                                        args[k] = wildcard_to
+                                    elif wildcard_from in v:
+                                        args[k] = v.replace(wildcard_from, wildcard_to)
                     self.add_transit(from_state, to_state, action_name, args, wait, act_id)
+
+        return self
 
     def to_graphviz(self):
         """Encode the FSM in GraphViz format."""
@@ -467,6 +609,14 @@ class FiniteStateMachine:
         if filename.lower().endswith(".pdf"):
             filename = filename[0:-4]
         self.to_graphviz().render(filename, format='pdf', cleanup=True)
+
+    def print_actions(self, state: str | None = None):
+        state = (self.state if self.state is not None else self.limbo_state) if state is None else state
+        for to_state, action_tuples in self.transitions[state].items():
+            if action_tuples is None:
+                print(f"{state}, no actions")
+            for i, (action, args, wait, act_id) in enumerate(action_tuples):
+                print(f"{state} -> {to_state}, action: {action.__name__}, args: {args}, wait: {wait}, act_id: {act_id}")
 
     def __get_actual_params(self, action_name: str, args: dict):
         actual_params = {}

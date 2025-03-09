@@ -193,7 +193,7 @@ class Server:
         return Server.pack_data(self.env.step)
 
     def get_env_name(self):
-        return Server.pack_data(self.env.name)
+        return Server.pack_data({"name": self.env.name, "title": self.env.title})
 
     def get_summary(self):
         agent_name = request.args.get('agent_name')
@@ -219,7 +219,7 @@ class Server:
     def get_list_of_agents(self):
         agent_name = request.args.get('agent_name')
         agents = self.env.agents[agent_name].known_agents if agent_name != self.env.name else self.env.agents
-        return Server.pack_data(list(agents.keys()))
+        return Server.pack_data({"agents": list(agents.keys()), "authorities": [x.authority for x in agents.values()]})
 
     def get_list_of_streams(self):
         agent_name = request.args.get('agent_name')
