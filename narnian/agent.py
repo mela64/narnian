@@ -147,6 +147,10 @@ class Agent:
         self.behav.set_wildcards(wildcards)
         self.behav.add_transit(*args, **kwargs)
 
+    def add_state_action(self, *args, wildcards: dict[str, str] | None = None, **kwargs):
+        self.behav.set_wildcards(wildcards)
+        self.behav.add_state_action(*args, **kwargs)
+
     def get_action_step(self):
         return self.behav.action_step
 
