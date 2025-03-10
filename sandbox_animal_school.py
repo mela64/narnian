@@ -81,6 +81,9 @@ env.add_agent(ag)
 # saving
 env.save()
 
+# loading back (test)
+env_load = env.load()
+
 # printing
 print(env)
 for ag in env.agents.values():

@@ -120,6 +120,12 @@ class Model(torch.nn.Module):
             ret = 1. - float(torch.sum((a > thres) == (b > thres)).item()) / a.numel()
         return ret
 
+    def save(self, file):
+        torch.save(self.state_dict(), file)
+
+    def load(self, file):
+        self.load_state_dict(torch.load(file))
+
 
 class EmptyModel(Model):
     def __init__(self):

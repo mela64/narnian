@@ -1,4 +1,5 @@
 import os
+import pickle
 import inspect
 import threading
 from .agent import Agent
@@ -16,13 +17,13 @@ class Environment:
         self.behav = FiniteStateMachine(self)  # FSM that describes the environment's behaviour
         self.streams = {}  # streams that are available in this environment
         self.agents = {}  # agents living in this environment
+        self.step = 0
         self.print_enabled = True  # if output should be printed to screen
         self.using_server = False  # it will be changed by the server, if any
         self.step_event = None  # event that triggers a new step (manipulated by the server)
         self.wait_event = None  # event that triggers a new "wait-for-step-event" case (manipulated by the server)
         self.skip_clear_for = 0
         self.shared_attributes = None
-        self.step = 0
         self.steps = None
         self.output_messages = [""] * 20
         self.output_messages_ids = [-1] * 20
@@ -89,12 +90,63 @@ class Environment:
         self.behav.add_transit(*args, **kwargs)
 
     def save(self, where: str = "output"):
+
+        # creating output folder
         if not os.path.exists(where):
             os.makedirs(where)
-        self.behav.save(os.path.join(where, f"{self.name}.json"))
-        self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))
+
+        # saving models
         for agent in self.agents.values():
-            agent.save(where)
+            agent.model.save(os.path.join(where, f"{self.name}.pt"))
+
+        # hiding models to pickle
+        models = {}
+        for agent in self.agents.values():
+            models[agent.name] = agent.model
+            agent.model = None
+
+        # saving the whole thing, skipping networks
+        with open(os.path.join(where, f"{self.name}.pkl"), "wb") as f:
+            pickle.dump(self, f)
+
+        # restoring models
+        for agent in self.agents.values():
+            agent.model = models[agent.name]
+
+        # saving FSMs (extra)
+        self.behav.save(os.path.join(where, f"{self.name}.json"))  # FSM json
+        self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))  # FSM pdf
+        for agent in self.agents.values():
+            agent.behav.save(os.path.join(where, f"{agent.name}.json"))  # FSM json
+            agent.behav.save_pdf(os.path.join(where, f"{agent.name}.pdf"))  # FSM pdf
+
+    def load(self, where: str = "output"):
+
+        # checking output folder
+        assert os.path.exists(where), f"Invalid load path: {where}"
+
+        # loading models
+        for agent in self.agents.values():
+            agent.model.load(os.path.join(where, f"{agent.name}.pt"))
+
+        # hiding models to pickle
+        models = {}
+        for agent in self.agents.values():
+            models[agent.name] = agent.model
+            agent.model = None
+
+        # loading the whole object
+        with open(os.path.join(where, f"{self.name}.pkl"), "rb") as f:
+            loaded_env = pickle.load(f)
+
+        # update self's attributes with the loaded object's attributes
+        self.__dict__.update(loaded_env.__dict__)
+
+        # restoring models
+        for agent in self.agents.values():
+            agent.model = models[agent.name]
+
+        return loaded_env
 
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""

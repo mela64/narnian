@@ -1,4 +1,5 @@
 import os
+import pickle
 import inspect
 from .model import Model
 from .streams import Stream
@@ -18,9 +19,9 @@ class Agent:
         self.authority = authority  # authority level (right now assuming 0 = student and 1 = teacher)
         self.known_streams = {}  # streams that are known to this agent
         self.known_agents = {}  # other agents that are known to this agent
+        self.buffered_streams_offsets = {}  # from buffered-stream hash to offset to apply
         self.print_enabled = True  # if output should be printed to screen
         self.env = None  # environment where the agent is currently living (it will be set when joining the environment)
-        self.buffered_streams_offsets = {}  # from buffered-stream hash to offset to apply
         self.output_messages = [""] * 20
         self.output_messages_ids = [-1] * 20
         self.output_messages_count = 0
@@ -153,12 +154,6 @@ class Agent:
 
     def get_action_step(self):
         return self.behav.action_step
-
-    def save(self, where: str = "output"):
-        if not os.path.exists(where):
-            os.makedirs(where)
-        self.behav.save(os.path.join(where, f"{self.name}.json"))
-        self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))
 
     def nop(self):
         """Do nothing."""
