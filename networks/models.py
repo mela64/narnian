@@ -1,7 +1,8 @@
 import torch
 import torchvision
-import torch.nn.functional as F
 from typing import Callable
+import torch.nn.functional as F
+from networks.mh.layers import LinearMH
 
 
 def hard_tanh(x: torch.Tensor) -> torch.Tensor:
@@ -635,13 +636,13 @@ class BasicImagePredictor(torch.nn.Module):
         self.net = torch.nn.Sequential(
             torch.nn.Conv2d(3, 64, kernel_size=5, stride=1, padding=2),
             torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.AvgPool2d(kernel_size=3, stride=2),
             torch.nn.Conv2d(64, 128, kernel_size=5, padding=2),
             torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.AvgPool2d(kernel_size=3, stride=2),
             torch.nn.Conv2d(128, 256, kernel_size=3, padding=1),
             torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.AvgPool2d(kernel_size=3, stride=2),
             torch.nn.Flatten(),
             torch.nn.Linear(256 * 3 * 3, 2048),
             torch.nn.ReLU(inplace=True),
@@ -649,10 +650,42 @@ class BasicImagePredictor(torch.nn.Module):
             torch.nn.Sigmoid()
         ).to(self.device)
 
-        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
-
     def forward(self, y, first=False):
         return self.net(self.transforms(y).to(self.device))
+
+
+class BasicImagePredictorCNU(torch.nn.Module):
+
+    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu")):
+        super(BasicImagePredictorCNU, self).__init__()
+        self.device = device
+
+        self.transforms = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(32),
+            torchvision.transforms.CenterCrop(32),
+            torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])
+        ])
+
+        self.net = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 64, kernel_size=5, stride=1, padding=2),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.AvgPool2d(kernel_size=3, stride=2),
+            torch.nn.Conv2d(64, 128, kernel_size=5, padding=2),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.AvgPool2d(kernel_size=3, stride=2),
+            torch.nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.AvgPool2d(kernel_size=3, stride=2),
+            torch.nn.Flatten(),
+            torch.nn.Linear(256 * 3 * 3, 2048),
+            torch.nn.ReLU(inplace=True),
+            LinearMH(2048, d_dim, key_mem_units=mem_units),
+            torch.nn.Sigmoid()
+        ).to(self.device)
+
+    def forward(self, y, first=False):
+        return self.net(self.transforms(y))
 
 
 class BasicTokenGenerator(torch.nn.Module):
