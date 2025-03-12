@@ -702,9 +702,9 @@ class BasicTokenGenerator(torch.nn.Module):
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True))
-        self.register_buffer("h_init", self.h.clone())
-        self.register_buffer("dh", torch.zeros_like(self.h))
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
+        self.h_init = self.h.clone().detach()
+        self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
         self.du_dim = du_dim
         self.delta = 1.     # already defined in discrete time
@@ -726,32 +726,33 @@ class BasicTokenGenerator(torch.nn.Module):
         h = self.h.detach()
         if first:
             h = self.h_init
-        self.h.data = self.A(h) + self.B(torch.cat([du, u], dim=1))
+        self.h = self.A(h) + self.B(torch.cat([du, u], dim=1))
         y = self.C(torch.tanh(self.h))
-        self.dh.data = (self.h - h) / self.delta
-        self.h.data.retain_grad()
+        self.dh = (self.h - h) / self.delta
+        self.h.retain_grad()
         return y
 
 
 class BasicTokenPredictor(torch.nn.Module):
 
-    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int):
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int, device: torch.device = torch.device("cpu")):
         super(BasicTokenPredictor, self).__init__()
+        self.device = device
 
         y_dim = emb_dim
-        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim, device=self.device)
 
-        self.A = torch.nn.Linear(h_dim, h_dim, bias=False)
-        self.B = torch.nn.Linear(y_dim, h_dim, bias=False)
-        self.C = torch.nn.Linear(h_dim, d_dim, bias=False)
-        self.register_buffer("h", torch.randn((1, h_dim)))
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=self.device)
+        self.B = torch.nn.Linear(y_dim, h_dim, bias=False, device=self.device)
+        self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=self.device)
+        self.register_buffer("h", torch.randn((1, h_dim), device=self.device))
         self.register_buffer("h_init", self.h.clone())
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y, first=False):
         if first:
             self.h.data = self.h_init
-        y = self.embeddings(y)  # added this
+        y = self.embeddings(y.to(self.device))  # added this
         h = self.A(self.h) + self.B(y)
         d = self.C(torch.tanh(h))
         self.h.data = h.detach()

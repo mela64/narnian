@@ -259,7 +259,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             .force("link", d3_forceLink(graphData.links).id((d) => d.id).distance(100))
             .force("charge", d3_forceManyBody().strength(-150))
             .force("center", d3_forceCenter(width / 2, height / 2))
-            .force("collide", d3_forceCollide().radius(110))
+            .force("collide", d3_forceCollide().radius(100))
             .stop();
 
         // saving the state with the new simulation (and possibly stopping an already running one)

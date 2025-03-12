@@ -17,9 +17,9 @@ class BasicTokenModel(Model):
 
         # creating the model (superclass)
         super(BasicTokenModel, self).__init__(BasicTokenGenerator(num_emb=num_emb, emb_dim=16,
-                                                                  d_dim=d_dim, y_dim=y_dim, h_dim=5),
+                                                                  d_dim=d_dim, y_dim=y_dim, h_dim=5, device=device),
                                               BasicTokenPredictor(num_emb=num_emb, emb_dim=16,
-                                                                  d_dim=d_dim, h_dim=3),
+                                                                  d_dim=d_dim, h_dim=3, device=device),
                                               attributes, device=device)
 
         # extra stuff

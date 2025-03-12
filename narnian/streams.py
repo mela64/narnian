@@ -287,7 +287,7 @@ class ImageDataset(Stream):
 
 class Tokens(Stream):
 
-    def __init__(self, tokens_file_csv: str, circular: bool = False):
+    def __init__(self, tokens_file_csv: str, circular: bool = True):
         super().__init__()
         self.circular = circular
         self.token_ids = []

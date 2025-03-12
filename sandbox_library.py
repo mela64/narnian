@@ -1,25 +1,18 @@
 import torch
-import random
 from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
-from narnian.streams import Stream, ImageDataset
-from basic.basic_image_model import BasicImageModel, BasicImageModelCNU
+from narnian.streams import Stream, Tokens
+from basic.basic_token_model import BasicTokenModel
 from basic.basic_environment import BasicEnvironment
 
 # creating environment
-env = BasicEnvironment("Env", title="Animal School")
+env = BasicEnvironment("env", title="Cat Library")
 device = torch.device("cpu")
-torch.manual_seed(42)
-random.seed(42)
 
-# adding streams to the environment (images of 3 animals; image of other 4 animals; images of all 3+4 animals)
-env.add_stream(Stream.create(name="3-ani", creator=env.name,
-                             stream=ImageDataset(image_dir="data/animals",
-                                                 label_file_csv="./data/animals/first3c_skip_10i.csv")))
-env.add_stream(Stream.create(name="all-ani", creator=env.name,
-                             stream=ImageDataset(image_dir="data/animals",
-                                                 label_file_csv="data/animals/first3c_10i.csv")))
+# adding streams to the environment
+env.add_stream(Stream.create(name="cats", creator=env.name,
+                             stream=Tokens(tokens_file_csv="data/cats/stream_of_words.csv")))
 
 # modeling behaviour of the environment
 env.add_transit("init", "./basic/behaviours/env_sharing_info.json", action="nop")
@@ -32,12 +25,12 @@ ag.add_transit("init", "basic/behaviours/getting_from_env.json", action="nop")
 
 # preparing exam
 ag.add_transit("got_agents", "exam_prepared", action="record",
-               args={"stream_hash": env.name + ":all-ani", "steps": 30})
+               args={"stream_hash": env.name + ":cats", "steps": 1000})
 
 # engaging students, teaching and, afterward, evaluating students
-ag.add_transit("exam_prepared", "basic/behaviours/teach-playlist_eval-recorded1_pred.json",
-               action="set_pref_streams", args={"stream_hashes": [env.name + ":3-ani"]},
-               wildcards={"<agent_name>": ag.name, "<learn_steps>": 120, "<eval_steps>": 30, "<cmp_thres>": 0.4})
+ag.add_transit("exam_prepared", "basic/behaviours/teach-playlist_eval-recorded1_gen.json",
+               action="set_pref_streams", args={"stream_hashes": [env.name + ":cats"]},
+               wildcards={"<agent_name>": ag.name, "<learn_steps>": 1000, "<eval_steps>": 1000, "<cmp_thres>": 0.4})
 
 # promoting students that were positively evaluated
 ag.add_transit("some_good", "promote", action="set_authority", args={"agent": "<valid_cmp>", "auth": 1.0})
@@ -53,8 +46,8 @@ ag.add_transit("habilitate", "done_teaching", action="wait_for_actions",
 env.add_agent(ag)
 
 # creating student agent named Mario
-ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attributes, mem_units=5,
-                                                  lr=0.01956, lr_head=0.08583, device=device), authority=0.0)
+ag = BasicAgent("Mario", model=BasicTokenModel(attributes=env.shared_attributes, lr=0.01, device=device),
+                authority=0.0)
 
 # in principle, he is like Dr. Green...
 ag.behave_as(env.agents["Dr. Green"])
@@ -65,22 +58,6 @@ ag.wait_for_actions(ag, "got_agents", "exam_prepared", wait=True)
 # generic behaviour of a student who listens to the requests from the teacher
 ag.add_transit("got_agents", "./basic/behaviours/listening_to_teacher.json", action="get_engagement",
                args={"min_auth": 1.0, "max_auth": 1.0})
-
-# when the teacher will send the student back home
-ag.add_transit("teacher_engaged", "got_agents", action="get_disengagement")
-
-# adding agent to environment
-env.add_agent(ag)
-
-torch.manual_seed(42)
-random.seed(42)
-
-# creating another student agent named Luigi
-ag = BasicAgent("Luigi", model=BasicImageModel(attributes=env.shared_attributes, lr=0.007223, device=device),
-                authority=0.0)
-
-# he really acts like Mario
-ag.behave_as(env.agents["Mario"])
 
 # adding agent to environment
 env.add_agent(ag)
@@ -94,4 +71,5 @@ for ag in env.agents.values():
 Server(env=env)
 
 # running
-env.run(steps=200)
+env.run()
+

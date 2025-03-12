@@ -6,23 +6,43 @@
     "state_actions": {
         "teacher_engaged": [null, null, 0],
         "got_more_streams": [null, null, 1],
-        "learned": [null, null, 2],
-        "predicted": [null, null, 3]
+        "learned_gen": [null, null, 2],
+        "learned_pred": [null, null, 3],
+        "learned_both": [null, null, 4],
+        "generated": [null, null, 5],
+        "predicted": [null, null, 6],
+        "gen_and_pred": [null, null, 7]
     },
     "transitions": {
         "teacher_engaged": {
             "got_more_streams": [["get_streams", {}, false, 0]],
-            "learned": [["do_learn_gen", {}, false, 1],["do_learn_pred", {}, false, 1],["do_learn_gen_and_pred", {}, false, 1]],
-            "predicted": [["do_gen", {}, false, 2],["do_pred", {}, false, 2],["do_gen_and_pred", {}, false, 2]]
+            "learned_gen": [["do_learn_gen", {}, false, 1]],
+            "learned_pred": [["do_learn_pred", {}, false, 2]],
+            "learned_both": [["do_learn_gen_and_pred", {}, false, 3]],
+            "generated": [["do_gen", {}, false, 4]],
+            "predicted": [["do_pred", {}, false, 5]],
+            "gen_and_pred": [["do_gen_and_pred", {}, false, 6]]
         },
         "got_more_streams": {
-            "teacher_engaged": [["nop", {}, false, 3]]
+            "teacher_engaged": [["nop", {}, false, 7]]
         },
-        "learned": {
-            "teacher_engaged": [["nop", {}, false, 4]]
+        "learned_gen": {
+            "teacher_engaged": [["nop", {}, false, 8]]
+        },
+        "learned_pred": {
+            "teacher_engaged": [["nop", {}, false, 9]]
+        },
+        "learned_both": {
+            "teacher_engaged": [["nop", {}, false, 10]]
+        },
+        "generated": {
+            "teacher_engaged": [["nop", {}, false, 11]]
         },
         "predicted": {
-            "teacher_engaged": [["nop", {}, false, 5]]
+            "teacher_engaged": [["nop", {}, false, 12]]
+        },
+        "gen_and_pred": {
+            "teacher_engaged": [["nop", {}, false, 13]]
         }
     },
     "action": null,
