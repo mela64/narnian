@@ -17,7 +17,7 @@ const id2Color = { // plot colors
     9: "#17BECF" // cyan
 }
 
-export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _setBusy_ }) {
+export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _setBusy_, _ioDataRef_, _offline_ }) {
     out("[PlotFigure] " +
         "_agentName_: " + _agentName_ + ", " +
         "_streamStruct_: " + JSON.stringify(_streamStruct_) + ", " +
@@ -25,7 +25,7 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
 
     // basic structure of the data that will be plotted: it is an array where each element is the data of a single plot
     // in particular, each element is {x: [...], y: [...], type: "scatter", mode: "lines", name: "plot-name"}
-    const emptyXYs = Array.from({
+    const emptyXYs = useRef(Array.from({
             length: 0
         }, (_,) => ({
             x: [],
@@ -35,17 +35,17 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
             line: { color: id2Color[0] },
             name: null,
         })
-    );
+    ));
 
     // basic structure taking case of xLims and yLims
-    const emptyMIMAXs = {xMin: 0, yMin: 0, xMax: 0, yMax: 0}
+    const emptyMIMAXs = useRef({xMin: 0, yMin: 0, xMax: 0, yMax: 0});
 
     // this is the basic structure of ALL the data that will be used py the plot
     const emptyPlotData = {
-        XYs: emptyXYs,
+        XYs: structuredClone(emptyXYs.current),
         PNGs: [],
         TEXTs: [],
-        MIMAXs: emptyMIMAXs,
+        MIMAXs: structuredClone(emptyMIMAXs.current),
         limitToLastN: false,
         version: 0,
     }
@@ -55,10 +55,10 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
     const [streamStruct, setStreamStruct] = useState(_streamStruct_);
 
     // the whole data plotted in this figure, and array like "emptyPlotData" above, where the "x" and "y" fields grow
-    const XYs = useRef(emptyXYs);
+    const XYs = useRef(structuredClone(emptyXYs.current));
     const PNGs = useRef([]);
     const TEXTs = useRef([]);
-    const MIMAXs = useRef(emptyMIMAXs);
+    const MIMAXs = useRef(structuredClone(emptyMIMAXs.current));
     const limitToLastN = useRef(false);
     const [allPlotData, setAllPlotData] = useState(emptyPlotData);
 
@@ -93,21 +93,32 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
         }
 
         // this will tell the parent that this component is working
-        _setBusy_(true);
+        _setBusy_((prev) => prev + 1);
+
+        // flags
+        const goingToSave = _ioDataRef_.current !== null && _ioDataRef_.current !== undefined && !_offline_;
+        const goingToLoad = _ioDataRef_.current !== null && _ioDataRef_.current !== undefined && _offline_;
+
 
         // declared as an inner-function for readability, it will be used below!
         // store/add new plot data to one of the existing plots of the figure or add a fully new plot
         // (_nexXYsStorage_ is a (usually empty) map (plotIdx -> plot structure) that gets populated by calling
         // this function several times)
         function storeNewPlotData(_colorId_, _name_, _xData_, _yData_,
-                                  _nexXYsStorage_, _newPNGsStorage_, _newTEXTsStorage_) {
+                                  _nexXYsStorage_, _newPNGsStorage_, _newTEXTsStorage_,
+                                  _agentId_, _streamId_, _streamID2PlotIdxs_) {
+            _streamID2PlotIdxs_.set(_streamId_, []);
+
             if (_xData_ == null || _yData_ == null || _xData_.length <= 0 || _yData_.length <= 0) {
+                const plotIdx = -1; // marking a missing plot
+                _streamID2PlotIdxs_.get(_streamId_).push(plotIdx);
                 return;
             }
 
             const PNGDetected = (typeof _yData_[0] === 'string' && _yData_[0].startsWith("data:image/png;base64"))
-            const textDetected = (typeof _yData_[0] === 'string' && !_yData_[0].startsWith("data:image/png;base64"))
-            const numVecComponents = PNGDetected || textDetected ? 1 : _yData_[0].length;
+            const textDetected =
+                (typeof _yData_[0] === 'string' && !_yData_[0].startsWith("data:image/png;base64"))
+            const numVecComponents = (PNGDetected || textDetected) ? 1 : _yData_[0].length;
 
             // for each vector component on the _yData_ ...
             for (let vecComponentIdx = 0;
@@ -184,23 +195,99 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
                             //weight: 'bold'
                         },
                         xanchor: "center",
-                        yanchor: "middle",
+                        yanchor: "middle"
                     })));
 
                     limitToLastN.current = true; // this marks that we want to see only a small set of recent samples
                 }
+
+                _streamID2PlotIdxs_.get(_streamId_).push(plotIdx);
             }
+        }
+
+        function packStorageAndSetAllPlotData() {
+
+            // here we change the real-plot-object data, either adding new plots or augmenting others
+            for (const [plotIdx, plotData] of nexXYsStorage.entries()) {
+                if (plotIdx >= 0 && XYs.current[plotIdx]) { // existing plot: augment it
+                    XYs.current[plotIdx].x.push(...plotData.new_x);  // append new
+                    XYs.current[plotIdx].y.push(...plotData.new_y);  // append new y
+                } else {
+                    XYs.current.push(plotData); // new plot: add it
+                }
+            }
+
+            // purging streams that are not part of this figure anymore (due to unmerging)
+            // and returning the current "purged" data
+            XYs.current = XYs.current.filter((plotDataStruct) => {
+                const delimiterIndex = plotDataStruct.name.lastIndexOf("~");
+                const _streamName = delimiterIndex !== -1 ?
+                    plotDataStruct.name.substring(0, delimiterIndex) : plotDataStruct.name;
+                return streamNames.includes(_streamName);
+            });
+
+            // estimating min and max of the whole data
+            XYs.current.forEach(trace => {
+                const xValues = trace.x;
+                const yValues = trace.y;
+                MIMAXs.current.xMin = Math.min(...xValues);
+                MIMAXs.current.xMax = Math.max(...xValues);
+                MIMAXs.current.yMin = Math.min(...yValues);
+                MIMAXs.current.yMax = Math.max(...yValues);
+            });
+
+            // here we augment the current set of images with the newly received ones
+            if (newPNGsStorage.length > 0) {
+
+                // we assume PNG plots to be at y-coordinates that are 0, 1, 2... and we assume they are
+                // "tall" 1.0
+                MIMAXs.current.yMax = Math.max(MIMAXs.current.yMax, XYs.current.length - 1 + 1.0);
+                MIMAXs.current.yMin = Math.min(MIMAXs.current.yMin, 0.);
+                PNGs.current.push(...newPNGsStorage); // add newly received PNGs
+            }
+
+            // here we augment the current set of text annotations with the newly received ones
+            if (newTEXTsStorage.length > 0) {
+
+                // we assume PNG plots to be at y-coordinates that are 0, 1, 2... and we assume they are
+                // "tall" 1.0
+                MIMAXs.current.yMax = Math.max(MIMAXs.current.yMax, XYs.current.length - 1 + 1.0);
+                MIMAXs.current.yMin = Math.min(MIMAXs.current.yMin, 0.);
+                TEXTs.current.push(...newTEXTsStorage); // add newly received PNGs
+            }
+
+            // now we update the state
+            setAllPlotData((prev) => {
+                return {
+                    XYs: XYs.current,
+                    PNGs: PNGs.current,
+                    TEXTs: TEXTs.current,
+                    MIMAXs: MIMAXs.current,
+                    limitToLastN: limitToLastN.current,
+                    version: prev.version + 1
+                }
+            });
         }
 
         // fetching data from a single stream or, if merged, from multiple streams
         const streamIDs = _streamStruct_.mergedIds;
+        const agentID = _streamStruct_.agentButtonId;
         const streamNames = _streamStruct_.mergedLabels;
         const numStreams = streamIDs.length;
         const nexXYsStorage = new Map(); // created as empty map, populated by storeNewPlotData(...)
         const newPNGsStorage = []; // created as empty array, populated by storeNewPlotData(...)
         const newTEXTsStorage = []; // created as empty array, populated by storeNewPlotData(...)
+        const streamID2PlotIdxs = new Map();
         returnedAPICallsRef.current = 0; // we will count how many of the merged stream return data and what fails
         limitToLastN.current = false;
+
+        // clearing data
+        if (goingToSave) {
+            XYs.current = structuredClone(emptyXYs.current);
+            PNGs.current = [];
+            TEXTs.current = [];
+            MIMAXs.current = structuredClone(emptyMIMAXs.current);
+        }
 
         for (let j = 0; j < numStreams; j++) {
 
@@ -217,7 +304,7 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
 
                     // here we store the received data into the temporary storage
                     storeNewPlotData(j, streamNames[j], x.ks, x.data,
-                        nexXYsStorage, newPNGsStorage, newTEXTsStorage);
+                        nexXYsStorage, newPNGsStorage, newTEXTsStorage, agentID, streamIDs[j], streamID2PlotIdxs);
 
                     // we actually change the real-plot-object data using the temporarily stored plots
                     // only when getting data from the API call about the last merged stream (if one fails, we do not
@@ -225,82 +312,108 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
                     returnedAPICallsRef.current++;
 
                     // when reaching the last stream...
-                    if (returnedAPICallsRef.current === numStreams && nexXYsStorage.size > 0) {
+                    if (returnedAPICallsRef.current === numStreams && (nexXYsStorage.size > 0 || goingToSave)) {
 
-                        // here we change the real-plot-object data, either adding new plots or augmenting others
-                        for (const [plotIdx, plotData] of nexXYsStorage.entries()) {
-                            if (plotIdx >= 0 && XYs.current[plotIdx]) { // existing plot: augment it
-                                XYs.current[plotIdx].x.push(...plotData.new_x);  // append new
-                                XYs.current[plotIdx].y.push(...plotData.new_y);  // append new y
-                            } else {
-                                XYs.current.push(plotData); // new plot: add it
+                        // this is doing the job
+                        packStorageAndSetAllPlotData();
+
+                        // update the save-related reference array
+                        if (goingToSave) {
+
+                            for (let jj = 0; jj < numStreams; jj++) {
+                                const streamID = streamIDs[jj];
+                                const plotIdx_s = streamID2PlotIdxs.get(streamID);
+
+                                _ioDataRef_.current[agentID][streamID] = {
+                                    ks: null,
+                                    data: null
+                                }
+
+                                for (let pp = 0; pp < plotIdx_s.length; pp++) {
+                                    const plotIdx = plotIdx_s[pp];
+
+                                    if (plotIdx === -1) {  // this is a missing plot (usually when the env is new)
+                                        continue;
+                                    }
+
+                                    const _XYs = XYs.current[plotIdx];
+                                    const _PNGs = PNGs.current.filter(item => Math.floor(item.y) === plotIdx);
+                                    const _TEXTs = TEXTs.current.filter(item => Math.floor(item.y) === plotIdx);
+
+                                    if (_XYs !== undefined && _PNGs.length === 0 && _TEXTs.length === 0) {
+
+                                        // collect x once (assuming all x arrays are identical)
+                                        if (pp === 0) {
+                                            _ioDataRef_.current[agentID][streamID].ks = _XYs.x;
+                                            _ioDataRef_.current[agentID][streamID].data =
+                                                Array.from({length: _XYs.y.length}, () => []);
+                                        }
+
+                                        // add y values at each index to the corresponding array
+                                        _XYs.y.forEach((yValue, idx) => {
+                                            _ioDataRef_.current[agentID][streamID].data[idx].push(yValue);
+                                        });
+                                    }
+
+                                    if (_PNGs.length > 0) {
+                                        _ioDataRef_.current[agentID][streamID].ks = []
+                                        _ioDataRef_.current[agentID][streamID].data = []
+                                        _PNGs.forEach(item => {
+                                            _ioDataRef_.current[agentID][streamID].ks.push(item.x);
+                                            _ioDataRef_.current[agentID][streamID].data.push(item.source);
+                                        });
+                                    }
+
+                                    if (_TEXTs.length > 0) {
+                                        _ioDataRef_.current[agentID][streamID].ks = []
+                                        _ioDataRef_.current[agentID][streamID].data = []
+                                        _TEXTs.forEach(item => {
+                                            _ioDataRef_.current[agentID][streamID].ks.push(item.x);
+                                            _ioDataRef_.current[agentID][streamID].data.push(item.text);
+                                        });
+                                    }
+                                }
                             }
                         }
-
-                        // purging streams that are not part of this figure anymore (due to unmerging)
-                        // and returning the current "purged" data
-                        XYs.current = XYs.current.filter((plotDataStruct) => {
-                            const delimiterIndex = plotDataStruct.name.lastIndexOf("~");
-                            const _streamName = delimiterIndex !== -1 ?
-                                plotDataStruct.name.substring(0, delimiterIndex) : plotDataStruct.name;
-                            return streamNames.includes(_streamName);
-                        });
-
-                        // estimating min and max of the whole data
-                        XYs.current.forEach(trace => {
-                            const xValues = trace.x;
-                            const yValues = trace.y;
-                            MIMAXs.current.xMin = Math.min(...xValues);
-                            MIMAXs.current.xMax = Math.max(...xValues);
-                            MIMAXs.current.yMin = Math.min(...yValues);
-                            MIMAXs.current.yMax = Math.max(...yValues);
-                        });
-
-                        // here we augment the current set of images with the newly received ones
-                        if (newPNGsStorage.length > 0) {
-
-                            // we assume PNG plots to be at y-coordinates that are 0, 1, 2... and we assume they are
-                            // "tall" 1.0
-                            MIMAXs.current.yMax = Math.max(MIMAXs.current.yMax, XYs.current.length - 1 + 1.0);
-                            MIMAXs.current.yMin = Math.min(MIMAXs.current.yMin, 0.);
-                            PNGs.current.push(...newPNGsStorage); // add newly received PNGs
-                        }
-
-                        // here we augment the current set of text annotations with the newly received ones
-                        if (newTEXTsStorage.length > 0) {
-
-                            // we assume PNG plots to be at y-coordinates that are 0, 1, 2... and we assume they are
-                            // "tall" 1.0
-                            MIMAXs.current.yMax = Math.max(MIMAXs.current.yMax, XYs.current.length - 1 + 1.0);
-                            MIMAXs.current.yMin = Math.min(MIMAXs.current.yMin, 0.);
-                            TEXTs.current.push(...newTEXTsStorage); // add newly received PNGs
-                        }
-
-                        // now we update the state
-                        setAllPlotData((prev) => {
-                            return {
-                                XYs: XYs.current,
-                                PNGs: PNGs.current,
-                                TEXTs: TEXTs.current,
-                                MIMAXs: MIMAXs.current,
-                                limitToLastN: limitToLastN.current,
-                                version: prev.version + 1
-                            }
-                        });
                     }
                 },
                 () => {
-                    setAllPlotData((prevData) => (prevData));
+                    if (!goingToLoad) {
+                        setAllPlotData((prevData) => (prevData));
+                        return true;
+                    } else {
+
+                        // here we replace what comes from the network with the loaded stuff
+                        const x = _ioDataRef_.current[agentID][streamIDs[j]];
+
+                        // here we store the received data into the temporary storage
+                        storeNewPlotData(j, streamNames[j], x.ks, x.data,
+                            nexXYsStorage, newPNGsStorage, newTEXTsStorage, agentID, streamIDs[j], streamID2PlotIdxs);
+
+                        // we actually change the real-plot-object data using the temporarily stored plots
+                        // only when getting data from the API call about the last merged stream (if one fails, we do not
+                        // update anything, since we will never reach the numStreams number)
+                        returnedAPICallsRef.current++;
+
+                        // when reaching the last stream...
+                        if (returnedAPICallsRef.current === numStreams && nexXYsStorage.size > 0) {
+
+                            // this is doing the job
+                            packStorageAndSetAllPlotData();
+                        }
+
+                        return false;
+                    }
                 },
                 () => {
                     if (returnedAPICallsRef.current === numStreams) {
                         // this will tell the parent that this component is now ready
-                        _setBusy_(false);
+                        _setBusy_((prev) => prev - 1);
                     }
                 }
             );
         }
-    }, [_isPaused_, _streamStruct_, _agentName_, _setBusy_]);
+    }, [_isPaused_, _streamStruct_, _agentName_, _setBusy_, _ioDataRef_, _offline_]);
     // _isPaused_ is what we care, while _streamStruct_ changes due to (un)merge (_agentName_, _setBusy_ are constant)
 
     // returning the <div>...</div> that will be displayed

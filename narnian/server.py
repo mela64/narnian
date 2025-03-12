@@ -47,6 +47,7 @@ class Server:
         self.app.add_url_rule('/get_list_of_streams', view_func=self.get_list_of_streams, methods=['GET'])
         self.app.add_url_rule('/get_stream', view_func=self.get_stream, methods=['GET'])
         self.app.add_url_rule('/get_console', view_func=self.get_console, methods=['GET'])
+        self.app.add_url_rule('/save', view_func=self.save, methods=['GET'])
 
     @staticmethod
     def pack_data(_data):
@@ -275,3 +276,6 @@ class Server:
                                  'output_messages_count': agent.output_messages_count,
                                  'output_messages_last_pos': agent.output_messages_last_pos,
                                  'output_messages_ids': agent.output_messages_ids})
+
+    def save(self):
+        return Server.pack_data(self.env.save())

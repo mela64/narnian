@@ -91,34 +91,50 @@ class Environment:
 
     def save(self, where: str = "output"):
 
-        # creating output folder
-        if not os.path.exists(where):
-            os.makedirs(where)
+        try:
 
-        # saving models
-        for agent in self.agents.values():
-            agent.model.save(os.path.join(where, f"{self.name}.pt"))
+            # creating output folder
+            if not os.path.exists(where):
+                os.makedirs(where)
 
-        # hiding models to pickle
-        models = {}
-        for agent in self.agents.values():
-            models[agent.name] = agent.model
-            agent.model = None
+            # saving models
+            for agent in self.agents.values():
+                agent.model.save(os.path.join(where, f"{self.name}.pt"))
 
-        # saving the whole thing, skipping networks
-        with open(os.path.join(where, f"{self.name}.pkl"), "wb") as f:
-            pickle.dump(self, f)
+            # hiding models to pickle
+            models = {}
+            for agent in self.agents.values():
+                models[agent.name] = agent.model
+                agent.model = None
 
-        # restoring models
-        for agent in self.agents.values():
-            agent.model = models[agent.name]
+            # hiding thread locks to pickle
+            locks = [self.wait_event, self.step_event]
+            self.wait_event = None
+            self.step_event = None
 
-        # saving FSMs (extra)
-        self.behav.save(os.path.join(where, f"{self.name}.json"))  # FSM json
-        self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))  # FSM pdf
-        for agent in self.agents.values():
-            agent.behav.save(os.path.join(where, f"{agent.name}.json"))  # FSM json
-            agent.behav.save_pdf(os.path.join(where, f"{agent.name}.pdf"))  # FSM pdf
+            # saving the whole thing, skipping networks
+            with open(os.path.join(where, f"{self.name}.pkl"), "wb") as f:
+                pickle.dump(self, f)
+
+            # restoring models
+            for agent in self.agents.values():
+                agent.model = models[agent.name]
+
+            # restoring locks
+            self.wait_event = locks[0]
+            self.step_event = locks[1]
+
+            # saving FSMs (extra)
+            self.behav.save(os.path.join(where, f"{self.name}.json"))  # FSM json
+            self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))  # FSM pdf
+            for agent in self.agents.values():
+                agent.behav.save(os.path.join(where, f"{agent.name}.json"))  # FSM json
+                agent.behav.save_pdf(os.path.join(where, f"{agent.name}.pdf"))  # FSM pdf
+
+        except (TypeError, ValueError, RuntimeError, IOError, FileNotFoundError) as e:
+            self.out(f"Could not save the environment: {e}")
+            return str(e)
+        return "<SAVE_OK>"  # this means OK
 
     def load(self, where: str = "output"):
 
@@ -135,6 +151,11 @@ class Environment:
             models[agent.name] = agent.model
             agent.model = None
 
+        # hiding thread locks to pickle
+        locks = [self.wait_event, self.step_event]
+        self.wait_event = None
+        self.step_event = None
+
         # loading the whole object
         with open(os.path.join(where, f"{self.name}.pkl"), "rb") as f:
             loaded_env = pickle.load(f)
@@ -145,6 +166,10 @@ class Environment:
         # restoring models
         for agent in self.agents.values():
             agent.model = models[agent.name]
+
+        # restoring locks
+        self.wait_event = locks[0]
+        self.step_event = locks[1]
 
         return loaded_env
 

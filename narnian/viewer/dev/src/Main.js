@@ -5,7 +5,7 @@ import {motion, AnimatePresence} from "framer-motion";  // animated opening pane
 import FSM from "./FSM";
 import Console from "./Console";
 import PlotFigure from "./PlotFigure";
-import {callAPI, out} from "./utils";
+import {callAPI, out, showError} from "./utils";
 
 // icons
 import {
@@ -14,7 +14,10 @@ import {
     Activity,
     Search,
     Waves,
-    GraduationCap
+    GraduationCap,
+    Save,
+    Upload,
+    Download
 } from "lucide-react";
 
 let clickTimeout; // timer that triggers a reaction to the click action
@@ -24,19 +27,24 @@ let clickCount = 0;  // number of consecutive clicks (to distinguish clicks from
 const agentButtonIcons = [<Settings/>, <Bot/>, <GraduationCap/>];
 const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 
-
 // the structure representing the play/pause status, in its initial (unknown) setting
 const unknownPlayPauseStatus = {
     "status": "?",
     "still_to_play": -1
 }
 
+// the structure representing the pause status
+const endedStatus = {
+    "status": "ended",
+    "still_to_play": -1
+}
+
 export default function Main() {
 
     // working-state of the components used in this page
-    const [isFSMBusy, setIsFSMBusy] = useState(false);
-    const [isConsoleBusy, setIsConsoleBusy] = useState(false);
-    const [isPlotFigureBusy, setIsPlotFigureBusy] = useState(false);
+    const [isFSMBusy, setIsFSMBusy] = useState(0);
+    const [isConsoleBusy, setIsConsoleBusy] = useState(0);
+    const [isPlotFigureBusy, setIsPlotFigureBusy] = useState(0);
 
     // whenever an agent button is clicked, an agent panel is opened (with the FSM, console, streams, stream panels)
     const [agentButtons, setAgentButtons] = useState([]);
@@ -53,9 +61,10 @@ export default function Main() {
     // the column-layout of the agent panels: 1 column when only 1 agent is shown, two columns otherwise
     const [gridCols, setGridCols] = useState("grid-cols-1");
 
-    // the name of the environment (set to "?" if unknown)
-    const [envName, setEnvName] = useState("?");
+    // the name of the environment, set to "?" when unknown
     const [envTitle, setEnvTitle] = useState("?");
+    const envTitleRef = useRef(envTitle);
+    const envNameRef = useRef("?");
 
     // the structure with the current play/pause status of the environment (see "unknownPlayPauseStatus" above)
     const [playPauseStatus, setPlayPauseStatus] = useState(unknownPlayPauseStatus);
@@ -73,6 +82,17 @@ export default function Main() {
     const streamButtonsRef = useRef(streamButtons);
     const agentButtonsRef = useRef(agentButtons);
     const openStreamPanelsRef = useRef(openStreamPanels);
+
+    // up-lifted data from the plot figures (array of arrays of integers)
+    const ioDataRef = useRef(null)
+
+    // saving flag
+    const [saving, setSaving] = useState(false);
+
+    // if offline
+    const [offline, setOffline] = useState(false);
+    const offlineRef = useRef(offline);
+    const fileInputRef = useRef(null);
 
     out("[Main]");
 
@@ -94,27 +114,41 @@ export default function Main() {
         agentButtonsRef.current = agentButtons;
     }, [agentButtons]);
 
+    // keeping references up-to-date at each rendering operation
+    useEffect(() => {
+        out("[Main] useEffect *** updating envTitleRef ***");
+        envTitleRef.current = envTitle;
+    }, [envTitle]);
+
+    useEffect(() => {
+        if (saving)
+            document.body.classList.add("saving");
+        else
+            document.body.classList.remove("saving");
+    }, [saving]);
+
     // first thing to do when loading the page: getting the name of the environment
     useEffect(() => {
         out("[Main] useEffect *** fetching data (environment name) ***");
 
         callAPI('/get_env_name', null,
-            (x) => { setEnvName(x.name); setEnvTitle(x.title) },
-            () => { setEnvName("?"); setEnvTitle("?") },
+            (x) => { envNameRef.current = x.name; setEnvTitle(x.title); },
+            () => { envNameRef.current = "?"; setEnvTitle("Offline");
+            setOffline(true); return false; },
             () => {
             });
     }, []);
 
     // getting list of agents
     useEffect(() => {
-        if (envName === "?") {
+        if (envNameRef.current === "?") {
             out("[Main] useEffect *** fetching data (list of agents) *** (skipping, missing env name)");
             return;
         } else {
              out("[Main] useEffect *** fetching data (list of agents) ***")
         }
 
-        callAPI('/get_list_of_agents', "agent_name=" + envName,
+        callAPI('/get_list_of_agents', "agent_name=" + envNameRef.current,
             (x) => {
                 const agent_names = x.agents;
                 const agent_authorities = x.authorities;
@@ -127,7 +161,7 @@ export default function Main() {
 
                 // if it is the first time, or if the authority changed...
                 if (firstTime || needToRefreshButtons) {
-                    agent_names.unshift(envName); // adding the name of the environment as extra agent
+                    agent_names.unshift(envNameRef.current); // adding the name of the environment as extra agent
                     agent_authorities.unshift(-1.); // fake authority for the environment
                     const agent_buttons = agent_names.map((label, index) => ({
                         id: index + 1,  // button indices start from 1
@@ -146,9 +180,12 @@ export default function Main() {
                     setAgentButtons(agent_buttons);
                 }
             },
-            () => setAgentButtons([]),
+            () => {
+                if (!offlineRef.current) {
+                    setAgentButtons([]); return true;
+                } else { return false; }},
             () => {});
-    }, [envName, isPaused]);  // when the status of the loading env name operation changes, we get the agent list
+    }, [envTitle, isPaused]);  // when the status of the loading env name operation changes, we get the agent list
     // it the authority changed, we need to update button graphics, so we also call this API when isPaused
 
     // when paused, we get the list of streams for all the agents of the environment
@@ -160,14 +197,14 @@ export default function Main() {
 
         out("[Main] useEffect *** fetching data (list of streams for all agents) ***");
 
-        agentButtonsRef.current.forEach((agentButton) => {
+        agentButtons.forEach((agentButton) => {
             getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id, streamButtonsRef.current);
         });
-    }, [isPaused]);
+    }, [isPaused, agentButtons]);
 
     // getting the play/pause status of the environment when loading the page the first time
     useEffect(() => {
-        if (envName === "?") {
+        if (envNameRef.current === "?") {
             out("[Main] useEffect *** fetching data (play/pause status) *** (skipping, missing env name)");
             return;
         }
@@ -177,16 +214,31 @@ export default function Main() {
         getAndUpdatePlayPauseStatus(
             () => {}, // "if playing" callback (do nothing)
             () => {
-                setPlayPauseStatus(unknownPlayPauseStatus);
+                if (!offlineRef.current) {
+                    setPlayPauseStatus(unknownPlayPauseStatus);
+                } else {
+                    setIsPaused(() => { setPlayPauseStatus(endedStatus); return true; } );
+                }
             } // "if error" callback
         );
-    }, [envName]);
+    }, [envTitle]);
     // wait for the environment name to be loaded, then ask for play/pause status
+
+    // in case of offline setting
+    useEffect(() => {
+        offlineRef.current = offline;
+        if (!offline) {
+            out("[Main] useEffect *** checking if offline and updating ref (not offline) ***");
+        } else {
+            out("[Main] useEffect *** checking if offline and updating ref (confirmed: offline) ***");
+        }
+    }, [offline]);
 
     // whenever a new agent panel is opened, the column-layout could switch from 1 to 2 columns
     useEffect(() => {
         out("[Main] useEffect *** possibly changing column layout 1<->2 ***");
-        setGridCols(openAgentPanels.length > 1 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-[1280px]");
+        setGridCols(openAgentPanels.filter((num) => num > 0).length > 1 ?
+            "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-[1280px]");
     }, [openAgentPanels]);  // listen to changes to the agent panels that are opened
 
     // open a new agent panel or closes an already opened one
@@ -317,7 +369,7 @@ export default function Main() {
      // handle double-click on a "stream button" (it un-merges merged buttons)
     const handleDoubleClick = useCallback((_agentButtonIdOfClicked_, _streamButtonIdOfClicked_) => {
 
-        // this is to stop the procedure that was distringuishing clicks from double clicks
+        // this is to stop the procedure that was distinguishing clicks from double clicks
         clearTimeout(clickTimeout);
 
         // getting a reference to the double-clicked stream button
@@ -347,6 +399,254 @@ export default function Main() {
             ],
         }));
     }, []);
+
+    useEffect(() => {
+        if (saving && ioDataRef.current !== null) {
+            out("[Main] useEffect *** continuing a save procedure ***");
+
+            const waitingSaveToComplete = () => {
+                const shouldStop = doSave();
+                if (shouldStop) {
+                    setSaving(false);
+                } else {
+                    setTimeout(() => {
+                        waitingSaveToComplete();
+                    }, 1500);
+                }
+            }
+
+            const saveToFile = (data, filename) => {
+                const json = JSON.stringify(data);
+                const blob = new Blob([json], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            };
+
+            const doSave = () => {
+
+                // counting the total streams that were collected so far ("null" means "not-received-yet")
+                const totalReceivedStreams = ioDataRef.current.reduce(
+                    (total, subArray) => total +
+                        (subArray != null ? subArray.filter(item => item !== null).length : 0),
+                    0
+                );
+
+                // counting the total number of streams that are expected
+                const totalStreams = Object.values(streamButtonsRef.current).reduce((total, outerItem) => {
+                    return total + outerItem.reduce((innerTotal, innerItem) => {
+                        return innerTotal + (Array.isArray(innerItem.mergedIds) ? innerItem.mergedIds.length : 0);
+                    }, 0);
+                }, 0)
+
+                // if it is too early...
+                if (totalReceivedStreams !== totalStreams) {
+                    out("[doSave] Tried to save, but it's too early, got data from " + totalReceivedStreams +
+                        " streams looking for " + totalStreams);
+                    return false;
+                }
+
+                out("[doSave] Saving to file...");
+
+                // save
+                saveToFile({
+                    fileVer: 0,
+                    data: ioDataRef.current,
+                    agentButtons: agentButtonsRef.current,
+                    streamButtons: streamButtonsRef.current,
+                    envTitle: envTitleRef.current,
+                    envName: envNameRef.current
+                }, envTitleRef.current + ".json");
+
+                out("[doSave] Done!");
+
+                // this will signal that we are not interested in saving anymore
+                ioDataRef.current = null;
+
+                // restore (remove negative IDs)
+                setOpenAgentPanels((prevOpenAgentPanels) => {
+
+                    // this is about the stream buttons for each agent
+                    setOpenStreamPanels((prevOpenStreamPanels) => {
+                        return Object.keys(prevOpenStreamPanels).reduce((newPanels, agentId) => {
+                            const cleanedStreamButtons = prevOpenStreamPanels[agentId].filter(id => id >= 0);
+                            if (cleanedStreamButtons.length > 0) {
+                                return {...newPanels, [agentId]: cleanedStreamButtons};
+                            }
+                            return newPanels;
+                        }, {});
+                    });
+
+                    // this is about agent-related buttons
+                    return prevOpenAgentPanels.filter(id => id >= 0);
+                });
+
+                return true;
+            };
+
+            setIsPaused(true);  // this is what actually triggers the re-rendering of the opened figures
+
+            // artificially add negative IDs, to force rendering
+            setOpenAgentPanels((prevOpenAgentPanels) => {
+
+                // this is about the stream buttons for each agent
+                setOpenStreamPanels((prevOpenStreamPanels) => {
+                    return agentButtonsRef.current.reduce((newPanels, button) => {
+                        const agentId = button.id; // Invert the sign of button.id
+                        const prevOpenStreamPanelsCurAgent =
+                            agentId in prevOpenStreamPanels ? prevOpenStreamPanels[agentId] : []
+
+                        const differ = Object.values(streamButtonsRef.current[agentId])
+                            .filter(button => !prevOpenStreamPanelsCurAgent.includes(button.id))
+                            .map(button => -button.id);
+
+                        // ensure the currentStreamButtons contains all numbers from -1 to -targetLength
+                        const updatedStreamButtons =
+                            Array.from(new Set([...prevOpenStreamPanelsCurAgent, ...differ]));
+
+                        return {...newPanels, [agentId]: updatedStreamButtons};
+                    }, prevOpenStreamPanels);
+                });
+
+                // this is about agent-related buttons
+                const newIds = agentButtonsRef.current
+                    .filter((button) => !prevOpenAgentPanels.includes(button.id)) // only if not already in openAgentPanels
+                    .map((button) => -button.id); // invert the sign of each added id
+
+                return [...prevOpenAgentPanels, ...newIds];
+            });
+
+            // waiting for the data to be downloaded, stored, and then we can really finish save
+            waitingSaveToComplete();
+        } else {
+            out("[Main] useEffect *** continuing a save procedure *** (skipping, it did not start yet)");
+        }
+    }, [saving]);
+
+    const startUpload = () => {
+        if (!offline) {
+            showError("Can only upload in offline mode", "#1F77B4")
+        } else {
+            out("[Upload] Select file...");
+            fileInputRef.current.click();  // this will trigger "handleFileUpload"
+        }
+    }
+
+    const handleFileUpload = (event) => {
+        const file = event.target.files[0];
+        if (file && file.type === 'application/json') {
+            const reader = new FileReader();
+            out("[Upload] Loading data...");
+            reader.onload = (e) => {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+                    out("[Upload] Done!");
+
+                    // clear/close all panels
+                    setOpenAgentPanels([]);
+                    setOpenStreamPanels({});
+
+                    // setting up environment name
+                    envNameRef.current = loadedData.envName;
+                    setEnvTitle(loadedData.envTitle);
+
+                    // restoring data to be plotted
+                    ioDataRef.current = loadedData.data;
+
+                    // agent buttons: restoring icons
+                    loadedData.agentButtons = loadedData.agentButtons.map((btn, index) => ({
+                        ...btn,
+                        icon: btn.id === 1 ? agentButtonIcons[0] :  // here the ID of the envir is assumed to be 1
+                            (btn.authority < 1.0 ? agentButtonIcons[1] : agentButtonIcons[2])
+                    }));
+
+                    // agent buttons: setting them up
+                    setAgentButtons(loadedData.agentButtons);
+
+                    // stream buttons: restoring icons
+                    Object.values(loadedData.streamButtons).forEach(streamButtons => {
+                        streamButtons.forEach(streamButton => {
+                            streamButton.icon = streamButton.mergedLabels[0].endsWith("[y]")
+                                ? streamButtonIcons[0]
+                                : streamButtonIcons[1];
+                        });
+                    });
+
+                    // stream buttons: setting them up
+                    setStreamButtons(loadedData.streamButtons);
+
+                    // go
+                    setIsPaused(true);
+                } catch (error) {
+                    console.error("Error while parsing JSON file", error);
+                    showError("Error while parsing JSON file");
+                }
+            };
+            reader.readAsText(file);
+        } else {
+            showError("Please upload a valid JSON file", "#1F77B4");
+        }
+    };
+
+    const saveOnServer = () => {
+
+        if (!isPaused) {
+            showError("Pause the environment first!", "#1F77B4")
+            return;
+        }
+        // meanwhile we fill the stuff to lock the screen
+        setSaving(true);
+
+        callAPI('/save', null,
+            (x) => {
+                if (x !== "<SAVE_OK>") {
+                    showError("Unable to save (or to fully save) the environment on server", "#1F77B4")
+                }
+            },
+            () => {
+                return true; },
+            () => {
+                setSaving(false);
+            });
+    }
+
+    const startSave = () => {
+        if (Object.keys(streamButtons).length !== Object.keys(agentButtons).length) {
+            showError("Right now there is nothing to save..." +
+                "hit the play button at least once to get in touch with the running environment", "#1F77B4")
+            return;
+        }
+
+        if (!isPaused) {
+            showError("Pause the environment first!", "#1F77B4")
+            return;
+        }
+
+        // before going on, let's appropriately create the ioDataRef "matrix"
+        // this will signal that we are interested in saving
+        ioDataRef.current =
+            new Array(Math.max(0, ...agentButtonsRef.current.map(agentButton => agentButton.id)) + 1)
+                .fill(null);
+
+        agentButtonsRef.current.forEach(agentButton => {
+            ioDataRef.current[agentButton.id] =
+                Array.from({
+                        length: Math.max(0,
+                            ...(streamButtonsRef.current[agentButton.id].map(streamButton => streamButton.id))) + 1
+                    },
+                    () => null);
+        });
+
+        setIsPaused(false);  // this is to create conditions to trigger the re-rendering of the opened figures
+
+        // meanwhile we fill the stuff to lock the screen
+        setSaving(true);
+    }
 
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
     function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _streamButtons_) {
@@ -495,7 +795,9 @@ export default function Main() {
                     [_agentButtonId_]: [...(prevStreamButtons[_agentButtonId_] || []), ...alteredNewStreamButtons],
                 }));
             },
-            () => setStreamButtons((prev) => (prev)),
+            () => {
+                if (!offlineRef.current) { setStreamButtons((prev) => (prev)); return true; }
+                else { return false; }},
             () => {
             });
     }
@@ -534,20 +836,20 @@ export default function Main() {
                         if (_playCallback_) {
                             _playCallback_();
                         }
-                        setIsPaused(false);
+                        setIsPaused(() => { setPlayPauseStatus(x); return false; } );
                     } else if (x.status === "paused") {
-                        setIsPaused(true);
+                        setIsPaused(() => { setPlayPauseStatus(x); return true; } );
                     } else if (x.status === "ended") {
-                        setIsPaused(true);
+                        setIsPaused(() => { setPlayPauseStatus(x); return true; } );
                     } else {
                         throw new Error("Unknown status: " + x.status);
                     }
-                    setPlayPauseStatus(x);
                 },
                 () => {
                     if (_errorCallback_) {
                         _errorCallback_();
                     }
+                    return !offlineRef.current;
                 },
                 () => {
                     playPauseStatusAskedRef.current = false;
@@ -559,7 +861,7 @@ export default function Main() {
     const handleClickOnPlayPauseButton = () => {
 
         // if something is drawing/working/fetching-data, do not let it go
-        if (isFSMBusy || isConsoleBusy || isPlotFigureBusy) {
+        if (isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0) {
             out("[Main] *** click on play/pause button *** (ignored due to other components busy)");
             return;
         } else {
@@ -582,6 +884,7 @@ export default function Main() {
                     startOrStopPlayTimer();  // starting timer!
                 },
                 () => {
+                    return !offlineRef.current;
                 },
                 () => {
                 });
@@ -597,6 +900,7 @@ export default function Main() {
                     startOrStopPlayTimer(); // stop timer!
                 },
                 () => {
+                    return !offlineRef.current;
                 },
                 () => {
                 });
@@ -608,18 +912,29 @@ export default function Main() {
     // returning what will be displayed in the "root" <div>...</div>
     return (
         <DndProvider backend={HTML5Backend}>
+            {saving && <div className="saving-spinner"></div>}
 
             <div className="p-6 space-y-8 flex flex-col items-center w-full">
                 <div className="flex flex-col items-center justify-center text-center">
                     <h1 className="text-2xl font-semibold mt-2">NARNIAN</h1>
                     <h1 className="text-2xl font-semibold mt-2">Environment:{" "}
-                        {envTitle}</h1>
+                        {envTitle}
+                        <button onClick={saveOnServer}
+                                className={`save-button inline-flex items-center pl-2 gap-2 relative top-0.5 
+                                ${offline ? "hidden" : ""}`}><Save size={20}/></button>
+                        <button onClick={!offline ? startSave : startUpload}
+                                className="save-button inline-flex items-center pl-2 gap-2 relative top-0.5">
+                            {!offline ? <Download size={20}/> : <Upload size={20}/>}</button>
+                        <input type="file" accept=".json" ref={fileInputRef} style={{display: "none"}}
+                               onChange={handleFileUpload}
+                        />
+                    </h1>
                 </div>
 
                 <div className="flex flex-wrap gap-4 w-full justify-center">
 
                     <div className="flex items-center"
-                         style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
+                         style={{display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
 
                         <span className="text-xs font-semibold w-20 text-right block mr-2">
                           {playPauseStatus.status === '?' ? "What?" :
@@ -649,7 +964,7 @@ export default function Main() {
 
                     <button onClick={handleClickOnPlayPauseButton}
                             className={`px-4 py-2 rounded-2xl bg-amber-200 
-                            ${(isFSMBusy || isConsoleBusy || isPlotFigureBusy) ? 
+                            ${(isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0) ? 
                                 "hover:bg-gray-200" : "hover:bg-amber-300"}`}
                             style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }} >
 
@@ -709,134 +1024,147 @@ export default function Main() {
                 </div>
 
                 <div className={`grid ${gridCols} gap-8 w-full`}>
-                    {agentButtons.map(
-                        (agent_button) =>
-                            openAgentPanels.includes(agent_button.id) &&
-                            (  // **** big thing opening here.... ***
-                                <AnimatePresence key={agent_button.id}>
-                                    <motion.div initial={{opacity: 0, height: 0}}
-                                                animate={{opacity: 1, height: "auto"}}
-                                                exit={{opacity: 0, height: 0}}
-                                                transition={{duration: 0.3}}
-                                                className="w-full p-4 bg-white rounded-2xl shadow-lg border space-y-6">
+                    {agentButtons.map((agent_button) => {
+                        const isOpen = openAgentPanels.includes(agent_button.id);
+                        const isForcedOpen = openAgentPanels.includes(-agent_button.id);
+                        const shouldRender = isOpen || isForcedOpen;
+                        const shouldHideOthers = isForcedOpen && !isOpen;
 
-                                        <h2 className="font-medium text-lg flex items-center justify-center">
-                                            <span className="mr-1">{agent_button.label}</span>
-                                            <button
-                                                className={`w-6 h-6 
-                                                ${openFSMPanels.includes(agent_button.id) ? 
-                                                    "text-white bg-blue-500" : "bg-gray-100"} rounded-full 
-                                                    flex items-center justify-center ml-2`}
-                                                onClick={() => toggleFSMPanel(agent_button.id)}>
-                                                B
-                                            </button>
-                                            <button
-                                                className={`w-6 h-6 
-                                                ${openConsolePanels.includes(agent_button.id) ? 
-                                                    "text-white bg-blue-500" : "bg-gray-100"} rounded-full flex 
-                                                    items-center justify-center ml-2`}
-                                                onClick={() => toggleConsolePanel(agent_button.id)}>
-                                                C
-                                            </button>
-                                        </h2>
+                        return shouldRender && (  // **** big thing opening here.... ***
+                            <AnimatePresence key={agent_button.id}>
+                                <motion.div initial={{opacity: 0, height: 0}}
+                                            animate={{opacity: 1, height: shouldHideOthers ? 0 : "auto"}}
+                                            exit={{opacity: 0, height: 0}}
+                                            transition={{duration: 0.3}}
+                                            className={`w-full p-4 bg-white rounded-2xl shadow-lg border space-y-6 
+                                                ${shouldHideOthers ? "hidden" : ""}`}>
 
-                                        <div className={`grid grid-cols-1 ${(openFSMPanels.includes(agent_button.id) &&
-                                            openConsolePanels.includes(agent_button.id)) ?
-                                            "sm:grid-cols-2" : "sm:grid-cols-1"} gap-4`}>
+                                    <h2 className="font-medium text-lg flex items-center justify-center">
+                                        <span className="mr-1">{agent_button.label}</span>
+                                        <button
+                                            className={`w-6 h-6 
+                                                ${openFSMPanels.includes(agent_button.id) ?
+                                                "text-white bg-blue-500" : "bg-gray-100"} rounded-full 
+                                                    flex items-center justify-center ml-2
+                                                    ${offline ? "hidden" : ""}`}
+                                            onClick={() => toggleFSMPanel(agent_button.id)}>
+                                            B
+                                        </button>
+                                        <button
+                                            className={`w-6 h-6 
+                                                ${openConsolePanels.includes(agent_button.id) ?
+                                                "text-white bg-blue-500" : "bg-gray-100"} rounded-full flex 
+                                                    items-center justify-center ml-2
+                                                    ${offline ? "hidden" : ""}`}
+                                            onClick={() => toggleConsolePanel(agent_button.id)}>
+                                            C
+                                        </button>
+                                    </h2>
 
-                                            {openFSMPanels.includes(agent_button.id) &&
-                                                <div className="h-[400px] w-full flex justify-center">
+                                    <div className={`grid grid-cols-1 ${(openFSMPanels.includes(agent_button.id) &&
+                                        openConsolePanels.includes(agent_button.id)) ?
+                                        "sm:grid-cols-2" : "sm:grid-cols-1"} gap-4 ${offline ? "hidden" : ""}`}>
+
+                                        {openFSMPanels.includes(agent_button.id) &&
+                                            <div className="h-[400px] w-full flex justify-center">
                                                 <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
                                                         rounded-xl shadow text-center">
-                                                        <h3 className="font-medium">Behaviour</h3>
-                                                        <FSM _agentName_={agent_button.label}
-                                                             _isPaused_={isPaused}
-                                                             _setBusy_={setIsFSMBusy}
-                                                        />
-                                                    </div>
+                                                    <h3 className="font-medium">Behaviour</h3>
+                                                    <FSM _agentName_={agent_button.label}
+                                                         _isPaused_={isPaused}
+                                                         _setBusy_={setIsFSMBusy}
+                                                    />
                                                 </div>
-                                            }
+                                            </div>
+                                        }
 
-                                            {openConsolePanels.includes(agent_button.id) &&
-                                                <div className="h-[400px] w-full flex justify-center">
-                                                    <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
+                                        {openConsolePanels.includes(agent_button.id) &&
+                                            <div className="h-[400px] w-full flex justify-center">
+                                                <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
                                                         rounded-xl shadow text-center">
-                                                        <h3 className="font-medium">Console</h3>
-                                                        <Console _agentName_={agent_button.label}
-                                                                 _isPaused_={isPaused}
-                                                                 _setBusy_={setIsConsoleBusy}
-                                                        />
-                                                    </div>
+                                                    <h3 className="font-medium">Console</h3>
+                                                    <Console _agentName_={agent_button.label}
+                                                             _isPaused_={isPaused}
+                                                             _setBusy_={setIsConsoleBusy}
+                                                    />
                                                 </div>
-                                            }
+                                            </div>
+                                        }
 
-                                        </div>
+                                    </div>
 
-                                        <div className="flex gap-4 justify-center w-full flex-wrap">
-                                            {streamButtons[agent_button.id]?.map((streamButton) => (
-                                                <AnimatePresence key={streamButton.mergedIds.join("-")}>
-                                                    <motion.div initial={{opacity: 0, scale: 0.9}}
-                                                                animate={{opacity: 1, scale: 1}}
-                                                                exit={{opacity: 0, scale: 0.9}}
-                                                                transition={{duration: 0.2}}>
+                                    <div className="flex gap-4 justify-center w-full flex-wrap">
+                                        {streamButtons[agent_button.id]?.map((streamButton) => (
+                                            <AnimatePresence key={streamButton.mergedIds.join("-")}>
+                                                <motion.div initial={{opacity: 0, scale: 0.9}}
+                                                            animate={{opacity: 1, scale: 1}}
+                                                            exit={{opacity: 0, scale: 0.9}}
+                                                            transition={{duration: 0.2}}>
 
-                                                        <DraggableStreamButton
-                                                            _streamButton_={streamButton}
-                                                            _onDrop_={(droppedStreamButton) =>
-                                                                handleDrop(
-                                                                    droppedStreamButton.agentButtonId,
-                                                                    droppedStreamButton.id,
-                                                                    streamButton.agentButtonId,
-                                                                    streamButton.id)}
-                                                            _onDoubleClick_={() =>
-                                                                handleDoubleClick(
-                                                                    streamButton.agentButtonId,
-                                                                    streamButton.id)}
-                                                            _onClick_={() =>
-                                                                handleClick(
-                                                                    streamButton.agentButtonId,
-                                                                    streamButton.id)}
-                                                            _checkIfActive_={() =>
-                                                                checkIfActive(
-                                                                    streamButton.agentButtonId,
-                                                                    streamButton.id)}
-                                                        />
-                                                    </motion.div>
-                                                </AnimatePresence>
-                                            ))}
-                                        </div>
+                                                    <DraggableStreamButton
+                                                        _streamButton_={streamButton}
+                                                        _onDrop_={(droppedStreamButton) =>
+                                                            handleDrop(
+                                                                droppedStreamButton.agentButtonId,
+                                                                droppedStreamButton.id,
+                                                                streamButton.agentButtonId,
+                                                                streamButton.id)}
+                                                        _onDoubleClick_={() =>
+                                                            handleDoubleClick(
+                                                                streamButton.agentButtonId,
+                                                                streamButton.id)}
+                                                        _onClick_={() =>
+                                                            handleClick(
+                                                                streamButton.agentButtonId,
+                                                                streamButton.id)}
+                                                        _checkIfActive_={() =>
+                                                            checkIfActive(
+                                                                streamButton.agentButtonId,
+                                                                streamButton.id)}
+                                                    />
+                                                </motion.div>
+                                            </AnimatePresence>
+                                        ))}
+                                    </div>
 
-                                        <div className={`gap-4 mt-6r  
-                                        ${openStreamPanels[agent_button.id]?.length <= 2 ?
-                                            (openStreamPanels[agent_button.id]?.length <= 1 ? 
-                                                " grid sm:grid-cols-1 max-w-[900px] mx-auto" 
-                                                : "grid sm:grid-cols-2") : "grid sm:grid-cols-3"}`}>
-                                            {openStreamPanels[agent_button.id]?.map((id) => {
-                                                const streamButton = streamButtons[agent_button.id]?.find(
-                                                    (btn) => btn.id === id
-                                                );
-                                                return (
-                                                    <div key={id}
-                                                         className="min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
-                                                            rounded-xl shadow text-center">
-                                                        <h3 className="font-medium flex items-center justify-center">
-                                                            <span className="w-5 h-5">{streamButton?.icon}</span>
-                                                            <span className="ml-1">{streamButton?.label}</span>
-                                                        </h3>
-                                                        <PlotFigure _agentName_={agent_button.label}
-                                                                    _streamStruct_={streamButton}
-                                                                    _isPaused_={isPaused}
-                                                                    _setBusy_={setIsPlotFigureBusy}
-                                                        />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </motion.div>
-                                </AnimatePresence>
-                            )  // **** big thing closing here.... ***
-                    )}
+                                    <div className={`gap-4 mt-6r  
+                                        ${openStreamPanels[agent_button.id]?.filter((id) => id > 0)
+                                        .length <= 2 ?
+                                        (openStreamPanels[agent_button.id]?.filter((id) => id > 0)
+                                            .length <= 1 ?
+                                            " grid sm:grid-cols-1 max-w-[900px] mx-auto"
+                                            : "grid sm:grid-cols-2") : "grid sm:grid-cols-3"}`}>
+                                        {openStreamPanels[agent_button.id]?.map((id) => {
+                                            const shouldHidePlotFigure = id < 0;
+                                            if (id < 0) { id = -id; }
 
+                                            const streamButton = streamButtons[agent_button.id]?.find(
+                                                (btn) => btn.id === id
+                                            );
+                                            return (
+                                                <div key={id}
+                                                    style={{visibility: shouldHidePlotFigure ? "hidden" : "visible"}}
+                                                    className="min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
+                                                    rounded-xl shadow text-center">
+                                                    <h3 className="font-medium flex items-center justify-center">
+                                                        <span className="w-5 h-5">{streamButton?.icon}</span>
+                                                        <span className="ml-1">{streamButton?.label}</span>
+                                                    </h3>
+                                                    <PlotFigure _agentName_={agent_button.label}
+                                                                _streamStruct_={streamButton}
+                                                                _isPaused_={isPaused}
+                                                                _setBusy_={setIsPlotFigureBusy}
+                                                                _ioDataRef_={ioDataRef}
+                                                                _offline_={offlineRef.current}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
+                            </AnimatePresence>
+                        );  // **** big thing closing here.... ***
+                    })}
                 </div>
             </div>
         </DndProvider>

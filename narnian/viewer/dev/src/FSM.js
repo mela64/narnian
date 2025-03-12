@@ -43,7 +43,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             (x) => {
                 setGraphvizDotStringData(x);
             },
-            () => setGraphvizDotStringData(null),  // clearing
+            () => { setGraphvizDotStringData(null); return true; },  // clearing
             () => {
                 setLoading(false);  // done loading
             })
@@ -93,6 +93,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
                 }
             },
             () => {
+                return true;
             },
             () => {
             }
@@ -149,7 +150,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         }
 
         // this will tell the parent that this component is working
-        _setBusy_(true);
+        _setBusy_((prev) => prev + 1);
 
         const {width, height} = svgSize;
         out("[FSM] useEffect *** drawing *** (data ready, width: " + width + ", height: " + height + ")");
@@ -533,7 +534,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         setDrawingDone(true);  // marking the drawing has completed
 
         // this will tell the parent that this component is now ready
-        _setBusy_(false);
+        _setBusy_((prev) => prev - 1);
     }, [graphvizDotStringData, svgSize, _setBusy_]);
     // redraw when the data is loaded and when the size changes due to resize (_setBusy_ will not change)
 

@@ -113,10 +113,12 @@ export function callAPI(api_name, params, fcn, fcn_error, fcn_finally) {
                 "with params " + (queryString !== "" ? queryString : '(none)') + ". Exception: " + err;
             console.error(err_msg);
             if (fcn_error != null) {
-                fcn_error();
+                const ret = fcn_error();
+                if (ret)
+                    showError(err_msg);
+            } else {
+                showError(err_msg);
             }
-            //alert(err_msg);
-            showError(err_msg);
         })
         .finally(() => {
             if (fcn_finally != null) {
@@ -125,14 +127,14 @@ export function callAPI(api_name, params, fcn, fcn_error, fcn_finally) {
         });
 }
 
-function showError(message) {
+export function showError(message, bgColor = '#ff4d4d') {
     let toast = document.createElement('div');
     toast.textContent = message;
     toast.style.position = 'fixed';
     toast.style.top = '50%';
     toast.style.left = '50%';
     toast.style.transform = 'translateX(-50%)';
-    toast.style.backgroundColor = '#ff4d4d';
+    toast.style.backgroundColor = bgColor;
     toast.style.color = 'white';
     toast.style.padding = '12px 20px';
     toast.style.borderRadius = '5px';

@@ -36,7 +36,7 @@ export default function Console({ _agentName_, _isPaused_, _setBusy_}) {
         }
 
         // this will tell the parent that this component is working
-        _setBusy_(true);
+        _setBusy_((prev) => prev + 1);
 
         out("[Console] useEffect *** fetching data (agent_name: " + _agentName_ + ") ***");
         callAPI('/get_console', "agent_name=" + _agentName_,
@@ -76,10 +76,10 @@ export default function Console({ _agentName_, _isPaused_, _setBusy_}) {
                 setLastStoredStep(_lastStoredStep); // last step
                 setMessages((prev) => [...prev, ...newMessages]);  // message buffer
             },
-            () => setMessages((prev) => (prev)),
+            () => { setMessages((prev) => (prev)); return true; },
             () => {
                 // this will tell the parent that this component is now ready
-                _setBusy_(false);
+                _setBusy_((prev) => prev - 1);
             }
         );
     }, [_isPaused_, _agentName_, _setBusy_]);
