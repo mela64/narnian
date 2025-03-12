@@ -18,7 +18,7 @@ class BasicHLModel(Model):
         d_dim = attributes[1].shape.numel()
         y_dim = attributes[0].shape.numel()
 
-        super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=100, delta=delta),
+        super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=delta, local=True),
                                            BasicPredictor(y_dim=1, d_dim=3, h_dim=3),
                                            attributes)
 
@@ -27,8 +27,8 @@ class BasicHLModel(Model):
         self.loss_pred = torch.nn.functional.mse_loss
 
         # HL based optimization of the generator
-        self.hl_optim = HL(self.generator, gamma=1., theta=0., beta=1.,
-                           reset_neuron_costate=True, reset_weight_costate=True)
+        self.hl_optim = HL(self.generator, gamma=1., theta=0.2, beta=0.01,
+                           reset_neuron_costate=False, reset_weight_costate=False, local=True)
         self.loss_gen = torch.nn.functional.mse_loss
 
     def learn(self,

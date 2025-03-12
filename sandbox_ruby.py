@@ -10,7 +10,7 @@ env = BasicEnvironment("Env", title="Ruby's Sandbox")
 
 # adding streams to the environment
 env.add_stream(Stream.create(name="sin", creator=env.name, stream=Sin(freq=0.159, phase=0.5, delta=0.1)))
-env.add_stream(Stream.create(name="square", creator=env.name, stream=Square(freq=0.159, phase=0.5, delta=0.1)))
+env.add_stream(Stream.create(name="square", creator=env.name, stream=Square(freq=0.159, phase=0.5, delta=0.1, ampl=1.)))
 
 # modeling behaviour of the environment
 env.add_transit("init", "streams_enabled", action="enable_all_streams")

@@ -614,7 +614,7 @@ class BasicAgent(Agent):
     def check_pref_stream(self, what: str = "last") -> bool:
         """Check the current preferred stream."""
 
-        valid = ['first', 'last', 'not_first', 'not_last', 'last_round', 'not_last_round']
+        valid = ['first', 'last', 'not_first', 'not_last', 'last_round', 'not_last_round', 'last_song', 'not_last_song']
         assert what in valid, f"The what argument can only be one of {valid}"
 
         self.out(f"Checking if the current preferred playlist item is the '{what}' one")
@@ -630,6 +630,12 @@ class BasicAgent(Agent):
             return self.cur_preferred_stream + len(self.preferred_streams) // self.repeat >= len(self.preferred_streams)
         elif what == "not_last_round":
             return self.cur_preferred_stream + len(self.preferred_streams) // self.repeat < len(self.preferred_streams)
+        elif what == "last_song":
+            num_streams_in_playlist = len(self.preferred_streams) // self.repeat
+            return (self.cur_preferred_stream + 1) % num_streams_in_playlist == 0
+        elif what == "not_last_song":
+            num_streams_in_playlist = len(self.preferred_streams) // self.repeat
+            return (self.cur_preferred_stream + 1) % num_streams_in_playlist != 0
 
     def set_pref_streams(self, stream_hashes: list[str], repeat: int = 1):
         """Fill a list with preferred streams."""

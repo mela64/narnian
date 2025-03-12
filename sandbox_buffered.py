@@ -13,7 +13,7 @@ env = BasicEnvironment("sandbox")
 # adding streams to the environment
 env.add_stream(Stream.create(name="3sin", creator="envir", stream=CombSin(f_cap=0.159, c_cap=1., delta=0.1, order=3)))
 env.add_stream(Stream.create(name="6sin", creator="envir", stream=CombSin(f_cap=0.159, c_cap=0.5, delta=0.1, order=6)))
-env.add_stream(Stream.create(name="square", creator="envir", stream=Square(freq=0.0159, phase=0.5, delta=0.1)))
+env.add_stream(Stream.create(name="square", creator="envir", stream=Square(freq=0.0159, phase=0.5, delta=0.1, ampl=1.)))
 
 # modeling behaviour of the environment
 env.behav.add_transit("init", "streams_enabled", action="enable_all_streams")
@@ -59,7 +59,8 @@ ag.behav.save_pdf(f"{ag.name}.pdf")
 env.add_agent(ag)
 
 # creating student agent
-ag = BasicAgent("student", model=BasicModel(attributes=env.shared_attributes, lr=0.001), authority=0.0)
+# ag = BasicAgent("student", model=BasicModel(attributes=env.shared_attributes, lr=0.001), authority=0.0)
+ag = BasicAgent("student", model=BasicHLModel(attributes=env.shared_attributes, lr=0.001, delta=0.1), authority=0.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
 ag.behav.add_transit("got_agents", "teacher_engaged", action="get_engagement", args={"min_auth": 1.0, "max_auth": 1.0})
