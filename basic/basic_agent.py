@@ -942,10 +942,10 @@ class BasicAgent(Agent):
                           first=(k == 0))
 
         # buffer data to the streams
-        yhatdhat_stream.append_data(yhat.detach() if yhat is not None and not skip_gen else None,
-                                    dhat.detach() if dhat is not None and not skip_pred else None)
-        yd_stream.append_data(y.detach(),
-                              d.detach())
+        yhatdhat_stream.append_data(yhat.cpu().detach() if yhat is not None and not skip_gen else None,
+                                    dhat.cpu().detach() if dhat is not None and not skip_pred else None)
+        yd_stream.append_data(y.cpu().detach(),
+                              d.cpu().detach())
 
         # learn
         if (not skip_gen and yhat_stream is not None) or (not skip_pred and dhat_stream is not None):

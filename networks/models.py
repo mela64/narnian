@@ -55,9 +55,11 @@ class BasicGenerator(torch.nn.Module):
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
         else:
-            u = u.flatten(1)
+            u = u.flatten(1).to(self.device)
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
+        else:
+            du = du.to(self.device)
 
         # Reset hidden state if first step
         h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h.detach()
@@ -129,9 +131,11 @@ class _DiagR(torch.nn.Module):
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
         else:
-            u = u.flatten(1)
+            u = u.flatten(1).to(self.device)
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
+        else:
+            du = du.to(self.device)
 
         h = self.h.detach()
         if first:
@@ -201,12 +205,12 @@ class _DiagC(torch.nn.Module):
             u = torch.zeros((1, self.u_dim), dtype=torch.cfloat, device=self.device)
         else:
             u = u.flatten(1)
-            u.to(dtype=torch.cfloat)
+            u.to(dtype=torch.cfloat).to(self.device)
 
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.cfloat, device=self.device)
         else:
-            du.to(dtype=torch.cfloat)
+            du.to(dtype=torch.cfloat).to(self.device)
 
         h = self.h.detach()
         if first:
@@ -295,8 +299,8 @@ class _CTE(torch.nn.Module):
             y: Output tensor of shape (batch_size, y_dim)
         """
         # Handle missing inputs
-        u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
-        du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
         h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h.detach()
@@ -445,8 +449,8 @@ class _CTB(torch.nn.Module):
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through block-structured dynamics"""
         # Input handling
-        u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
-        du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # State management
         h = self.h_init if first else self.h.detach()
@@ -538,8 +542,8 @@ class _CTBE(torch.nn.Module):
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Exact matrix exponential forward pass"""
         # Input handling
-        u = u.flatten(1) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
-        du = du if du is not None else torch.zeros((1, self.du_dim), device=self.device)
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # State management
         h = self.h_init if first else self.h.detach()
@@ -584,20 +588,24 @@ class BasicPredictor(torch.nn.Module):
         h_dim: Hidden state dimension
     """
 
-    def __init__(self, y_dim: int, d_dim: int, h_dim: int):
+    def __init__(self, y_dim: int, d_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
         super(BasicPredictor, self).__init__()
+        self.device = device
+
         # System matrices
-        self.A = torch.nn.Linear(h_dim, h_dim, bias=False)
-        self.B = torch.nn.Linear(y_dim, h_dim, bias=False)
-        self.C = torch.nn.Linear(h_dim, d_dim, bias=False)
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
+        self.B = torch.nn.Linear(y_dim, h_dim, bias=False, device=device)
+        self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=device)
 
         # Hidden state
-        self.register_buffer("h", torch.randn(1, h_dim))
+        self.register_buffer("h", torch.randn(1, h_dim, device=device))
         self.register_buffer("h_init", self.h.clone())
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Simple nonlinear prediction step"""
+        y = y.to(self.device)
+
         if first:
             self.h = self.h_init
 
@@ -613,8 +621,9 @@ class BasicPredictor(torch.nn.Module):
 
 class BasicImagePredictor(torch.nn.Module):
 
-    def __init__(self, d_dim: int):
+    def __init__(self, d_dim: int, device: torch.device = torch.device("cpu")):
         super(BasicImagePredictor, self).__init__()
+        self.device = device
 
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.Resize(32),
@@ -638,12 +647,12 @@ class BasicImagePredictor(torch.nn.Module):
             torch.nn.ReLU(inplace=True),
             torch.nn.Linear(2048, d_dim),
             torch.nn.Sigmoid()
-        )
+        ).to(self.device)
 
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y, first=False):
-        return self.net(self.transforms(y))
+        return self.net(self.transforms(y).to(self.device))
 
 
 class BasicTokenGenerator(torch.nn.Module):
@@ -651,6 +660,7 @@ class BasicTokenGenerator(torch.nn.Module):
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu")):
         super(BasicTokenGenerator, self).__init__()
+        self.device = device
 
         u_dim = emb_dim
         du_dim = d_dim
@@ -664,7 +674,6 @@ class BasicTokenGenerator(torch.nn.Module):
         self.register_buffer("dh", torch.zeros_like(self.h))
         self.u_dim = u_dim
         self.du_dim = du_dim
-        self.device = device
         self.delta = 1.     # already defined in discrete time
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
@@ -676,9 +685,11 @@ class BasicTokenGenerator(torch.nn.Module):
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
         else:
-            u = self.embeddings(u)  # added this
+            u = self.embeddings(u.to(self.device))  # added this
         if du is None:
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
+        else:
+            du = du.to(self.device)
         h = self.h.detach()
         if first:
             h = self.h_init

@@ -1,3 +1,4 @@
+import torch
 from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
@@ -7,6 +8,7 @@ from basic.basic_environment import BasicEnvironment
 
 # creating environment
 env = BasicEnvironment("Env", title="Animal School")
+device = torch.device("cpu")
 
 # adding streams to the environment (images of 3 animals; image of other 4 animals; images of all 3+4 animals)
 env.add_stream(Stream.create(name="3-ani", creator=env.name,
@@ -51,7 +53,8 @@ ag.add_transit("habilitate", "done_teaching", action="wait_for_actions",
 env.add_agent(ag)
 
 # creating student agent named Mario
-ag = BasicAgent("Mario", model=BasicImageModel(attributes=env.shared_attributes, lr=0.01), authority=0.0)
+ag = BasicAgent("Mario", model=BasicImageModel(attributes=env.shared_attributes, lr=0.01, device=device),
+                authority=0.0)
 
 # in principle, he is like Dr. Green...
 ag.behave_as(env.agents["Dr. Green"])
@@ -70,7 +73,8 @@ ag.add_transit("teacher_engaged", "got_agents", action="get_disengagement")
 env.add_agent(ag)
 
 # creating another student agent named Luigi
-ag = BasicAgent("Luigi", model=BasicImageModel(attributes=env.shared_attributes, lr=0.0001), authority=0.0)
+ag = BasicAgent("Luigi", model=BasicImageModel(attributes=env.shared_attributes, lr=0.0001, device=device),
+                authority=0.0)
 
 # he really acts like Mario
 ag.behave_as(env.agents["Mario"])

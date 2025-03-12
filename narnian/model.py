@@ -14,13 +14,14 @@ class Model(torch.nn.Module):
     LEARN_MODES = [LEARN_GEN_AND_PRED, LEARN_GEN, LEARN_PRED]
 
     def __init__(self, generator: torch.nn.Module | None, predictor: torch.nn.Module | None,
-                 attributes: list[Attributes]):
+                 attributes: list[Attributes], device: torch.device = torch.device("cpu")) :
         """Creates a model composed of a generator and a predictor."""
         super(Model, self).__init__()
         assert generator is not None or predictor is not None, "Both generator and predictor not provided (None, None)"
         self.generator = generator
         self.predictor = predictor
         self.attributes = attributes
+        self.device = device
         assert len(self.attributes) == 2, f"Expecting two sets of attributes, got {len(attributes)}"
 
     def forward(self,
@@ -45,7 +46,7 @@ class Model(torch.nn.Module):
             return y, d
         elif mode == Model.PRED:
             d = self.predictor.forward(y, first) if self.predictor is not None else None
-            return y, d
+            return y.to(self.device), d.to(self.device)
 
     @staticmethod
     def detect_forward_mode(u: torch.Tensor | None, du: torch.Tensor | None,
@@ -85,6 +86,11 @@ class Model(torch.nn.Module):
             d_clean = None
         elif mode == Model.LEARN_PRED:
             y_clean = None
+
+        if yhat_clean is not None:
+            yhat_clean = yhat_clean.to(self.device)
+        if dhat_clean is not None:
+            dhat_clean = dhat_clean.to(self.device)
 
         return loss_as_float, y_clean, yhat_clean, d_clean, dhat_clean
 
@@ -129,6 +135,23 @@ class Model(torch.nn.Module):
 
 class EmptyModel(Model):
     def __init__(self):
-        super(EmptyModel, self).__init__(generator=torch.nn.Identity(), predictor=torch.nn.Identity(),
+
+        class EmptyGenerator(torch.nn.Module):
+            def __init__(self):
+                super(EmptyGenerator, self).__init__()
+
+            # noinspection PyMethodMayBeStatic
+            def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False):
+                return None
+
+        class EmptyPredictor(torch.nn.Module):
+            def __init__(self):
+                super(EmptyPredictor, self).__init__()
+
+            # noinspection PyMethodMayBeStatic
+            def forward(self, y: torch.Tensor, first=False):
+                return None
+
+        super(EmptyModel, self).__init__(generator=EmptyGenerator(), predictor=EmptyPredictor(),
                                          attributes=[Attributes(shape=None, labels=None),
                                                      Attributes(shape=None, labels=None)])

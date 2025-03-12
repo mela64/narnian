@@ -6,7 +6,7 @@ from networks.models import BasicImagePredictor
 
 class BasicImageModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, device: torch.device = torch.device("cpu")):
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -15,8 +15,8 @@ class BasicImageModel(Model):
 
         # calling constructor
         super(BasicImageModel, self).__init__(None,
-                                              BasicImagePredictor(d_dim=d_dim),
-                                              attributes)
+                                              BasicImagePredictor(d_dim=d_dim, device=device),
+                                              attributes, device=device)
 
         # extra stuff
         self.optim = torch.optim.SGD(self.predictor.parameters(), lr=lr)

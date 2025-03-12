@@ -7,7 +7,8 @@ from narnian.attributes import Attributes
 
 class BasicHLModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, delta: float = None):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, delta: float = None,
+                 device: torch.device = torch.device("cpu")):
         """Creates a model composed of a generator and a predictor."""
         assert delta is not None, f"delta should be specified."
         self.delta = delta
@@ -20,7 +21,7 @@ class BasicHLModel(Model):
 
         super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=delta, local=True),
                                            BasicPredictor(y_dim=1, d_dim=3, h_dim=3),
-                                           attributes)
+                                           attributes, device=device)
 
         # SGD based optimization of the predictor
         self.optim = torch.optim.SGD(list(self.predictor.parameters()), lr=lr)

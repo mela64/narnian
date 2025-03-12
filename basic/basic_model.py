@@ -6,7 +6,7 @@ from networks.models import AntisymmetricExpGenerator, BasicPredictor
 
 class BasicModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, device: torch.device = torch.device("cpu")):
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -18,7 +18,7 @@ class BasicModel(Model):
         # creating the model (superclass)
         super(BasicModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150, delta=0.1),
                                          BasicPredictor(y_dim=y_dim, d_dim=d_dim, h_dim=3),
-                                         attributes)
+                                         attributes, device=device)
 
         # extra stuff
         self.optim = torch.optim.SGD(list(self.generator.parameters()) + list(self.predictor.parameters()), lr=lr)
