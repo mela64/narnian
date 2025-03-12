@@ -133,6 +133,7 @@ class Environment:
 
         except (TypeError, ValueError, RuntimeError, IOError, FileNotFoundError) as e:
             self.out(f"Could not save the environment: {e}")
+            raise e
             return str(e)
         return "<SAVE_OK>"  # this means OK
 

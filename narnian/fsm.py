@@ -35,30 +35,31 @@ class FiniteStateMachine:
             'prev_state': self.prev_state,
             'limbo_state': self.limbo_state,
             'state_actions': {
-                state: str([state_action_tuple[0].__name__ if state_action_tuple[0] is not None else None,
-                            state_action_tuple[1], state_action_tuple[2]])
+                state: [state_action_tuple[0].__name__ if state_action_tuple[0] is not None else None,
+                        state_action_tuple[1], state_action_tuple[2]]
                 for state, state_action_tuple in self.states.items() if state_action_tuple is not None
             },
             'transitions': {
                 from_state: {
-                    to_state: str([[action.__name__, args, wait, act_id]
-                                   for (action, args, wait, act_id) in action_tuple])
+                    to_state: [[action.__name__, args, wait, act_id]
+                               for (action, args, wait, act_id) in action_tuple]
                     for to_state, action_tuple in to_states.items()
                 }
                 for from_state, to_states in self.transitions.items()
             },
-            'action': str([self.action[0].__name__,
-                           self.action[1], self.action[2]]) if self.action is not None else None,
+            'action': [self.action[0].__name__,
+                       self.action[1], self.action[2]] if self.action is not None else None,
             'action_step': self.action_step,
             'param_buffer': self.param_buffer
         }
-        json_string = json.dumps(fsm_data, indent=4)
-        json_string = json_string.replace("\"[", "[")
-        json_string = json_string.replace("]\"", "]")
-        json_string = json_string.replace("'", "\"")
-        json_string = json_string.replace("None", "null")
-        json_string = json_string.replace("False", "false")
-        json_string = json_string.replace("True", "true")
+
+        def custom_serializer(obj):
+            if not isinstance(obj, (int, str, float, bool, list, tuple, dict, set)):
+                return "_non_basic_type_removed_"
+            else:
+                return obj
+
+        json_string = json.dumps(fsm_data, indent=4, default=custom_serializer)
         return json_string
 
     def set_actionable(self, obj: object):
@@ -138,8 +139,13 @@ class FiniteStateMachine:
             raise ValueError("Unknown state: " + str(state))
 
     def add_transit(self, from_state: str, to_state: str,
-                    action: str, args: dict | None = None, wait: bool = False, act_id: int | None = None):
+                    action: str, args: dict | None = None, wait: bool | list[bool, bool] = False,
+                    act_id: int | None = None):
         """Define a transition between two states with an associated action."""
+
+        # fixing (when loading from JSON, "wait" is a list, but the whole code expects a tuple)
+        if isinstance(wait, list):
+            wait = tuple(wait)
 
         # plugging a previously loaded FSM
         if os.path.exists(to_state):

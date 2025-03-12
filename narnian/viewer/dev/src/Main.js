@@ -1144,8 +1144,9 @@ export default function Main() {
                                             return (
                                                 <div key={id}
                                                     style={{visibility: shouldHidePlotFigure ? "hidden" : "visible"}}
-                                                    className="min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
-                                                    rounded-xl shadow text-center">
+                                                    className={`min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
+                                                    rounded-xl shadow text-center 
+                                                    ${shouldHidePlotFigure ? "hidden" : ""}`}>
                                                     <h3 className="font-medium flex items-center justify-center">
                                                         <span className="w-5 h-5">{streamButton?.icon}</span>
                                                         <span className="ml-1">{streamButton?.label}</span>
