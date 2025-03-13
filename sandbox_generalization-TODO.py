@@ -74,7 +74,7 @@ class LFLASquare(Square):
 
 
 # creating environment
-env = BasicEnvironment("sandbox")
+env = BasicEnvironment("Feature generalization")
 
 # adding streams to the environment
 env.add_stream(Stream.create(name="3sinhfha", creator="envir", stream=HFHACombSin()))
@@ -98,18 +98,18 @@ env.behav.save_pdf(f"{env.name}.pdf")
 ag = BasicAgent("teacher", model=BasicModel(attributes=env.shared_attributes, lr=0.), authority=1.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
-ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sinhfha", "steps": 500})
-ag.behav.add_transit("recording1", "recording2", action="record", args={"stream_hash": "envir:3sinhfla", "steps": 500})
-ag.behav.add_transit("recording2", "recording3", action="record", args={"stream_hash": "envir:3sinlfha", "steps": 500})
-ag.behav.add_transit("recording3", "recording4", action="record", args={"stream_hash": "envir:3sinlfla", "steps": 500})
-ag.behav.add_transit("recording4", "recording5", action="record", args={"stream_hash": "envir:squarehfha", "steps": 500})
-ag.behav.add_transit("recording5", "recording6", action="record", args={"stream_hash": "envir:squarehfla", "steps": 500})
-ag.behav.add_transit("recording6", "recording7", action="record", args={"stream_hash": "envir:squarelfha", "steps": 500})
-ag.behav.add_transit("recording7", "recording8", action="record", args={"stream_hash": "envir:squarelfla", "steps": 500})
+ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sinhfha", "steps": 1000})
+ag.behav.add_transit("recording1", "recording2", action="record", args={"stream_hash": "envir:3sinhfla", "steps": 1000})
+ag.behav.add_transit("recording2", "recording3", action="record", args={"stream_hash": "envir:3sinlfha", "steps": 1000})
+ag.behav.add_transit("recording3", "recording4", action="record", args={"stream_hash": "envir:3sinlfla", "steps": 1000})
+ag.behav.add_transit("recording4", "recording5", action="record", args={"stream_hash": "envir:squarehfha", "steps": 1000})
+ag.behav.add_transit("recording5", "recording6", action="record", args={"stream_hash": "envir:squarehfla", "steps": 1000})
+ag.behav.add_transit("recording6", "recording7", action="record", args={"stream_hash": "envir:squarelfha", "steps": 1000})
+ag.behav.add_transit("recording7", "recording8", action="record", args={"stream_hash": "envir:squarelfla", "steps": 1000})
 ag.behav.add_transit("recording8", "playlist_ready", action="set_pref_streams",
                      args={"stream_hashes": ["teacher:recorded1", "teacher:recorded2", "teacher:recorded3", "teacher:recorded4",
                                              "teacher:recorded5", "teacher:recorded6", "teacher:recorded7", "teacher:recorded8"],
-                           "repeat": 10})
+                           "repeat": 30})
 ag.behav.add_state_action("playlist_ready", action="find_agent_to_engage", args={"min_auth": 0.0, "max_auth": 0.0})
 ag.behav.add_transit("playlist_ready", "student_found", action="send_engagement")
 ag.behav.add_transit("student_found", "playlist_ready", action="nop")
@@ -117,17 +117,18 @@ ag.behav.add_transit("student_found", "student_engaged", action="got_engagement"
 ag.behav.add_transit("student_engaged", "stream_shared", action="share_streams")
 ag.behav.add_transit("stream_shared", "asked_learn", action="ask_learn_gen",
                      args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>",
-                           "ask_steps": 500})
+                           "ask_steps": 1000})
 ag.behav.add_transit("asked_learn", "done_learn", action="done_learn_gen")
 ag.behav.add_state_action("done_learn", action="next_pref_stream")
-ag.behav.add_transit("done_learn", "stream_shared", action="check_pref_stream", args={"what": "not_last_song"})
-ag.behav.add_transit("done_learn", "ready_to_ask", action="check_pref_stream", args={"what": "last_song"})
+# todo qui l'ho messo come sandbox_buffered, sta facendo la playlist ma solo perchè volevo vedere se gli 8 segnali li riusciva a generare
+ag.behav.add_transit("done_learn", "stream_shared", action="check_pref_stream", args={"what": "not_last_round"})
+ag.behav.add_transit("done_learn", "ready_to_ask", action="check_pref_stream", args={"what": "last_round"})
 # add a final unsupervised generation for each signal
 ag.behav.add_transit("ready_to_ask", "asked_gen", action="ask_gen",
-                     args={"du_hash": "teacher:recorded8",  "dhat_hash": "teacher:recorded8", "ask_steps": 500})
+                     args={"du_hash": "<playlist>",  "dhat_hash": "<playlist>", "ask_steps": 1000})
 ag.behav.add_transit("asked_gen", "done_gen", action="done_gen")
 ag.behav.add_state_action("done_gen", action="next_pref_stream")
-ag.behav.add_transit("done_gen", "stream_shared", action="check_pref_stream", args={"what": "not_first"})
+ag.behav.add_transit("done_gen", "ready_to_ask", action="check_pref_stream", args={"what": "not_first"})
 ag.behav.add_transit("done_gen", "finished", action="check_pref_stream", args={"what": "first"})
 ag.behav.set_state("init")
 ag.behav.save(f"{ag.name}.json")

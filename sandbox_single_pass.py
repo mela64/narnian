@@ -12,8 +12,6 @@ env = BasicEnvironment("Playlist memorization")
 
 # adding streams to the environment
 env.add_stream(Stream.create(name="3sin", creator="envir", stream=CombSin(f_cap=0.159, c_cap=1., delta=0.1, order=3)))
-env.add_stream(Stream.create(name="6sin", creator="envir", stream=CombSin(f_cap=0.159, c_cap=0.5, delta=0.1, order=6)))
-env.add_stream(Stream.create(name="square", creator="envir", stream=Square(freq=0.0159, phase=0.5, delta=0.1, ampl=1.)))
 
 # modeling behaviour of the environment
 env.behav.add_transit("init", "streams_enabled", action="enable_all_streams")
@@ -27,30 +25,19 @@ env.behav.save_pdf(f"{env.name}.pdf")
 ag = BasicAgent("teacher", model=BasicModel(attributes=env.shared_attributes, lr=0.), authority=1.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
-ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sin", "steps": 3000})
-ag.behav.add_transit("recording1", "recording2", action="record", args={"stream_hash": "envir:6sin", "steps": 3000})
-ag.behav.add_transit("recording2", "recording3", action="record", args={"stream_hash": "envir:square", "steps": 3000})
-ag.behav.add_transit("recording3", "playlist_ready", action="set_pref_streams",
-                     args={"stream_hashes": ["teacher:recorded1", "teacher:recorded2", "teacher:recorded3"], "repeat": 30})
-ag.behav.add_state_action("playlist_ready", action="find_agent_to_engage", args={"min_auth": 0.0, "max_auth": 0.0})
-ag.behav.add_transit("playlist_ready", "student_found", action="send_engagement")
-ag.behav.add_transit("student_found", "playlist_ready", action="nop")
+ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sin", "steps": 5000})
+ag.behav.add_state_action("recording1", action="find_agent_to_engage", args={"min_auth": 0.0, "max_auth": 0.0})
+ag.behav.add_transit("recording1", "student_found", action="send_engagement")
 ag.behav.add_transit("student_found", "student_engaged", action="got_engagement")
 ag.behav.add_transit("student_engaged", "stream_shared", action="share_streams")
 ag.behav.add_transit("stream_shared", "asked_learn", action="ask_learn_gen",
-                     args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>",
-                           "ask_steps": 2000})
+                     args={"du_hash": "teacher:recorded1", "yhat_hash": "teacher:recorded1", "dhat_hash": "teacher:recorded1",
+                           "ask_steps": 1500})
 ag.behav.add_transit("asked_learn", "done_learn", action="done_learn_gen")
-ag.behav.add_state_action("done_learn", action="next_pref_stream")
-ag.behav.add_transit("done_learn", "stream_shared", action="check_pref_stream", args={"what": "not_last_round"})
-ag.behav.add_transit("done_learn", "ready_to_ask", action="check_pref_stream", args={"what": "last_round"})
-# add a final unsupervised generation for each signal
-ag.behav.add_transit("ready_to_ask", "asked_gen", action="ask_gen",
-                     args={"du_hash": "<playlist>",  "dhat_hash": "<playlist>", "ask_steps": 2000})
+ag.behav.add_transit("done_learn", "asked_gen", action="ask_gen",
+                     args={"du_hash": "teacher:recorded1", "dhat_hash": "teacher:recorded1", "ask_steps": 1500})
 ag.behav.add_transit("asked_gen", "done_gen", action="done_gen")
-ag.behav.add_state_action("done_gen", action="next_pref_stream")
-ag.behav.add_transit("done_gen", "ready_to_ask", action="check_pref_stream", args={"what": "not_first"})
-ag.behav.add_transit("done_gen", "finished", action="check_pref_stream", args={"what": "first"})
+ag.behav.add_transit("done_gen", "finished", action="nop")
 ag.behav.set_state("init")
 ag.behav.save(f"{ag.name}.json")
 ag.behav.save_pdf(f"{ag.name}.pdf")

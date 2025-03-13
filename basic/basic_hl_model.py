@@ -1,8 +1,21 @@
 import torch
 from narnian.model import Model
-from networks.models import AntisymmetricExpGenerator, BasicPredictor
+from networks.models import AntisymmetricExpGenerator, BasicPredictor, _CTBE
 from basic.hl_utils import HL
 from narnian.attributes import Attributes
+
+
+class BlockExpGenerator(_CTBE):
+    def __init__(self, u_shape, d_dim, y_dim, h_dim, delta, local):
+        super().__init__(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim, delta=delta, local=local)
+
+    @torch.no_grad()
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.B(udu).detach() / torch.sum(udu)  # this is the init
+
+    @staticmethod
+    def handle_inputs(du, u):
+        return torch.zeros_like(du), torch.zeros_like(u)
 
 
 class BasicHLModel(Model):
@@ -19,9 +32,11 @@ class BasicHLModel(Model):
         d_dim = attributes[1].shape.numel()
         y_dim = attributes[0].shape.numel()
 
-        super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=delta, local=True, project_every=0),
-                                           BasicPredictor(y_dim=1, d_dim=3, h_dim=3),
-                                           attributes, device=device)
+        # generator = AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150,
+        #                                       delta=delta, local=True, project_every=0)
+        generator = BlockExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=5000, delta=delta, local=True)
+        predictor = BasicPredictor(y_dim=1, d_dim=3, h_dim=3)
+        super(BasicHLModel, self).__init__(generator, predictor, attributes, device=device)
 
         # SGD based optimization of the predictor
         self.optim = torch.optim.SGD(list(self.predictor.parameters()), lr=lr)
