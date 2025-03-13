@@ -32,10 +32,11 @@ class BasicGenerator(torch.nn.Module):
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)  # Input-to-hidden mapping
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)  # Hidden-to-output mapping
 
-        # Initialize hidden state
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True))  # Hidden state
-        self.register_buffer("h_init", self.h.clone())  # Store initial hidden state
-        self.register_buffer("dh", torch.zeros_like(self.h))  # Store hidden state derivative
+        # Hidden state initialization
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
+        self.h_init = self.h.clone()
+        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
+        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
         self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
@@ -54,42 +55,44 @@ class BasicGenerator(torch.nn.Module):
         return self.h_init
 
     @staticmethod
-    def handle_inputs(u, du):
+    def handle_inputs(du, u):
         # in the general case DO NOTHING
-        return u, du
+        # return du, u
+        return torch.zeros_like(du), torch.zeros_like(u)
 
     def forward(self, u, du, first=False):
         """ Forward pass that updates the hidden state and computes the output. """
 
-        # Handle None inputs by initializing to zero tensors
-        if u is None:
-            u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
-        else:
-            u = u.flatten(1).to(self.device)
-        if du is None:
-            du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
-        else:
-            du = du.to(self.device)
+        # Handle missing inputs
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h.detach()
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        # track the gradients on h from here on
+        h.requires_grad_()
+
         # handle inputs
-        u, du = self.handle_inputs(u, du)
+        du, u = self.handle_inputs(du, u)
 
         # Update hidden state based on input and previous hidden state
-        self.h.data = self.A(h) + self.B(torch.cat([du, u], dim=1))
+        h_new = self.A(h) + self.B(torch.cat([du, u], dim=1))
+
+        if self.local:
+            # in the local version we keep track in self.h of the old value of the state
+            self.h = h
+            self.dh = (h_new - self.h) / self.delta  # (h_new - h_old) / delta
+        else:
+            # in the non-local version we keep track in self.h of the new value of the state
+            self.h = h_new
+            self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
+        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
-        if self.local:
-            y = self.C(self.sigma(h))
-        else:
-            y = self.C(self.sigma(self.h))
+        y = self.C(self.sigma(self.h))
 
-        # Compute hidden state derivative
-        self.dh.data = (self.h - h) / self.delta
-
-        # Retain gradient of the hidden state
-        self.h.data.retain_grad()
+        # store the new state for the next iteration
+        self.h_next = h_new.detach()
 
         return y
 
@@ -108,11 +111,12 @@ class _DiagR(torch.nn.Module):
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
 
-        # Initialize hidden state
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True))
-        self.register_buffer("h_init", self.h.clone())
-        self.register_buffer("dh", torch.zeros_like(self.h))
-        self.sigma = sigma
+        # Hidden state initialization
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
+        self.h_init = self.h.clone()
+        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
+        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
         self.u_dim = u_dim
@@ -130,40 +134,45 @@ class _DiagR(torch.nn.Module):
         return self.h_init
 
     @staticmethod
-    def handle_inputs(u, du):
+    def handle_inputs(du, u):
         # in the general case DO NOTHING
-        return u, du
+        # return du, u
+        return torch.zeros_like(du), torch.zeros_like(u)
 
     def forward(self, u, du, first=False):
         """ Forward pass with diagonal transformation. """
 
-        # Handle None inputs
-        if u is None:
-            u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
-        else:
-            u = u.flatten(1).to(self.device)
-        if du is None:
-            du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
-        else:
-            du = du.to(self.device)
+        # Handle missing inputs
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
-        h = self.h.detach()
-        if first:
-            h = self.h_init
+        # Reset hidden state if first step
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        # track the gradients on h from here on
+        h.requires_grad_()
+
+        # handle inputs
+        du, u = self.handle_inputs(du, u)
 
         # Apply diagonal transformation to hidden state
-        self.h.data = self.diag.weight.view(self.diag.out_features) * h + self.B(torch.cat([du, u], dim=1))
+        h_new = self.diag.weight.view(self.diag.out_features) * h + self.B(torch.cat([du, u], dim=1))
+
+        if self.local:
+            # in the local version we keep track in self.h of the old value of the state
+            self.h = h
+            self.dh = (h_new - self.h) / self.delta  # (h_new - h_old) / delta
+        else:
+            # in the non-local version we keep track in self.h of the new value of the state
+            self.h = h_new
+            self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
+        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
-        if self.local:
-            y = self.C(self.sigma(h))
-        else:
-            y = self.C(self.sigma(self.h))
+        y = self.C(self.sigma(self.h))
 
-        # Compute hidden state derivative
-        self.dh.data = (self.h - h) / self.delta
+        # store the new state for the next iteration
+        self.h_next = h_new.detach()
 
-        self.h.data.retain_grad()
         return y
 
 
@@ -181,11 +190,12 @@ class _DiagC(torch.nn.Module):
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device, dtype=torch.cfloat)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device, dtype=torch.cfloat)
 
-        # Initialize hidden state with complex values
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True, dtype=torch.cfloat))
-        self.register_buffer("h_init", self.h.clone())
-        self.register_buffer("dh", torch.zeros_like(self.h))
-        self.sigma = sigma
+        # Hidden state initialization
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True, dtype=torch.cfloat)
+        self.h_init = self.h.clone()
+        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False, dtype=torch.cfloat)
+        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True, dtype=torch.cfloat)
+        self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
         self.u_dim = u_dim
@@ -203,43 +213,46 @@ class _DiagC(torch.nn.Module):
         return self.h_init
 
     @staticmethod
-    def handle_inputs(u, du):
+    def handle_inputs(du, u):
         # in the general case DO NOTHING
-        return u, du
+        return torch.zeros_like(du), torch.zeros_like(u)
+        # return du, u
 
     def forward(self, u, du, first=False):
         """ Forward pass with complex-valued transformation. """
 
-        # Convert input to complex if needed
-        if u is None:
-            u = torch.zeros((1, self.u_dim), dtype=torch.cfloat, device=self.device)
-        else:
-            u = u.flatten(1)
-            u.to(dtype=torch.cfloat).to(self.device)
+        # Handle missing inputs
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device, dtype=torch.cfloat)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device, dtype=torch.cfloat)
 
-        if du is None:
-            du = torch.zeros((1, self.du_dim), dtype=torch.cfloat, device=self.device)
-        else:
-            du.to(dtype=torch.cfloat).to(self.device)
+        # Reset hidden state if first step
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        # track the gradients on h from here on
+        h.requires_grad_()
 
-        h = self.h.detach()
-        if first:
-            h = self.h_init
+        # handle inputs
+        du, u = self.handle_inputs(du, u)
 
         # Apply complex diagonal transformation
-        self.h.data = self.diag.weight.view(self.diag.out_features) * h + self.B(torch.cat([du, u], dim=1))
+        h_new = self.diag.weight.view(self.diag.out_features) * h + self.B(torch.cat([du, u], dim=1))
+
+        if self.local:
+            # in the local version we keep track in self.h of the old value of the state
+            self.h = h
+            self.dh = (h_new - self.h) / self.delta  # (h_new - h_old) / delta
+        else:
+            # in the non-local version we keep track in self.h of the new value of the state
+            self.h = h_new
+            self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
+        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
-        if self.local:
-            y = self.C(self.sigma(h)).real
-        else:
-            y = self.C(self.sigma(self.h)).real
+        y = self.C(self.sigma(self.h))
 
-        # Compute hidden state derivative
-        self.dh.data = (self.h - h) / self.delta
+        # store the new state for the next iteration
+        self.h_next = h_new.detach()
 
-        self.h.data.retain_grad()
-        return y
+        return y.real
 
 
 class _CTE(torch.nn.Module):
@@ -272,9 +285,10 @@ class _CTE(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
 
         # Hidden state initialization
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True))
-        self.register_buffer("h_init", self.h.clone())
-        self.register_buffer("dh", torch.zeros_like(self.h))
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
+        self.h_init = self.h.clone()
+        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
+        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
         self.sigma = sigma  # the non-linear activation function
 
         # System parameters
@@ -293,9 +307,9 @@ class _CTE(torch.nn.Module):
         return self.h_init
 
     @staticmethod
-    def handle_inputs(u, du):
+    def handle_inputs(du, u):
         # in the general case DO NOTHING
-        return u, du
+        return du, u
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through the system dynamics.
@@ -313,32 +327,39 @@ class _CTE(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h.detach()
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        # track the gradients on h from here on
+        h.requires_grad_()
+
         # handle inputs
-        u, du = self.handle_inputs(u, du)
+        du, u = self.handle_inputs(du, u)
 
         # Antisymmetric matrix construction
         A = 0.5 * (self.W.weight - self.W.weight.t())
         A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
-
-        # Recurrent component
-        rec = F.linear(h, A_expm, self.W.bias)
+        rec = F.linear(h, A_expm, self.W.bias)  # Recurrent component
 
         # Input processing component
         A_inv = torch.linalg.inv(A)
         inp = A_inv @ (A_expm - self.I) @ self.B(torch.cat([du, u], dim=1)).unsqueeze(-1)
 
-        # Update hidden state
-        self.h.data = rec + inp.squeeze(-1)
-        # Compute output using a nonlinear activation function
+        # Handle locality
+        h_new = rec + inp.squeeze(-1)   # updated hidden state
         if self.local:
-            y = self.C(self.sigma(h))
+            # in the local version we keep track in self.h of the old value of the state
+            self.h = h
+            self.dh = (h_new - self.h) / self.delta     # (h_new - h_old) / delta
         else:
-            y = self.C(self.sigma(self.h))
+            # in the non-local version we keep track in self.h of the new value of the state
+            self.h = h_new
+            self.dh = (self.h - h) / self.delta     # (h_new - h_old) / delta
+        # self.h.retain_grad()
 
-        # Compute hidden state derivative
-        self.dh.data = (self.h - h) / self.delta
-        self.h.data.retain_grad()  # Preserve gradient for custom backward pass
+        # Compute output using a nonlinear activation function
+        y = self.C(self.sigma(self.h))
+
+        # store the new state for the next iteration
+        self.h_next = h_new.detach()
 
         return y
 
@@ -363,11 +384,22 @@ class AntisymmetricExpGenerator(_CTE):
 
     @torch.no_grad()
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.B(udu).detach()  # this is the init
+        # h = torch.randn((1, self.h_init.data.shape[1]))
+        # # Antisymmetric matrix construction
+        # A = 0.5 * (self.W.weight - self.W.weight.t()) # - 0.1 * torch.eye(self.W.weight.shape[0])
+        # A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
+        # # Input processing component (constant)
+        # A_inv = torch.linalg.inv(A)
+        # # inp = A_inv @ (A_expm - self.I) @ self.B(udu).unsqueeze(-1)
+        # for _ in range(200):
+        #     # h = F.linear(h, A_expm, self.W.bias) + inp.squeeze(-1)
+        #     h = F.linear(h, A_expm, self.W.bias)  # + self.B(udu)
+        # return h
+        return self.B(udu).detach() / torch.sum(udu)  # this is the init
 
     @staticmethod
-    def handle_inputs(u, du):
-        return torch.zeros_like(u), torch.zeros_like(du)
+    def handle_inputs(du, u):
+        return torch.zeros_like(du), torch.zeros_like(u)
 
 
 class _CTB(torch.nn.Module):
@@ -397,8 +429,8 @@ class _CTB(torch.nn.Module):
         self.order = h_dim // 2  # Number of 2x2 blocks
 
         # Learnable rotational frequencies
-        self.omega = torch.nn.Parameter(torch.empty(self.order))
-        self.register_buffer('ones', torch.ones(self.order, requires_grad=False))
+        self.omega = torch.nn.Parameter(torch.empty(self.order, device=device))
+        self.register_buffer('ones', torch.ones(self.order, requires_grad=False, device=device))
 
         # Projection matrices
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
@@ -408,20 +440,21 @@ class _CTB(torch.nn.Module):
         if alpha > 0.:
             # in this case we want to add the feedback parameter alpha and use it to move eigenvalues on the unit circle
             self.project_method = 'const'
-            self.register_buffer('alpha', torch.full_like(self.omega, alpha))
+            self.register_buffer('alpha', torch.full_like(self.omega.data, alpha, device=device))
         elif alpha == 0.:
             # this is the case in which we want to divide by the modulus
             self.project_method = 'modulus'
-            self.register_buffer('alpha', torch.zeros_like(self.omega))
+            self.register_buffer('alpha', torch.zeros_like(self.omega.data, device=device))
         elif alpha == -1.:
             self.project_method = 'alpha'
-            self.register_buffer('alpha', torch.zeros_like(self.omega))
+            self.register_buffer('alpha', torch.zeros_like(self.omega.data, device=device))
 
-        # State initialization
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True))
-        self.register_buffer("h_init", self.h.clone())
-        self.register_buffer("dh", torch.zeros_like(self.h))
-        self.sigma = sigma
+        # Hidden state initialization
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
+        self.h_init = self.h.clone()
+        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
+        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.sigma = sigma  # the non-linear activation function
 
         # System parameters
         self.u_dim = u_dim
@@ -452,19 +485,25 @@ class _CTB(torch.nn.Module):
         return self.h_init
 
     @staticmethod
-    def handle_inputs(u, du):
+    def handle_inputs(du, u):
         # in the general case DO NOTHING
-        return u, du
+        return torch.zeros_like(du), torch.zeros_like(u)
+        # return du, u
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through block-structured dynamics"""
-        # Input handling
+        # Handle missing inputs
         u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
-        # State management
-        h = self.h_init if first else self.h.detach()
+        # Reset hidden state if first step
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        # track the gradients on h from here on
+        h.requires_grad_()
         h_pair = h.view(-1, self.order, 2)  # Reshape to (batch, blocks, 2)
+
+        # handle inputs
+        du, u = self.handle_inputs(du, u)
 
         # Block-wise rotation with damping
         h1 = (self.ones - self.delta * self.alpha) * h_pair[..., 0] + self.delta * self.omega * h_pair[..., 1]
@@ -474,17 +513,23 @@ class _CTB(torch.nn.Module):
         rec = torch.stack([h1, h2], dim=-1).flatten(start_dim=1)
         inp = self.delta * self.B(torch.cat([du, u], dim=1))
 
-        # State update
-        self.h.data = rec + inp
-        # Compute output using a nonlinear activation function
+        # Handle locality
+        h_new = rec + inp  # updated hidden state
         if self.local:
-            y = self.C(self.sigma(h))
+            # in the local version we keep track in self.h of the old value of the state
+            self.h = h
+            self.dh = (h_new - self.h) / self.delta  # (h_new - h_old) / delta
         else:
-            y = self.C(self.sigma(self.h))
+            # in the non-local version we keep track in self.h of the new value of the state
+            self.h = h_new
+            self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
+        # self.h.retain_grad()
 
-        # Derivative calculation
-        self.dh.data = (self.h - h) / self.delta
-        self.h.data.retain_grad()
+        # Compute output using a nonlinear activation function
+        y = self.C(self.sigma(self.h))
+
+        # store the new state for the next iteration
+        self.h_next = h_new.detach()
 
         return y
 
@@ -514,15 +559,16 @@ class _CTBE(torch.nn.Module):
         self.order = h_dim // 2
 
         # Learnable rotational frequencies
-        self.omega = torch.nn.Parameter(torch.empty(self.order))
+        self.omega = torch.nn.Parameter(torch.empty(self.order, device=device))
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
 
-        # State initialization
-        self.register_buffer("h", torch.randn((1, h_dim), device=device, requires_grad=True))
-        self.register_buffer("h_init", self.h.clone())
-        self.register_buffer("dh", torch.zeros_like(self.h))
-        self.sigma = sigma
+        # Hidden state initialization
+        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
+        self.h_init = self.h.clone()
+        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
+        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.sigma = sigma  # the non-linear activation function
 
         # System parameters
         self.u_dim = u_dim
@@ -545,19 +591,25 @@ class _CTBE(torch.nn.Module):
         return self.h_init
 
     @staticmethod
-    def handle_inputs(u, du):
+    def handle_inputs(du, u):
         # in the general case DO NOTHING
-        return u, du
+        return torch.zeros_like(du), torch.zeros_like(u)
+        # return du, u
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Exact matrix exponential forward pass"""
-        # Input handling
+        # Handle missing inputs
         u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device)
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
-        # State management
-        h = self.h_init if first else self.h.detach()
+        # Reset hidden state if first step
+        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        # track the gradients on h from here on
+        h.requires_grad_()
         h_pair = h.view(-1, self.order, 2)
+
+        # handle inputs
+        du, u = self.handle_inputs(du, u)
 
         # Trigonometric terms for exact rotation
         cos_t = torch.cos(self.omega * self.delta)
@@ -574,17 +626,23 @@ class _CTBE(torch.nn.Module):
         inp2 = ((cos_t - 1) * u_hat[..., 0] + sin_t * u_hat[..., 1]) / self.omega
         inp = torch.stack([inp1, inp2], dim=-1).flatten(start_dim=1)
 
-        # State update
-        self.h.data = rec + inp
-        # Compute output using a nonlinear activation function
+        # Handle locality
+        h_new = rec + inp  # updated hidden state
         if self.local:
-            y = self.C(self.sigma(h))
+            # in the local version we keep track in self.h of the old value of the state
+            self.h = h
+            self.dh = (h_new - self.h) / self.delta  # (h_new - h_old) / delta
         else:
-            y = self.C(self.sigma(self.h))
+            # in the non-local version we keep track in self.h of the new value of the state
+            self.h = h_new
+            self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
+        # self.h.retain_grad()
 
-        # Derivative calculation
-        self.dh.data = (self.h - h) / self.delta
-        self.h.data.retain_grad()
+        # Compute output using a nonlinear activation function
+        y = self.C(self.sigma(self.h))
+
+        # store the new state for the next iteration
+        self.h_next = h_new.detach()
 
         return y
 

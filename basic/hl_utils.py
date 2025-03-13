@@ -113,21 +113,19 @@ def _init(val: float | str, data_shape: torch.Size, device, dtype: torch.dtype, 
 def _init_state_and_costate(model: nn.Module, batch_size: int = 1) -> Dict[str, Dict[str, torch.Tensor | Dict[str, torch.Tensor]]]:
     """Initialize the state and costate dictionaries (keys are 'xi', 'w_xi', 'w_y').
     """
-
-    # creating state and costate
-    x = {'xi': model.h_init, 'w': {}}
-    p = {'xi': torch.zeros_like(x['xi']), 'w': {}}
-
     # getting device
     device = next(model.parameters()).device
     dtype = next(model.parameters()).dtype
 
+    # creating state and costate
+    x = dict(xi=model.h_init, w={})
+    p = dict(xi=torch.zeros_like(x['xi'], device=device, dtype=dtype), w={})
+
     # initialize state and costate for the weights of the state network
     x['w'] = {par_name: par for par_name, par in dict(model.named_parameters()).items() if par.requires_grad}
-    p['w'] = {par_name: torch.zeros_like(par) for par_name, par in x['w'].items()}
+    p['w'] = {par_name: torch.zeros_like(par, device=device, dtype=dtype) for par_name, par in x['w'].items()}
 
     return {'x': x, 'p': p}
-    # return x, p
 
 
 def _get_grad(a: torch.Tensor | Dict[str, torch.Tensor]) -> torch.Tensor | Dict[str, torch.Tensor]:
