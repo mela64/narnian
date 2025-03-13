@@ -1,7 +1,7 @@
 import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
-from networks.models import BasicTokenGenerator, BasicTokenPredictor
+from networks.models import BasicTokenGenerator, BasicTokenPredictor, BasicTokenGeneratorCTE
 
 
 class BasicTokenModel(Model):
@@ -17,9 +17,9 @@ class BasicTokenModel(Model):
         y_dim = len(attributes[0])  # the length of the vocabulary
 
         # creating the model (superclass)
-        super(BasicTokenModel, self).__init__(BasicTokenGenerator(num_emb=num_emb, emb_dim=8,
-                                                                  d_dim=d_dim, y_dim=y_dim, h_dim=100,
-                                                                  device=device, seed=seed),
+        super(BasicTokenModel, self).__init__(BasicTokenGeneratorCTE(num_emb=num_emb, emb_dim=8,
+                                                                     d_dim=d_dim, y_dim=y_dim, h_dim=100,
+                                                                     device=device, seed=seed),
                                               None,
                                               attributes, device=device, seed=seed)
 

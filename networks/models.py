@@ -778,10 +778,6 @@ class BasicTokenGenerator(torch.nn.Module):
         self.u_dim = u_dim
         self.du_dim = du_dim
 
-    @torch.no_grad()
-    def adjust_eigs(self, delta=0.01):
-        pass
-
     def forward(self, u, du, first=False):
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
@@ -796,6 +792,25 @@ class BasicTokenGenerator(torch.nn.Module):
             h = self.h_init
         self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
         y = self.C(self.h)
+        return y
+
+
+class BasicTokenGeneratorCTE(torch.nn.Module):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
+        super(BasicTokenGeneratorCTE, self).__init__()
+        self.device = device
+        set_seed(seed)
+
+        self.net = AntisymmetricExpGenerator((emb_dim,), d_dim, y_dim, h_dim,
+                                             delta=1.0, local=False, device=device)
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+
+    def forward(self, u, du, first=False):
+        if u is not None:
+            u = self.embeddings(u.to(self.device))
+        y = self.net(u, du, first=first)
         return y
 
 
