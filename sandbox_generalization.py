@@ -11,28 +11,36 @@ from narnian.attributes import Attributes
 
 class HFLACombSin(CombSin):
     def __init__(self):
-        super().__init__(f_cap=0.3, c_cap=0.1, delta=0.1, order=3)
+        freqs = [0.276, 0.149, 0.053]
+        coeffs = [0.4, 0.08, 0.08]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'hf', 'la'])
         self.static_d = torch.ones((1, 3))
 
 
 class HFHACombSin(CombSin):
     def __init__(self):
-        super().__init__(f_cap=0.3, c_cap=1., delta=0.1, order=3)
+        freqs = [0.276, 0.149, 0.053]
+        coeffs = [1.4, 0.2, 0.2]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'hf', 'ha'])
         self.static_d = torch.ones((1, 3))
 
 
 class LFLACombSin(CombSin):
     def __init__(self):
-        super().__init__(f_cap=0.03, c_cap=0.1, delta=0.1, order=3)
+        freqs = [0.276, 0.149, 0.053]
+        coeffs = [0.08, 0.08, 0.4]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'lf', 'la'])
         self.static_d = torch.ones((1, 3))
 
 
 class LFHACombSin(CombSin):
     def __init__(self):
-        super().__init__(f_cap=0.03, c_cap=1., delta=0.1, order=3)
+        freqs = [0.276, 0.149, 0.053]
+        coeffs = [0.2, 0.2, 1.4]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'lf', 'ha'])
         self.static_d = torch.ones((1, 3))
 
@@ -90,14 +98,14 @@ env.behav.save_pdf(f"{env.name}.pdf")
 ag = BasicAgent("teacher", model=BasicModel(attributes=env.shared_attributes, lr=0.), authority=1.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
-ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sinhfha", "steps": 3000})
-ag.behav.add_transit("recording1", "recording2", action="record", args={"stream_hash": "envir:3sinhfla", "steps": 3000})
-ag.behav.add_transit("recording2", "recording3", action="record", args={"stream_hash": "envir:3sinlfha", "steps": 3000})
-ag.behav.add_transit("recording3", "recording4", action="record", args={"stream_hash": "envir:3sinlfla", "steps": 3000})
-ag.behav.add_transit("recording4", "recording5", action="record", args={"stream_hash": "envir:squarehfha", "steps": 3000})
-ag.behav.add_transit("recording5", "recording6", action="record", args={"stream_hash": "envir:squarehfla", "steps": 3000})
-ag.behav.add_transit("recording6", "recording7", action="record", args={"stream_hash": "envir:squarelfha", "steps": 3000})
-ag.behav.add_transit("recording7", "recording8", action="record", args={"stream_hash": "envir:squarelfla", "steps": 3000})
+ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sinhfha", "steps": 500})
+ag.behav.add_transit("recording1", "recording2", action="record", args={"stream_hash": "envir:3sinhfla", "steps": 500})
+ag.behav.add_transit("recording2", "recording3", action="record", args={"stream_hash": "envir:3sinlfha", "steps": 500})
+ag.behav.add_transit("recording3", "recording4", action="record", args={"stream_hash": "envir:3sinlfla", "steps": 500})
+ag.behav.add_transit("recording4", "recording5", action="record", args={"stream_hash": "envir:squarehfha", "steps": 500})
+ag.behav.add_transit("recording5", "recording6", action="record", args={"stream_hash": "envir:squarehfla", "steps": 500})
+ag.behav.add_transit("recording6", "recording7", action="record", args={"stream_hash": "envir:squarelfha", "steps": 500})
+ag.behav.add_transit("recording7", "recording8", action="record", args={"stream_hash": "envir:squarelfla", "steps": 500})
 ag.behav.add_transit("recording8", "playlist_ready", action="set_pref_streams",
                      args={"stream_hashes": ["teacher:recorded1", "teacher:recorded2", "teacher:recorded3", "teacher:recorded4",
                                              "teacher:recorded5", "teacher:recorded6", "teacher:recorded7", "teacher:recorded8"],
@@ -109,14 +117,14 @@ ag.behav.add_transit("student_found", "student_engaged", action="got_engagement"
 ag.behav.add_transit("student_engaged", "stream_shared", action="share_streams")
 ag.behav.add_transit("stream_shared", "asked_learn", action="ask_learn_gen",
                      args={"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>",
-                           "ask_steps": 2000})
+                           "ask_steps": 500})
 ag.behav.add_transit("asked_learn", "done_learn", action="done_learn_gen")
 ag.behav.add_state_action("done_learn", action="next_pref_stream")
 ag.behav.add_transit("done_learn", "stream_shared", action="check_pref_stream", args={"what": "not_last_song"})
 ag.behav.add_transit("done_learn", "ready_to_ask", action="check_pref_stream", args={"what": "last_song"})
 # add a final unsupervised generation for each signal
 ag.behav.add_transit("ready_to_ask", "asked_gen", action="ask_gen",
-                     args={"du_hash": "teacher:recorded8",  "dhat_hash": "teacher:recorded8", "ask_steps": 2000})
+                     args={"du_hash": "teacher:recorded8",  "dhat_hash": "teacher:recorded8", "ask_steps": 500})
 ag.behav.add_transit("asked_gen", "done_gen", action="done_gen")
 ag.behav.add_state_action("done_gen", action="next_pref_stream")
 ag.behav.add_transit("done_gen", "stream_shared", action="check_pref_stream", args={"what": "not_first"})
