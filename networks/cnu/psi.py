@@ -3,10 +3,7 @@ import torch.nn.functional as F
 import math
 
 
-def psi(x, mode, key_size, normalize=True, query_class=None, memory_routing=None, routing_type=None,
-        query_class_mappings=None, memory_id_mappings=None, input_for_keys=None, training=None,
-        memory_id_propagation=None):
-
+def psi(x, mode, key_size, normalize=True):
     if mode == "identity":
         o = x.flatten(start_dim=1)
     elif mode == "sign":
@@ -19,28 +16,6 @@ def psi(x, mode, key_size, normalize=True, query_class=None, memory_routing=None
         o = torch.sign(resize2d(x, key_size))
     else:
         raise NotImplementedError
-
-    if query_class_mappings is not None:
-        o = torch.cat((o, query_class_mappings[query_class]), dim=1)
-        if training:
-            o = torch.cat((o, query_class_mappings[query_class]), dim=1)
-        else:
-            o = torch.cat((o, torch.zeros((o.shape[0], query_class_mappings.shape[1]), device=o.device)), dim=1)
-
-    if not memory_id_propagation:
-        ##### Routing mode inside psi only when the id propagation is off
-
-        if memory_routing and memory_routing == "top1":
-            # TODO handle the case of shared_keys=False
-            ids = memory_id_mappings[input_for_keys[..., 0].squeeze(1)].to(o.device)
-            o = torch.cat((o, ids), dim=1)
-        elif memory_routing and memory_routing == "topk":
-            ids = memory_id_mappings[input_for_keys.squeeze(1)].flatten(1).to(o.device)
-            o = torch.cat((o, ids), dim=1)
-        elif memory_routing and memory_routing == "topk_binary" and routing_type == "onehot":
-            ids = memory_id_mappings[input_for_keys.squeeze(1)].sum(dim=1).to(o.device)
-            o = torch.cat((o, ids), dim=1)
-
     assert o.shape[1] == key_size, \
         "The selected psi function (" \
         + str(mode) + ") cannot map data to the target " \
@@ -56,7 +31,6 @@ def resize1d(I, key_size):
     else:
         I = F.interpolate(I.unsqueeze(1), size=key_size, mode="linear").squeeze(1)
     return I
-
 
 def resize2d(I, key_size):
     b, c, h, w = I.shape

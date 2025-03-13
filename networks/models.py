@@ -4,7 +4,7 @@ import numpy as np
 import torchvision
 from typing import Callable
 import torch.nn.functional as F
-from networks.mh.layers import LinearMH
+from networks.cnu.layers import LinearCNU
 
 
 def hard_tanh(x: torch.Tensor) -> torch.Tensor:
@@ -821,7 +821,7 @@ class BasicImagePredictorCNU(torch.nn.Module):
             torch.nn.Flatten(),
             torch.nn.Linear(256 * 3 * 3, 2048),
             torch.nn.ReLU(inplace=True),
-            LinearMH(2048, d_dim, key_mem_units=mem_units),
+            LinearCNU(2048, d_dim, key_mem_units=mem_units),
             torch.nn.Sigmoid()
         ).to(self.device)
 

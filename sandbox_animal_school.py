@@ -93,8 +93,8 @@ for ag in env.agents.values():
     print(ag)
 
 # creating server
-Server(env=env)
+# Server(env=env)
 
 # running
-env.run()
+env.run(steps=459)
 
