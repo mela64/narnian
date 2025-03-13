@@ -79,8 +79,9 @@ class BasicGenerator(torch.nn.Module):
         h.requires_grad_()
 
         # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
+        if self.project_every:
+            if self.forward_count % self.project_every == 0:
+                self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -169,8 +170,9 @@ class _DiagR(torch.nn.Module):
         h.requires_grad_()
 
         # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
+        if self.project_every:
+            if self.forward_count % self.project_every == 0:
+                self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -259,8 +261,9 @@ class _DiagC(torch.nn.Module):
         h.requires_grad_()
 
         # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
+        if self.project_every:
+            if self.forward_count % self.project_every == 0:
+                self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -371,8 +374,9 @@ class _CTE(torch.nn.Module):
         h.requires_grad_()
 
         # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
+        if self.project_every:
+            if self.forward_count % self.project_every == 0:
+                self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -553,8 +557,9 @@ class _CTB(torch.nn.Module):
         h_pair = h.view(-1, self.order, 2)  # Reshape to (batch, blocks, 2)
 
         # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
+        if self.project_every:
+            if self.forward_count % self.project_every == 0:
+                self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -670,8 +675,9 @@ class _CTBE(torch.nn.Module):
         h_pair = h.view(-1, self.order, 2)
 
         # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
+        if self.project_every:
+            if self.forward_count % self.project_every == 0:
+                self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
