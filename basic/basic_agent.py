@@ -1034,6 +1034,13 @@ class BasicAgent(Agent):
 
             # getting generated stream
             stream_hash = Stream.build_hash("generated" + str(self.last_generated_stream_num), self.name)
+            stream = self.known_streams[stream_hash]
+            if isinstance(stream, BufferedStream):
+                y_text, d_text = stream.to_text()
+                if y_text is not None:
+                    self.out("Generated stream (y): " + y_text)
+                if d_text is not None:
+                    self.out("Generated stream (d): " + d_text)
 
             if stream_hash not in self.known_streams:
                 self.err(f"Unknown stream: {stream_hash}")

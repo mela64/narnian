@@ -20,9 +20,7 @@ class BasicTokenModel(Model):
         super(BasicTokenModel, self).__init__(BasicTokenGenerator(num_emb=num_emb, emb_dim=8,
                                                                   d_dim=d_dim, y_dim=y_dim, h_dim=100,
                                                                   device=device, seed=seed),
-                                              BasicTokenPredictor(num_emb=num_emb, emb_dim=16,
-                                                                  d_dim=d_dim, h_dim=3,
-                                                                  device=device, seed=seed),
+                                              None,
                                               attributes, device=device, seed=seed)
 
         # extra stuff
@@ -32,9 +30,9 @@ class BasicTokenModel(Model):
             assert yhat.shape[1] == 1, "Only one label per sample is supported"
             return torch.nn.functional.cross_entropy(y, yhat.view(-1))
 
-        self.optim = torch.optim.SGD(list(self.generator.parameters()) + list(self.predictor.parameters()), lr=lr)
+        self.optim = torch.optim.SGD(self.generator.parameters(), lr=lr)
         self.loss_gen = loss_gen
-        self.loss_pred = torch.nn.functional.mse_loss
+        self.loss_pred = lambda d, dhat: 0.
 
     def learn(self,
               y: torch.Tensor | None, yhat: torch.Tensor | None,
@@ -55,4 +53,6 @@ class BasicTokenModel(Model):
         loss.backward()
         self.optim.step()
 
+        # printing
+        self.out("Loss: " + str(loss_as_float))
         return loss_as_float, y, yhat, d, dhat

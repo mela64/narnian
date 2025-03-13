@@ -23,6 +23,7 @@ class Model(torch.nn.Module):
         self.attributes = attributes
         self.device = device
         self.seed = seed
+        self.out = lambda x: None
         assert len(self.attributes) == 2, f"Expecting two sets of attributes, got {len(attributes)}"
 
     def forward(self,
@@ -132,6 +133,9 @@ class Model(torch.nn.Module):
 
     def load(self, file):
         self.load_state_dict(torch.load(file))
+
+    def set_out_function(self, fcn):
+        self.out = fcn
 
 
 class EmptyModel(Model):

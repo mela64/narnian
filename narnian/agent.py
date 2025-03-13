@@ -39,6 +39,7 @@ class Agent:
         ]
 
         assert authority in [0.0, 1.0], f"We just support authority = 0.0 (student) and authority = 1.0 (teacher)"
+        self.model.set_out_function(lambda x: self.out(x, show_state=False, show_act=False))
 
     def __str__(self):
         """String representation of an agent."""

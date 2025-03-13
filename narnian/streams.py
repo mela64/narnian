@@ -89,9 +89,6 @@ class Stream(torch.utils.data.Dataset):
         self.attributes[1].check_data(d)
         return self.attributes[0].interleave_data(y), self.attributes[1].interleave_data(d)
 
-    def to_text(self, y: torch.Tensor, d: torch.Tensor):
-        return self.attributes[0].data_to_text(y), self.attributes[0].data_to_text(d)
-
     def __str__(self) -> str:
         return "Stream: " + self.name + " [registration id: " + str(self.id) + "]"
 
@@ -134,23 +131,18 @@ class PassThroughStream(Stream):
 
 class BufferedStream(Stream):
 
-    def __init__(self, max_len: int | None = None, use_static_descriptor: bool = True):
+    def __init__(self, use_static_descriptor: bool = True):
         super().__init__()
-        self.max_len = max_len
         self.last_added_step = -1
         self.last_added_pos = -1
         self.use_static_descriptor = use_static_descriptor
         self.first_k = Stream.k  # birthday
         self.last_k = self.first_k - 1  # last added step
         self.__wrapped_stream = None
-
-        if self.max_len is None:
-            self.data_y = []
-            self.data_d = []
-        else:
-            assert self.max_len >= 1, f"Invalid max_len for buffered stream: {self.max_len}"
-            self.data_y = [torch.empty(1)] * self.max_len
-            self.data_d = [torch.empty(1)] * self.max_len
+        self.data_y = []
+        self.data_d = []
+        self.text_y = []
+        self.text_d = []
 
     def wrap(self, stream: Stream, steps: int):
         self.__wrapped_stream = stream
@@ -176,18 +168,27 @@ class BufferedStream(Stream):
         if self.attributes[1].data_type == "token_ids" and d.shape[1] > 1:
             d = torch.argmax(d, dim=1, keepdim=True)
 
-        if self.max_len is None:
-            self.data_y.append(y)
-            if not self.use_static_descriptor or len(self.data_d) == 0:
-                self.data_d.append(d)
-        else:
-            self.last_added_step += 1
-            self.last_added_pos = (self.last_added_pos + 1) % self.max_len
-            self.data_y[self.last_added_pos] = y
-            if not self.use_static_descriptor or self.last_added_step == 0:
-                self.data_d[self.last_added_pos] = d
+        # appending data
+        self.data_y.append(y)
+        if not self.use_static_descriptor or len(self.data_d) == 0:
+            self.data_d.append(d)
+        if self.attributes[0].data_type == "token_ids":
+            self.text_y.append(self.attributes[0].data_to_text(y))
+        if self.attributes[1].data_type == "token_ids":
+            self.text_d.append(self.attributes[1].data_to_text(d))
 
         self.last_k += 1
+
+    def to_text(self):
+        if self.attributes[0].data_type == "token_ids":
+            text_y = " ".join(self.text_y)
+        else:
+            text_y = None
+        if self.attributes[1].data_type == "token_ids":
+            text_d = " ".join(self.text_d)
+        else:
+            text_d = None
+        return text_y, text_d
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
 

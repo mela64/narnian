@@ -238,11 +238,13 @@ class Environment:
                 agent.behav.act_states()
 
             state_changed = self.behav.act_transitions()
+            in_action = False
             for agent in sorted_agents:
                 state_changed = agent.behav.act_transitions() or state_changed
+                in_action = agent.behav.limbo_state is not None or in_action
 
             self.step += 1
-            if self.steps is not None and self.step == self.steps:
+            if self.steps is not None and self.step == self.steps or (not state_changed and not in_action):
                 break
 
             # in step mode, we clear the external event to be able to wait for a new one

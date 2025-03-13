@@ -96,5 +96,5 @@ for ag in env.agents.values():
 Server(env=env)
 
 # running
-env.run(steps=450)
+env.run()
 

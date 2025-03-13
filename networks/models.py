@@ -712,7 +712,7 @@ class BasicTokenGenerator(torch.nn.Module):
         self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
 
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
-        self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
+        self.B = lambda x: 0.  # killing every input
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
         self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
         self.h_init = self.h.clone().detach()
