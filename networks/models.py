@@ -719,8 +719,6 @@ class BasicTokenGenerator(torch.nn.Module):
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
         self.du_dim = du_dim
-        self.delta = 1.     # already defined in discrete time
-        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     @torch.no_grad()
     def adjust_eigs(self, delta=0.01):
@@ -738,10 +736,8 @@ class BasicTokenGenerator(torch.nn.Module):
         h = self.h.detach()
         if first:
             h = self.h_init
-        self.h = self.A(h) + self.B(torch.cat([du, u], dim=1))
-        y = self.C(torch.tanh(self.h))
-        self.dh = (self.h - h) / self.delta
-        self.h.retain_grad()
+        self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
+        y = self.C(self.h)
         return y
 
 

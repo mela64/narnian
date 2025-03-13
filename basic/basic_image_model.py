@@ -21,7 +21,7 @@ class BasicImageModel(Model):
 
         # extra stuff
         self.optim = torch.optim.SGD(self.predictor.parameters(), lr=lr)
-        self.loss_pred = torch.nn.functional.cross_entropy
+        self.loss_pred = torch.nn.functional.binary_cross_entropy
 
     def learn(self,
               y: torch.Tensor | None, yhat: torch.Tensor | None,
@@ -70,7 +70,7 @@ class BasicImageModelCNU(Model):
             {'params': self.predictor.net[:-2].parameters(), 'lr': lr},
             {'params': self.predictor.net[-2:].parameters(), 'lr': lr_head}
         ], lr=lr)
-        self.loss_pred = torch.nn.functional.cross_entropy
+        self.loss_pred = torch.nn.functional.binary_cross_entropy
 
     def learn(self,
               y: torch.Tensor | None, yhat: torch.Tensor | None,

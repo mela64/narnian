@@ -142,6 +142,7 @@ class BufferedStream(Stream):
         self.use_static_descriptor = use_static_descriptor
         self.first_k = Stream.k  # birthday
         self.last_k = self.first_k - 1  # last added step
+        self.__wrapped_stream = None
 
         if self.max_len is None:
             self.data_y = []
@@ -150,6 +151,13 @@ class BufferedStream(Stream):
             assert self.max_len >= 1, f"Invalid max_len for buffered stream: {self.max_len}"
             self.data_y = [torch.empty(1)] * self.max_len
             self.data_d = [torch.empty(1)] * self.max_len
+
+    def wrap(self, stream: Stream, steps: int):
+        self.__wrapped_stream = stream
+        self.attributes = stream.attributes
+        self.first_k = max(self.first_k, 0)
+        self.last_k = self.first_k + steps - 1
+        return self
 
     def get_first_step_offset_given_current_step(self):
         """Additive offset to go from the current step index (Stream.k) to the first step"""
@@ -189,7 +197,12 @@ class BufferedStream(Stream):
 
         # otherwise, let's fix indices
         j = step - self.first_k
-        return self.data_y[j], self.data_d[j] if not self.use_static_descriptor else self.data_d[0]
+
+        # if not wrapped
+        if self.__wrapped_stream is None:
+            return self.data_y[j], self.data_d[j] if not self.use_static_descriptor else self.data_d[0]
+        else:
+            return self.__wrapped_stream[j]
 
     def __len__(self):
         return self.last_k - self.first_k + 1

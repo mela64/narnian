@@ -674,6 +674,14 @@ class BasicAgent(Agent):
 
             stream_src = self.known_streams[stream_hash]
 
+            if isinstance(stream_src, BufferedStream):
+                if steps > len(stream_src):
+                    self.err(f"Cannot process stream {stream_src} for {steps} steps, since it is is shorter")
+                offset_stream_src = stream_src.get_first_step_offset_given_current_step()
+                self.buffered_streams_offsets[stream_src.get_hash()] = offset_stream_src
+            else:
+                offset_stream_src = 0
+
             # new recorded stream
             self.last_recorded_stream_num += 1
 
@@ -691,9 +699,13 @@ class BasicAgent(Agent):
             stream_dest = self.known_streams[Stream.build_hash("recorded" + str(self.last_recorded_stream_num),
                                                                self.name)]
             stream_src = self.known_streams[stream_hash]
+            if isinstance(stream_src, BufferedStream):
+                offset_stream_src = self.buffered_streams_offsets[stream_src.get_hash()]
+            else:
+                offset_stream_src = 0
 
         # recording
-        y, d = stream_src[stream_src.k]
+        y, d = stream_src[stream_src.k + offset_stream_src]
         stream_dest.append_data(y, d)
 
         return True

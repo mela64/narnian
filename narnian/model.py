@@ -40,7 +40,7 @@ class Model(torch.nn.Module):
 
         if mode == Model.GEN_AND_PRED:
             y = self.generator.forward(u, du, first) if self.generator is not None else None
-            d = self.predictor.forward(y, first) if self.predictor is not None else None
+            d = self.predictor.forward(y.detach(), first) if self.predictor is not None else None
             return y, d
         elif mode == Model.GEN:
             y = self.generator.forward(u, du, first) if self.generator is not None else None
