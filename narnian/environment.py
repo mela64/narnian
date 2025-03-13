@@ -243,10 +243,6 @@ class Environment:
                 state_changed = agent.behav.act_transitions() or state_changed
                 in_action = agent.behav.limbo_state is not None or in_action
 
-            self.step += 1
-            if self.steps is not None and self.step == self.steps or (not state_changed and not in_action):
-                break
-
             # in step mode, we clear the external event to be able to wait for a new one
             if self.using_server:
                 if self.skip_clear_for == 0:
@@ -258,6 +254,10 @@ class Environment:
                         self.step_event.clear()
                 else:
                     self.skip_clear_for -= 1
+
+            self.step += 1
+            if self.steps is not None and self.step == self.steps:  # or (not state_changed and not in_action):
+                break
 
     def send_command(self, command: str, dest_agent: Agent, data: dict | None = None) -> bool:
         """Send a predefined command to an agent."""

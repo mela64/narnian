@@ -179,13 +179,25 @@ class BufferedStream(Stream):
 
         self.last_k += 1
 
-    def to_text(self):
+    def to_text(self, length: int | None = None):
         if self.attributes[0].data_type == "token_ids":
-            text_y = " ".join(self.text_y)
+            if length is not None:
+                le = max(length // 2, 1)
+                text_y = " ".join(self.text_y[0:min(le, len(self.text_y))])
+                text_y += (" ... " + (" ".join(self.text_y[max(le, len(self.text_y)-le):]))) \
+                    if len(self.text_y) > le else ""
+            else:
+                text_y = " ".join(self.text_y)
         else:
             text_y = None
         if self.attributes[1].data_type == "token_ids":
-            text_d = " ".join(self.text_d)
+            if length is not None:
+                le = max(length // 2, 1)
+                text_d = " ".join(self.text_d[0:min(le, len(self.text_d))])
+                text_d += (" ... " + (" ".join(self.text_d[max(le, len(self.text_d)-le):]))) \
+                    if len(self.text_d) > le else ""
+            else:
+                text_d = " ".join(self.text_d)
         else:
             text_d = None
         return text_y, text_d

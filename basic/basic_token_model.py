@@ -1,7 +1,7 @@
 import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
-from networks.models import BasicTokenGenerator, BasicTokenPredictor, BasicTokenGeneratorCTE
+from networks.models import BasicTokenGenerator, BasicTokenGeneratorCTE, BasicTokenGeneratorLM
 
 
 class BasicTokenModel(Model):
@@ -17,12 +17,10 @@ class BasicTokenModel(Model):
         y_dim = len(attributes[0])  # the length of the vocabulary
 
         # creating the model (superclass)
-        # can be one of: { BasicTokenGenerator, BasicTokenGeneratorCTE }
-        super(BasicTokenModel, self).__init__(BasicTokenGenerator(num_emb=num_emb, emb_dim=8,
-                                                                  d_dim=d_dim, y_dim=y_dim, h_dim=100,
-                                                                  device=device, seed=seed),
-                                              None,
-                                              attributes, device=device, seed=seed)
+        # can be one of: { BasicTokenGenerator, BasicTokenGeneratorCTE, BasicTokenGeneratorLM }
+        super(BasicTokenModel, self).__init__(BasicTokenGeneratorLM(
+            num_emb=num_emb, emb_dim=16, d_dim=d_dim, y_dim=y_dim, h_dim=100, device=device, seed=seed),
+            None, attributes, device=device, seed=seed)
 
         # extra stuff
         def loss_gen(y, yhat):
@@ -53,6 +51,9 @@ class BasicTokenModel(Model):
         loss_as_float = loss.item()
         loss.backward()
         self.optim.step()
+
+        # teaching
+        self.generator.y = yhat  # only exploited by BasicTokenGeneratorLM
 
         # printing
         self.out("Loss: " + str(loss_as_float))

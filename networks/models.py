@@ -844,13 +844,17 @@ class BasicTokenGenerator(torch.nn.Module):
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
         self.B = lambda x: 0.  # killing every input
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
-        self.h_init = self.h.clone().detach()
-        self.dh = torch.zeros_like(self.h)
+        self.h_init = torch.randn((1, h_dim), device=device)
+        self.u_init = torch.zeros((1, u_dim), device=device)
+        self.h = None
         self.u_dim = u_dim
         self.du_dim = du_dim
 
     def forward(self, u, du, first=False):
+        if first:
+            h = self.h_init
+        else:
+            h = self.h.detach()
         if u is None:
             u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
         else:
@@ -859,10 +863,6 @@ class BasicTokenGenerator(torch.nn.Module):
             du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
         else:
             du = du.to(self.device)
-        h = self.h.detach()
-        # Reset hidden state if first step
-        if first:
-            h = self.h_init
 
         self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
         y = self.C(self.h)
@@ -886,6 +886,42 @@ class BasicTokenGeneratorCTE(torch.nn.Module):
             u = self.embeddings(u.to(self.device))
         y = self.net(u, du, first=first)
         return y
+
+
+class BasicTokenGeneratorLM(torch.nn.Module):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
+        super(BasicTokenGeneratorLM, self).__init__()
+        self.device = device
+        set_seed(seed)
+
+        u_dim = emb_dim
+        du_dim = d_dim
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
+        self.B = torch.nn.Linear(u_dim, h_dim, bias=False, device=device)
+        self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
+        self.h_init = torch.randn((1, h_dim), device=device)
+        self.u_init = torch.zeros((1, u_dim), device=device)
+        self.h = None
+        self.y = None
+        self.u_dim = u_dim
+        self.du_dim = du_dim
+
+    def forward(self, u, du, first=False):
+        if first:
+            h = self.h_init
+            u = self.u_init
+        else:
+            h = self.h.detach()
+            u = self.embeddings((torch.argmax(self.y.detach(), dim=1) if self.y.shape[1] > 1
+                                 else self.y.squeeze(1).detach()).to(self.device))
+
+        self.h = torch.tanh(self.A(h) + self.B(u))
+        self.y = self.C(self.h)
+        return self.y
 
 
 class BasicTokenPredictor(torch.nn.Module):
