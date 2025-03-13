@@ -96,29 +96,11 @@ export default function Main() {
 
     out("[Main]");
 
-    // keeping references up-to-date at each rendering operation
-    useEffect(() => {
-        out("[Main] useEffect *** updating streamButtonsRef ***");
-        streamButtonsRef.current = streamButtons;
-    }, [streamButtons]);
-
-    // keeping references up-to-date at each rendering operation
+    // keeping references up-to-date at each rendering operation (this is fine here)
     useEffect(() => {
         out("[Main] useEffect *** updating openStreamPanelsRef ***");
         openStreamPanelsRef.current = openStreamPanels;
     }, [openStreamPanels]);
-
-    // keeping references up-to-date at each rendering operation
-    useEffect(() => {
-        out("[Main] useEffect *** updating agentButtonsRef ***");
-        agentButtonsRef.current = agentButtons;
-    }, [agentButtons]);
-
-    // keeping references up-to-date at each rendering operation
-    useEffect(() => {
-        out("[Main] useEffect *** updating envTitleRef ***");
-        envTitleRef.current = envTitle;
-    }, [envTitle]);
 
     useEffect(() => {
         if (saving)
@@ -132,8 +114,10 @@ export default function Main() {
         out("[Main] useEffect *** fetching data (environment name) ***");
 
         callAPI('/get_env_name', null,
-            (x) => { envNameRef.current = x.name; setEnvTitle(x.title); },
-            () => { envNameRef.current = "?"; setEnvTitle("Offline");
+            (x) => { envNameRef.current = x.name; setEnvTitle((prev) => {
+                envTitleRef.current = x.title; return x.title; }); },
+            () => { envNameRef.current = "?"; setEnvTitle((prev) =>{
+                envTitleRef.current = "Offline"; return "Offline"; });
             setOffline(true); return false; },
             () => {
             });
@@ -177,12 +161,15 @@ export default function Main() {
                         setOpenConsolePanels(agent_buttons.map(agent_button => agent_button.id));
                     }
 
-                    setAgentButtons(agent_buttons);
+                    setAgentButtons((prev) => {
+                        agentButtonsRef.current = agent_buttons
+                        return agent_buttons;
+                    });
                 }
             },
             () => {
                 if (!offlineRef.current) {
-                    setAgentButtons([]); return true;
+                    setAgentButtons((prev) => {agentButtonsRef.current = []; return [];}); return true;
                 } else { return false; }},
             () => {});
     }, [envTitle, isPaused]);  // when the status of the loading env name operation changes, we get the agent list
@@ -198,7 +185,7 @@ export default function Main() {
         out("[Main] useEffect *** fetching data (list of streams for all agents) ***");
 
         agentButtons.forEach((agentButton) => {
-            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id, streamButtonsRef.current);
+            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id);
         });
     }, [isPaused, agentButtons]);
 
@@ -247,7 +234,7 @@ export default function Main() {
             if (prev.includes(_agentButtonId_)) {
                 return prev.filter((pid) => pid !== _agentButtonId_);
             } else {
-                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, streamButtonsRef.current);  // for all
+                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_);  // for all
                 return [...prev, _agentButtonId_];
             }
         });
@@ -335,10 +322,14 @@ export default function Main() {
             );
 
             // adding the new merged button to the already-filtered set of buttons
-            return {
+            const updatedStreamButtons = {
                 ...prevStreamButtons,
-                [agentButtonId]: [...curStreamButtons, newStreamButton], // Add the merged button to the specific panel
-            };
+                [agentButtonId]: [...curStreamButtons, newStreamButton], // add the merged button to the specific panel
+            }
+
+            // refreshing reference
+            streamButtonsRef.current = updatedStreamButtons;
+            return updatedStreamButtons;
         });
     }, []); // we have to list on those variables that will be updated here
 
@@ -391,13 +382,19 @@ export default function Main() {
 
         // updating the list of stream buttons with the newly created single-stream buttons
         // (the merged-button that was turned back into a single-stream button is already there, so we filter it out)
-        setStreamButtons((prev) => ({
-            ...prev,
-            [_agentButtonIdOfClicked_]: [
-                ...prev[_agentButtonIdOfClicked_].filter((btn) => btn.id !== streamButtonClicked.id),
-                ...restoredButtons, // Add the individual buttons to the specific panel
-            ],
-        }));
+        setStreamButtons((prev) => {
+            const updatedStreamButtons = {
+                ...prev,
+                [_agentButtonIdOfClicked_]: [
+                    ...prev[_agentButtonIdOfClicked_].filter((btn) => btn.id !== streamButtonClicked.id),
+                    ...restoredButtons, // Add the individual buttons to the specific panel
+                ]
+            };
+
+            // refreshing reference
+            streamButtonsRef.current = updatedStreamButtons;
+            return updatedStreamButtons;
+        });
     }, []);
 
     useEffect(() => {
@@ -553,7 +550,8 @@ export default function Main() {
 
                     // setting up environment name
                     envNameRef.current = loadedData.envName;
-                    setEnvTitle(loadedData.envTitle);
+                    setEnvTitle((prev) => {
+                        envTitleRef.current = loadedData.envTitle; return loadedData.envTitle; });
 
                     // restoring data to be plotted
                     ioDataRef.current = loadedData.data;
@@ -566,7 +564,12 @@ export default function Main() {
                     }));
 
                     // agent buttons: setting them up
-                    setAgentButtons(loadedData.agentButtons);
+                    setAgentButtons((prev) =>{
+
+                        // refreshing reference
+                        agentButtonsRef.current = loadedData.agentButtons;
+                        return loadedData.agentButtons;
+                    });
 
                     // stream buttons: restoring icons
                     Object.values(loadedData.streamButtons).forEach(streamButtons => {
@@ -578,7 +581,12 @@ export default function Main() {
                     });
 
                     // stream buttons: setting them up
-                    setStreamButtons(loadedData.streamButtons);
+                    setStreamButtons((prev) => {
+
+                        // refreshing reference
+                        streamButtonsRef.current = loadedData.streamButtons;
+                        return loadedData.streamButtons;
+                    });
 
                     // go
                     setIsPaused(true);
@@ -649,7 +657,7 @@ export default function Main() {
     }
 
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
-    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _streamButtons_) {
+    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_) {
 
         function isGenerated(label) {
             const match = label.match(/generated(\d+)/);
@@ -673,20 +681,20 @@ export default function Main() {
                 // building the list of single stream names that are not on the current buttons (single and merged)
                 const missingStreamNames = x.filter(
                     (streamName) =>
-                        !_streamButtons_[_agentButtonId_]
-                        || !Array.isArray(_streamButtons_[_agentButtonId_])
-                        || _streamButtons_[_agentButtonId_].length === 0
-                        || !_streamButtons_[_agentButtonId_].some((streamButton) => (
+                        !streamButtonsRef.current[_agentButtonId_]
+                        || !Array.isArray(streamButtonsRef.current[_agentButtonId_])
+                        || streamButtonsRef.current[_agentButtonId_].length === 0
+                        || !streamButtonsRef.current[_agentButtonId_].some((streamButton) => (
                             (Array.isArray(streamButton.mergedLabels) && streamButton.mergedLabels.includes(streamName))
                         ))
                 );
 
                 // finding the largest ID of the existing stream buttons, also looking inside the mergedIds array
                 let maxStreamButtonId = 0;
-                if (_streamButtons_[_agentButtonId_]
-                    && Array.isArray(_streamButtons_[_agentButtonId_])
-                    && _streamButtons_[_agentButtonId_].length > 0) {
-                    maxStreamButtonId = _streamButtons_[_agentButtonId_]
+                if (streamButtonsRef.current[_agentButtonId_]
+                    && Array.isArray(streamButtonsRef.current[_agentButtonId_])
+                    && streamButtonsRef.current[_agentButtonId_].length > 0) {
+                    maxStreamButtonId = streamButtonsRef.current[_agentButtonId_]
                         .map((button) => Math.max(...(button.mergedIds || []))) // max value for each mergedIds
                         .reduce((max, current) => Math.max(max, current), -Infinity); // max of all the maxes
                 }
@@ -790,10 +798,16 @@ export default function Main() {
                 }
 
                 // updating the current buttons with the newly created ones
-                setStreamButtons((prevStreamButtons) => ({
-                    ...prevStreamButtons,
-                    [_agentButtonId_]: [...(prevStreamButtons[_agentButtonId_] || []), ...alteredNewStreamButtons],
-                }));
+                setStreamButtons((prevStreamButtons) => {
+                    const updatedStreamButtons = {
+                        ...prevStreamButtons,
+                        [_agentButtonId_]: [...(prevStreamButtons[_agentButtonId_] || []), ...alteredNewStreamButtons],
+                    };
+
+                    // refreshing reference
+                    streamButtonsRef.current = updatedStreamButtons;
+                    return updatedStreamButtons;
+                });
             },
             () => {
                 if (!offlineRef.current) { setStreamButtons((prev) => (prev)); return true; }

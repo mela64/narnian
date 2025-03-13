@@ -696,7 +696,7 @@ class BasicImagePredictorCNU(torch.nn.Module):
         ).to(self.device)
 
     def forward(self, y, first=False):
-        return self.net(self.transforms(y))
+        return self.net(self.transforms(y).to(self.device))
 
 
 class BasicTokenGenerator(torch.nn.Module):
