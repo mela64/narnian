@@ -21,7 +21,7 @@ def set_seed(seed: int) -> None:
 class BasicGenerator(torch.nn.Module):
     """ Basic generator model with linear transformations and a recurrent hidden state """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = F.tanh,
-                 local: bool = False, device: torch.device = torch.device("cpu")):
+                 project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
         super(BasicGenerator, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -45,9 +45,11 @@ class BasicGenerator(torch.nn.Module):
         self.device = device
         self.delta = 1.  # Discrete time step
         self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
+        self.forward_count = 0
+        self.project_every = project_every
 
     @torch.no_grad()
-    def adjust_eigs(self, delta=0.01):
+    def adjust_eigs(self):
         """Placeholder for eigenvalue adjustment method"""
         pass
 
@@ -68,9 +70,17 @@ class BasicGenerator(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        if first:
+            h = self.init_h(torch.cat([du, u], dim=1))
+            self.forward_count = 0
+        else:
+            h = self.h_next
         # track the gradients on h from here on
         h.requires_grad_()
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -93,6 +103,7 @@ class BasicGenerator(torch.nn.Module):
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
+        self.forward_count += 1
 
         return y
 
@@ -100,7 +111,7 @@ class BasicGenerator(torch.nn.Module):
 class _DiagR(torch.nn.Module):
     """ Diagonal matrix-based generator with real-valued transformations """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = lambda x: x,
-                 local: bool = False, device: torch.device = torch.device("cpu")):
+                 project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
         super(_DiagR, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -124,9 +135,11 @@ class _DiagR(torch.nn.Module):
         self.device = device
         self.delta = 1.
         self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
+        self.forward_count = 0
+        self.project_every = project_every
 
     @torch.no_grad()
-    def adjust_eigs(self, delta=0.01):
+    def adjust_eigs(self):
         """ Normalize the diagonal weight matrix by setting signs. """
         self.diag.weight.copy_(torch.sign(self.diag.weight))
 
@@ -147,9 +160,17 @@ class _DiagR(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        if first:
+            h = self.init_h(torch.cat([du, u], dim=1))
+            self.forward_count = 0
+        else:
+            h = self.h_next
         # track the gradients on h from here on
         h.requires_grad_()
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -172,6 +193,7 @@ class _DiagR(torch.nn.Module):
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
+        self.forward_count += 1
 
         return y
 
@@ -179,7 +201,7 @@ class _DiagR(torch.nn.Module):
 class _DiagC(torch.nn.Module):
     """ Diagonal matrix-based generator with complex-valued transformations """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = lambda x: x,
-                 local: bool = False, device: torch.device = torch.device("cpu")):
+                 project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
         super(_DiagC, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -203,9 +225,11 @@ class _DiagC(torch.nn.Module):
         self.device = device
         self.delta = 1.
         self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
+        self.forward_count = 0
+        self.project_every = project_every
 
     @torch.no_grad()
-    def adjust_eigs(self, delta=0.01):
+    def adjust_eigs(self):
         """ Normalize the diagonal weight matrix by dividing by its magnitude. """
         self.diag.weight.div_(self.diag.weight.abs())
 
@@ -226,9 +250,17 @@ class _DiagC(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device, dtype=torch.cfloat)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        if first:
+            h = self.init_h(torch.cat([du, u], dim=1))
+            self.forward_count = 0
+        else:
+            h = self.h_next
         # track the gradients on h from here on
         h.requires_grad_()
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -251,6 +283,7 @@ class _DiagC(torch.nn.Module):
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
+        self.forward_count += 1
 
         return y.real
 
@@ -270,7 +303,7 @@ class _CTE(torch.nn.Module):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 sigma: Callable = lambda x: x, local: bool = False, device: torch.device = torch.device("cpu")):
+                 sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
         super(_CTE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -297,9 +330,11 @@ class _CTE(torch.nn.Module):
         self.device = device
         self.delta = delta
         self.local = local
+        self.forward_count = 0
+        self.project_every = project_every
 
     @torch.no_grad()
-    def adjust_eigs(self, delta=0.01):
+    def adjust_eigs(self):
         """Placeholder for eigenvalue adjustment method"""
         pass
 
@@ -327,9 +362,17 @@ class _CTE(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        if first:
+            h = self.init_h(torch.cat([du, u], dim=1))
+            self.forward_count = 0
+        else:
+            h = self.h_next
         # track the gradients on h from here on
         h.requires_grad_()
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -360,6 +403,7 @@ class _CTE(torch.nn.Module):
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
+        self.forward_count += 1
 
         return y
 
@@ -379,8 +423,8 @@ class AntisymmetricExpGenerator(_CTE):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 sigma: Callable = lambda x: x, local: bool = False, device: torch.device = torch.device("cpu")):
-        super(AntisymmetricExpGenerator, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, sigma, local, device)
+                 sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
+        super(AntisymmetricExpGenerator, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, sigma, project_every, local, device)
 
     @torch.no_grad()
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
@@ -418,7 +462,7 @@ class _CTB(torch.nn.Module):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float = None,
-                 alpha: float = 0., sigma: Callable = lambda x: x, local: bool = False,
+                 alpha: float = 0., sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False,
                  device: torch.device = torch.device("cpu")):
         super(_CTB, self).__init__()
         u_shape = torch.Size(u_shape)
@@ -463,18 +507,20 @@ class _CTB(torch.nn.Module):
         self.delta = delta
         self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
         self.reset_parameters()
+        self.forward_count = 0
+        self.project_every = project_every
 
     def reset_parameters(self) -> None:
         """Initialize rotational frequencies with uniform distribution"""
         torch.nn.init.uniform_(self.omega)
 
     @torch.no_grad()
-    def adjust_eigs(self, delta):
+    def adjust_eigs(self):
         """Adjust eigenvalues to maintain stability"""
         with torch.no_grad():
             if self.project_method == 'alpha':
                 # Compute damping to maintain eigenvalues on unit circle
-                self.alpha.copy_((1. - torch.sqrt(1. - (delta * self.omega) ** 2) / delta))
+                self.alpha.copy_((1. - torch.sqrt(1. - (self.delta * self.omega) ** 2) / self.delta))
             elif self.project_method == 'modulus':
                 # Normalize by modulus for unit circle stability
                 module = torch.sqrt(self.ones ** 2 + (self.delta * self.omega) ** 2)
@@ -497,10 +543,18 @@ class _CTB(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        if first:
+            h = self.init_h(torch.cat([du, u], dim=1))
+            self.forward_count = 0
+        else:
+            h = self.h_next
         # track the gradients on h from here on
         h.requires_grad_()
         h_pair = h.view(-1, self.order, 2)  # Reshape to (batch, blocks, 2)
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -530,6 +584,7 @@ class _CTB(torch.nn.Module):
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
+        self.forward_count += 1
 
         return y
 
@@ -549,7 +604,7 @@ class _CTBE(torch.nn.Module):
     """
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 sigma: Callable = lambda x: x, local: bool = False, device: torch.device = torch.device("cpu")):
+                 sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
         super(_CTBE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
@@ -577,13 +632,15 @@ class _CTBE(torch.nn.Module):
         self.delta = delta
         self.local = local  # if True the state update is computed locally in time (i.e., kept out from the graph)
         self.reset_parameters()
+        self.forward_count = 0
+        self.project_every = project_every
 
     def reset_parameters(self) -> None:
         """Initialize rotational frequencies"""
         torch.nn.init.uniform_(self.omega)
 
     @torch.no_grad()
-    def adjust_eigs(self, delta=0.01):
+    def adjust_eigs(self):
         """Placeholder for eigenvalue adjustment"""
         pass
 
@@ -603,10 +660,18 @@ class _CTBE(torch.nn.Module):
         du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device)
 
         # Reset hidden state if first step
-        h = self.init_h(torch.cat([du, u], dim=1)) if first else self.h_next
+        if first:
+            h = self.init_h(torch.cat([du, u], dim=1))
+            self.forward_count = 0
+        else:
+            h = self.h_next
         # track the gradients on h from here on
         h.requires_grad_()
         h_pair = h.view(-1, self.order, 2)
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -643,6 +708,7 @@ class _CTBE(torch.nn.Module):
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
+        self.forward_count += 1
 
         return y
 
@@ -760,7 +826,7 @@ class BasicImagePredictorCNU(torch.nn.Module):
 class BasicTokenGenerator(torch.nn.Module):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu"), seed: int = -1):
+                 project_every: int = 0, device: torch.device = torch.device("cpu"), seed: int = -1):
         super(BasicTokenGenerator, self).__init__()
         self.device = device
         set_seed(seed)
@@ -777,6 +843,12 @@ class BasicTokenGenerator(torch.nn.Module):
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
         self.du_dim = du_dim
+        self.forward_count = 0
+        self.project_every = project_every
+
+    @torch.no_grad()
+    def adjust_eigs(self):
+        pass
 
     def forward(self, u, du, first=False):
         if u is None:
@@ -788,10 +860,20 @@ class BasicTokenGenerator(torch.nn.Module):
         else:
             du = du.to(self.device)
         h = self.h.detach()
+        # Reset hidden state if first step
         if first:
             h = self.h_init
+            self.forward_count = 0
+        # track the gradients on h from here on
+        h.requires_grad_()
+
+        # check if it's time to project the eigenvalues
+        if self.forward_count % self.project_every == 0 and self.project_every:
+            self.adjust_eigs()
+
         self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
         y = self.C(self.h)
+        self.forward_count += 1
         return y
 
 

@@ -19,7 +19,7 @@ class BasicHLModel(Model):
         d_dim = attributes[1].shape.numel()
         y_dim = attributes[0].shape.numel()
 
-        super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=delta, local=True),
+        super(BasicHLModel, self).__init__(AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=delta, local=True, project_every=0),
                                            BasicPredictor(y_dim=1, d_dim=3, h_dim=3),
                                            attributes, device=device)
 
