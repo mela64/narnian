@@ -6,7 +6,8 @@ from networks.models import BasicTokenGenerator, BasicTokenPredictor
 
 class BasicTokenModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, device: torch.device = torch.device("cpu")):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -17,10 +18,12 @@ class BasicTokenModel(Model):
 
         # creating the model (superclass)
         super(BasicTokenModel, self).__init__(BasicTokenGenerator(num_emb=num_emb, emb_dim=16,
-                                                                  d_dim=d_dim, y_dim=y_dim, h_dim=5, device=device),
+                                                                  d_dim=d_dim, y_dim=y_dim, h_dim=5,
+                                                                  device=device, seed=seed),
                                               BasicTokenPredictor(num_emb=num_emb, emb_dim=16,
-                                                                  d_dim=d_dim, h_dim=3, device=device),
-                                              attributes, device=device)
+                                                                  d_dim=d_dim, h_dim=3,
+                                                                  device=device, seed=seed),
+                                              attributes, device=device, seed=seed)
 
         # extra stuff
         def loss_gen(y, yhat):

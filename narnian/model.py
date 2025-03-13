@@ -14,7 +14,7 @@ class Model(torch.nn.Module):
     LEARN_MODES = [LEARN_GEN_AND_PRED, LEARN_GEN, LEARN_PRED]
 
     def __init__(self, generator: torch.nn.Module | None, predictor: torch.nn.Module | None,
-                 attributes: list[Attributes], device: torch.device = torch.device("cpu")) :
+                 attributes: list[Attributes], device: torch.device = torch.device("cpu"), seed: int = -1) :
         """Creates a model composed of a generator and a predictor."""
         super(Model, self).__init__()
         assert generator is not None or predictor is not None, "Both generator and predictor not provided (None, None)"
@@ -22,6 +22,7 @@ class Model(torch.nn.Module):
         self.predictor = predictor
         self.attributes = attributes
         self.device = device
+        self.seed = seed
         assert len(self.attributes) == 2, f"Expecting two sets of attributes, got {len(attributes)}"
 
     def forward(self,

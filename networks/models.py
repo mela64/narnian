@@ -1,4 +1,6 @@
 import torch
+import random
+import numpy as np
 import torchvision
 from typing import Callable
 import torch.nn.functional as F
@@ -7,6 +9,13 @@ from networks.mh.layers import LinearMH
 
 def hard_tanh(x: torch.Tensor) -> torch.Tensor:
     return torch.clamp(x, min=-1., max=1.)
+
+
+def set_seed(seed: int) -> None:
+    if seed >= 0:
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(0)
 
 
 class BasicGenerator(torch.nn.Module):
@@ -622,9 +631,10 @@ class BasicPredictor(torch.nn.Module):
 
 class BasicImagePredictor(torch.nn.Module):
 
-    def __init__(self, d_dim: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, d_dim: int, device: torch.device = torch.device("cpu"), seed: int = -1):
         super(BasicImagePredictor, self).__init__()
         self.device = device
+        set_seed(seed)
 
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.Resize(32),
@@ -656,9 +666,10 @@ class BasicImagePredictor(torch.nn.Module):
 
 class BasicImagePredictorCNU(torch.nn.Module):
 
-    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"), seed: int = -1):
         super(BasicImagePredictorCNU, self).__init__()
         self.device = device
+        set_seed(seed)
 
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.Resize(32),
@@ -691,9 +702,10 @@ class BasicImagePredictorCNU(torch.nn.Module):
 class BasicTokenGenerator(torch.nn.Module):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu")):
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         super(BasicTokenGenerator, self).__init__()
         self.device = device
+        set_seed(seed)
 
         u_dim = emb_dim
         du_dim = d_dim
@@ -735,9 +747,11 @@ class BasicTokenGenerator(torch.nn.Module):
 
 class BasicTokenPredictor(torch.nn.Module):
 
-    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int, device: torch.device = torch.device("cpu")):
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         super(BasicTokenPredictor, self).__init__()
         self.device = device
+        set_seed(seed)
 
         y_dim = emb_dim
         self.embeddings = torch.nn.Embedding(num_emb, emb_dim, device=self.device)

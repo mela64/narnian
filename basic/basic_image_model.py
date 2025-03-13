@@ -6,7 +6,8 @@ from networks.models import BasicImagePredictor, BasicImagePredictorCNU
 
 class BasicImageModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, device: torch.device = torch.device("cpu")):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -15,8 +16,8 @@ class BasicImageModel(Model):
 
         # calling constructor
         super(BasicImageModel, self).__init__(None,
-                                              BasicImagePredictor(d_dim=d_dim, device=device),
-                                              attributes, device=device)
+                                              BasicImagePredictor(d_dim=d_dim, device=device, seed=seed),
+                                              attributes, device=device, seed=seed)
 
         # extra stuff
         self.optim = torch.optim.SGD(self.predictor.parameters(), lr=lr)
@@ -47,7 +48,7 @@ class BasicImageModelCNU(Model):
 
     def __init__(self, attributes: list[Attributes], mem_units: int = 5, lr: float = 0.0001,
                  lr_head: float | None = None,
-                 device: torch.device = torch.device("cpu")):
+                 device: torch.device = torch.device("cpu"), seed: int = -1) -> None:
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -61,8 +62,8 @@ class BasicImageModelCNU(Model):
         # calling constructor
         super(BasicImageModelCNU, self).__init__(None,
                                                  BasicImagePredictorCNU(d_dim=d_dim, mem_units=mem_units,
-                                                                        device=device),
-                                                 attributes, device=device)
+                                                                        device=device, seed=seed),
+                                                 attributes, device=device, seed=seed)
 
         # extra stuff
         self.optim = torch.optim.SGD([
