@@ -826,7 +826,7 @@ class BasicImagePredictorCNU(torch.nn.Module):
 class BasicTokenGenerator(torch.nn.Module):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
-                 project_every: int = 0, device: torch.device = torch.device("cpu"), seed: int = -1):
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         super(BasicTokenGenerator, self).__init__()
         self.device = device
         set_seed(seed)
@@ -843,12 +843,6 @@ class BasicTokenGenerator(torch.nn.Module):
         self.dh = torch.zeros_like(self.h)
         self.u_dim = u_dim
         self.du_dim = du_dim
-        self.forward_count = 0
-        self.project_every = project_every
-
-    @torch.no_grad()
-    def adjust_eigs(self):
-        pass
 
     def forward(self, u, du, first=False):
         if u is None:
@@ -863,17 +857,9 @@ class BasicTokenGenerator(torch.nn.Module):
         # Reset hidden state if first step
         if first:
             h = self.h_init
-            self.forward_count = 0
-        # track the gradients on h from here on
-        h.requires_grad_()
-
-        # check if it's time to project the eigenvalues
-        if self.forward_count % self.project_every == 0 and self.project_every:
-            self.adjust_eigs()
 
         self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
         y = self.C(self.h)
-        self.forward_count += 1
         return y
 
 
