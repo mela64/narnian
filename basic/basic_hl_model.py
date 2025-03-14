@@ -41,7 +41,7 @@ class BasicHLModel(Model):
         super(BasicHLModel, self).__init__(generator, predictor, attributes, device=device)
 
         # HL based optimization of the generator
-        self.hl_optim = HL(self.generator, gamma=1., theta=0.0, beta=0.025,  # gold: theta=0.2, beta=0.01
+        self.hl_optim = HL(self.generator, gamma=1., theta=0.2, beta=0.01,  # gold: theta=0.2, beta=0.01
                            reset_neuron_costate=False, reset_weight_costate=False, local=True)
         self.loss_gen = torch.nn.functional.mse_loss
 
