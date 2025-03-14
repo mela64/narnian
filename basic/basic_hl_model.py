@@ -6,8 +6,9 @@ from narnian.attributes import Attributes
 
 
 class BlockExpGenerator(_CTBE):
-    def __init__(self, u_shape, d_dim, y_dim, h_dim, delta, local):
-        super().__init__(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim, delta=delta, local=local)
+    def __init__(self, u_shape, d_dim, y_dim, h_dim, delta, local, cnu_memories: int = 0):
+        super().__init__(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim, delta=delta, local=local,
+                         cnu_memories=cnu_memories)
 
     @torch.no_grad()
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
@@ -21,7 +22,7 @@ class BlockExpGenerator(_CTBE):
 class BasicHLModel(Model):
 
     def __init__(self, attributes: list[Attributes], lr: float = 0.0001, delta: float = None,
-                 device: torch.device = torch.device("cpu")):
+                 device: torch.device = torch.device("cpu"), cnu_memories: int = 0):
         """Creates a model composed of a generator and a predictor."""
         assert delta is not None, f"delta should be specified."
         self.delta = delta
@@ -33,8 +34,9 @@ class BasicHLModel(Model):
         y_dim = attributes[0].shape.numel()
 
         # generator = AntisymmetricExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150,
-        #                                       delta=delta, local=True, project_every=0)
-        generator = BlockExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=5000, delta=delta, local=True)
+        #                                       delta=delta, local=True, project_every=0, cnu_memories=cnu_memories)
+        generator = BlockExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=5000, delta=delta,
+                                      local=True, cnu_memories=cnu_memories)
         predictor = BasicPredictor(y_dim=1, d_dim=3, h_dim=3)
         super(BasicHLModel, self).__init__(generator, predictor, attributes, device=device)
 

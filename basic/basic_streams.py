@@ -1,3 +1,4 @@
+import json
 import math
 import torch
 from narnian.streams import Stream
@@ -77,7 +78,7 @@ class CombSin(Stream):
             self.freqs = torch.tensor(f_cap)
         else:
             raise Exception(f"expected float or list for f_cap, not {type(f_cap)}")
-        self.phases = math.pi * (2 * torch.rand(order) - 1)
+        self.phases = torch.zeros_like(self.freqs)
         if isinstance(c_cap, float):
             self.coeffs = c_cap * (2 * torch.rand(order) - 1)
         elif isinstance(c_cap, list):
@@ -91,6 +92,10 @@ class CombSin(Stream):
         self.attributes = [Attributes((1,), None),
                            Attributes((1,), [self.name.lower()])]
         self.static_d = torch.ones((1, 1))
+
+        import json
+        with open(self.name.lower() + '.json', 'w') as f:
+            json.dump({"freqs": str(self.freqs), "coeffs": str(self.coeffs)}, f)
 
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
         """returns the input/output pair of sequences and the boolean masks."""

@@ -50,6 +50,7 @@ class CNUs(torch.nn.Module):
         self.beta_k = beta_k
         self.psi_fn = psi_fn
         self.debug = False  # temporarily used
+        self.reset_memories = True
 
         # creating keys (self.K) and memories (self.M)
         self.M = torch.nn.Parameter(torch.empty((self.q, self.m, self.u), dtype=torch.float32))
@@ -76,7 +77,8 @@ class CNUs(torch.nn.Module):
 
     def reset_parameters(self):
         self.__reset_keys()
-        self.__reset_memories()
+        if self.reset_memories:
+            self.__reset_memories()
         self.__reset_counters()
 
     def compute_weights(self, x):
@@ -105,8 +107,8 @@ class CNUs(torch.nn.Module):
             # getting the top-1 indices for the current mini-batch
             top1_indices_qb = top_indices_bqk[..., 0].t()
             self.key_counter.scatter_add_(dim=1,
-                           index=top1_indices_qb,
-                           src=torch.ones_like(top1_indices_qb, dtype=self.key_counter.dtype))
+                                          index=top1_indices_qb,
+                                          src=torch.ones_like(top1_indices_qb, dtype=self.key_counter.dtype))
         # updating keys with the ad-hoc scheme (also refreshing top-stuff: responses, indices, alpha)
         if self.training and self.upd_k == 'ad_hoc_WTA':
             top_responses_bqk, top_indices_bqk, top_alpha_bqk = \
@@ -168,7 +170,6 @@ class CNUs(torch.nn.Module):
 
     def forward(self, x):
         raise NotImplementedError
-
 
     @torch.no_grad()
     def __reset_memories(self):

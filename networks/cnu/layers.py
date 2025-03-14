@@ -11,6 +11,7 @@ class LinearCNU(CNUs):
         self.in_features = in_features
         self.out_features = out_features
         self.bias = bias
+        self.shared_keys = shared_keys
 
         if kwargs is not None:
             assert 'q' not in kwargs, "The number of CNUs is automatically determined, do not set argument 'q'"
@@ -69,6 +70,33 @@ class LinearCNU(CNUs):
         if bias is not None:
             o += bias
         return o
+
+    def reset_parameters(self):
+        self.reset_memories = False
+        super().reset_parameters()
+
+        # we ensure that memories M are initialized as Pytorch does for the classic linear layer
+        q = self.M.shape[0]
+        m = self.M.shape[1]
+        self.M.data.zero_()  # ensures we don’t keep old values
+
+        for j in range(q):
+            for i in range(m):
+
+                # initialize weight and bias separately for each memory
+                weight = torch.empty(self.out_features if self.shared_keys else 1, self.in_features)
+                torch.nn.init.kaiming_uniform_(weight, a=math.sqrt(5))  # computes fan in
+
+                if self.bias:
+                    bias = torch.empty(self.out_features if self.shared_keys else 1)
+                    bound = 1 / math.sqrt(self.in_features)
+                    torch.nn.init.uniform_(bias, -bound, bound)
+                    weight_bias = torch.cat([weight, bias.unsqueeze(1)], dim=1)
+                else:
+                    weight_bias = weight
+
+                # store the flattened weight_bias into self.M[i]
+                self.M.data[j, i, :] = weight_bias.flatten()
 
     def __str__(self):
         s = "- in_features = " + str(self.in_features) + "\n"
@@ -156,7 +184,7 @@ class Conv2d(CNUs):
         # getting weights
         W = self.compute_weights(x)
 
-        # ensuring the shape is right (needed when neurons share the same same keys)
+        # ensuring the shape is right (needed when neurons share the same keys)
         W = W.reshape((b, self.out_channels, -1))  # [b,q,1] => [b,out_channels,(in_features + 1-if-bias)]
 
         # splitting into weights and biases
