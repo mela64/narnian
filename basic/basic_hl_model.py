@@ -21,7 +21,7 @@ class BlockExpGenerator(_CTBE):
 
 class BasicHLModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, delta: float = None,
+    def __init__(self, attributes: list[Attributes], delta: float = None,
                  device: torch.device = torch.device("cpu"), cnu_memories: int = 0):
         """Creates a model composed of a generator and a predictor."""
         assert delta is not None, f"delta should be specified."
@@ -37,15 +37,11 @@ class BasicHLModel(Model):
         #                                       delta=delta, local=True, project_every=0, cnu_memories=cnu_memories)
         generator = BlockExpGenerator(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=5000, delta=delta,
                                       local=True, cnu_memories=cnu_memories)
-        predictor = BasicPredictor(y_dim=1, d_dim=3, h_dim=3)
+        predictor = None
         super(BasicHLModel, self).__init__(generator, predictor, attributes, device=device)
 
-        # SGD based optimization of the predictor
-        self.optim = torch.optim.SGD(list(self.predictor.parameters()), lr=lr)
-        self.loss_pred = torch.nn.functional.mse_loss
-
         # HL based optimization of the generator
-        self.hl_optim = HL(self.generator, gamma=1., theta=0.2, beta=0.01,
+        self.hl_optim = HL(self.generator, gamma=1., theta=0.0, beta=0.025,  # gold: theta=0.2, beta=0.01
                            reset_neuron_costate=False, reset_weight_costate=False, local=True)
         self.loss_gen = torch.nn.functional.mse_loss
 
@@ -65,13 +61,5 @@ class BasicHLModel(Model):
         ham.backward()
         self.hl_optim.step()
         self.hl_optim.zero_grad()
-
-        # SGD on the predictor
-        if dhat is not None:
-            loss = self.loss_pred(d, dhat)
-            self.optim.zero_grad()
-            loss_as_float += loss.item()
-            loss.backward()
-            self.optim.step()
 
         return loss_as_float, y, yhat, d, dhat

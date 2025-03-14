@@ -11,7 +11,7 @@ from narnian.attributes import Attributes
 
 class HFLACombSin(CombSin):
     def __init__(self):
-        freqs = [0.276, 0.149, 0.053]
+        freqs = [0.11, 0.07, 0.05]
         coeffs = [0.4, 0.08, 0.08]
         super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'hf', 'la'], labeling_rule="geq0.5")
@@ -20,8 +20,8 @@ class HFLACombSin(CombSin):
 
 class HFHACombSin(CombSin):
     def __init__(self):
-        freqs = [0.276, 0.149, 0.053]
-        coeffs = [1.4, 0.2, 0.2]
+        freqs = [0.11, 0.07, 0.05]
+        coeffs = [0.8, 0.16, 0.16]
         super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'hf', 'ha'], labeling_rule="geq0.5")
         self.static_d = torch.ones((1, 3))
@@ -29,7 +29,7 @@ class HFHACombSin(CombSin):
 
 class LFLACombSin(CombSin):
     def __init__(self):
-        freqs = [0.276, 0.149, 0.053]
+        freqs = [0.11, 0.07, 0.05]
         coeffs = [0.08, 0.08, 0.4]
         super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'lf', 'la'], labeling_rule="geq0.5")
@@ -38,8 +38,8 @@ class LFLACombSin(CombSin):
 
 class LFHACombSin(CombSin):
     def __init__(self):
-        freqs = [0.276, 0.149, 0.053]
-        coeffs = [0.2, 0.2, 1.4]
+        freqs = [0.11, 0.07, 0.05]
+        coeffs = [0.16, 0.16, 0.8]
         super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
         self.attributes[1] = Attributes((3,), ['3sin', 'lf', 'ha'], labeling_rule="geq0.5")
         self.static_d = torch.ones((1, 3))
@@ -47,21 +47,21 @@ class LFHACombSin(CombSin):
 
 class HFHASquare(Square):
     def __init__(self):
-        super().__init__(freq=0.1, phase=0.5, delta=0.1, ampl=1.5)
+        super().__init__(freq=0.06, phase=0.5, delta=0.1, ampl=1.0)
         self.attributes[1] = Attributes((3,), ['square', 'hf', 'ha'], labeling_rule="geq0.5")
         self.static_d = torch.ones((1, 3))
 
 
 class HFLASquare(Square):
     def __init__(self):
-        super().__init__(freq=0.1, phase=0.5, delta=0.1, ampl=0.5)
+        super().__init__(freq=0.06, phase=0.5, delta=0.1, ampl=0.5)
         self.attributes[1] = Attributes((3,), ['square', 'hf', 'la'], labeling_rule="geq0.5")
         self.static_d = torch.ones((1, 3))
 
 
 class LFHASquare(Square):
     def __init__(self):
-        super().__init__(freq=0.03, phase=0.5, delta=0.1, ampl=1.5)
+        super().__init__(freq=0.03, phase=0.5, delta=0.1, ampl=1.0)
         self.attributes[1] = Attributes((3,), ['square', 'lf', 'ha'], labeling_rule="geq0.5")
         self.static_d = torch.ones((1, 3))
 
@@ -139,7 +139,7 @@ env.add_agent(ag)
 
 # creating student agent
 # ag = BasicAgent("student", model=BasicModel(attributes=env.shared_attributes, lr=0.001), authority=0.0)
-ag = BasicAgent("student", model=BasicHLModel(attributes=env.shared_attributes, lr=0.001,
+ag = BasicAgent("student", model=BasicHLModel(attributes=env.shared_attributes,
                                               delta=0.1, cnu_memories=8), authority=0.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
