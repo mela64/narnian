@@ -70,6 +70,9 @@ class Attributes:
     def merge(self, new_labels: Self):
         if self._num_labels == 0:
             self.labels = []
+            self.labeling_rule = new_labels.labeling_rule
+            self.data_type = new_labels.data_type
+            self.inv_img_transform = new_labels.inv_img_transform
 
         assert self.data_type == 'misc', f"Cannot merge attributes of type: {self.data_type}"
         assert self.shape is not None and len(self.shape) == 1, f"Expected valid and 1d tensor"
@@ -156,5 +159,5 @@ class Attributes:
             else:
                 raise ValueError(f"Unknown data-to-text rule: {self.labeling_rule}")
         else:
-            raise ValueError(f"Cannot appliy data-to-text rule to attributes of type: {self.data_type}")
+            raise ValueError(f"Cannot apply data-to-text rule to attributes of type: {self.data_type}")
         return text

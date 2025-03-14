@@ -6,7 +6,6 @@ import torch
 import datetime
 import torchvision
 from PIL import Image
-from typing_extensions import Self
 from .attributes import Attributes
 
 
@@ -104,7 +103,7 @@ class Stream(torch.utils.data.Dataset):
         return f"{creator}:{name}"
 
     @staticmethod
-    def create(name: str, creator: str, stream: Self = None):
+    def create(name: str, creator: str, stream=None):
         stream.name = name
         stream.creator = creator
         if stream.attributes[1].labels[0] == 'unk' and len(stream.attributes[1]) == 1:
@@ -318,10 +317,6 @@ class Tokens(Stream):
         self.circular = circular
         self.token_ids = []
         self.labels = []
-
-        def remove_surrounding_quotes(s):
-            match = re.match(r'^"(.*)"$', s)
-            return match.group(1) if match else s
 
         # reading the label file (assume CSV format with lines such as: token,category_label1,category_label2,etc.)
         class_names = {}
