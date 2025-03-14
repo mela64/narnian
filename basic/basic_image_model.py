@@ -46,7 +46,8 @@ class BasicImageModel(Model):
 
 class BasicImageModelCNU(Model):
 
-    def __init__(self, attributes: list[Attributes], mem_units: int = 5, lr: float = 0.0001,
+    def __init__(self, attributes: list[Attributes], mem_units: int = 5, lr: float = 0.0001, delta: int = 1,
+                 scramble: bool = False,
                  lr_head: float | None = None,
                  device: torch.device = torch.device("cpu"), seed: int = -1) -> None:
         """Creates a model composed of a generator and a predictor."""
@@ -62,7 +63,8 @@ class BasicImageModelCNU(Model):
         # calling constructor
         super(BasicImageModelCNU, self).__init__(None,
                                                  BasicImagePredictorCNU(d_dim=d_dim, mem_units=mem_units,
-                                                                        device=device, seed=seed),
+                                                                        device=device, seed=seed, delta=delta,
+                                                                        scramble=scramble),
                                                  attributes, device=device, seed=seed)
 
         # extra stuff

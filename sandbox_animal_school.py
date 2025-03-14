@@ -42,7 +42,7 @@ ag.add_transit("exam_prepared", "basic/behaviours/teach-playlist_eval-recorded1_
                action="set_pref_streams", args={"stream_hashes": [env.name + ":albatross",
                                                                   env.name + ":cheetah",
                                                                   env.name + ":giraffe"]},
-               wildcards={"<agent_name>": ag.name, "<learn_steps>": 40, "<eval_steps>": 30, "<cmp_thres>": 0.4})
+               wildcards={"<agent_name>": ag.name, "<learn_steps>": 40, "<eval_steps>": 30, "<cmp_thres>": 0.5})
 
 # promoting students that were positively evaluated
 ag.add_transit("some_good", "promote", action="set_authority", args={"agent": "<valid_cmp>", "auth": 1.0})
@@ -58,8 +58,8 @@ ag.add_transit("habilitate", "done_teaching", action="wait_for_actions",
 env.add_agent(ag)
 
 # creating student agent named Mario
-ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attributes, mem_units=5,
-                                                  lr=0.0005, lr_head=0.05, device=device, seed=42), authority=0.0)
+ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attributes, mem_units=44,
+                                                  lr=0.009414, lr_head=0.01141, device=device, seed=42, scramble=True, delta=4), authority=0.0)
 
 # in principle, he is like Dr. Green...
 ag.behave_as(env.agents["Dr. Green"])
@@ -79,7 +79,7 @@ env.add_agent(ag)
 
 # creating another student agent named Luigi
 ag = BasicAgent("Luigi", model=BasicImageModel(attributes=env.shared_attributes,
-                                               lr=0.004, device=device, seed=42), authority=0.0)
+                                               lr=0.002182, device=device, seed=42), authority=0.0)
 
 # he really acts like Mario
 ag.behave_as(env.agents["Mario"])
@@ -93,8 +93,8 @@ for ag in env.agents.values():
     print(ag)
 
 # creating server
-# Server(env=env)
+Server(env=env)
 
 # running
-env.run(steps=459)
+env.run()
 

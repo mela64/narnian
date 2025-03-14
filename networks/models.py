@@ -834,7 +834,7 @@ class BasicImagePredictor(torch.nn.Module):
 
 class BasicImagePredictorCNU(torch.nn.Module):
 
-    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"), seed: int = -1):
+    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"), seed: int = -1, delta: int = 1, scramble: bool = False):
         super(BasicImagePredictorCNU, self).__init__()
         self.device = device
         set_seed(seed)
@@ -859,7 +859,7 @@ class BasicImagePredictorCNU(torch.nn.Module):
             torch.nn.Flatten(),
             torch.nn.Linear(256 * 3 * 3, 2048),
             torch.nn.ReLU(inplace=True),
-            LinearCNU(2048, d_dim, key_mem_units=mem_units),
+            LinearCNU(2048, d_dim, key_mem_units=mem_units, delta=delta, scramble=scramble),
             torch.nn.Sigmoid()
         ).to(self.device)
 
