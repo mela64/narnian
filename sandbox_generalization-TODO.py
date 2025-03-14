@@ -98,7 +98,7 @@ env.behav.save_pdf(f"{env.name}.pdf")
 ag = BasicAgent("teacher", model=BasicModel(attributes=env.shared_attributes, lr=0.), authority=1.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
-n = 10
+n = 1
 ag.behav.add_transit("got_agents", "recording1", action="record", args={"stream_hash": "envir:3sinhfha", "steps": n*1500})
 ag.behav.add_transit("recording1", "recording2", action="record", args={"stream_hash": "envir:3sinhfla", "steps": n*1500})
 ag.behav.add_transit("recording2", "recording3", action="record", args={"stream_hash": "envir:3sinlfha", "steps": n*1500})
@@ -141,7 +141,7 @@ env.add_agent(ag)
 # creating student agent
 # ag = BasicAgent("student", model=BasicModel(attributes=env.shared_attributes, lr=0.001), authority=0.0)
 ag = BasicAgent("student", model=BasicHLModel(attributes=env.shared_attributes,
-                                              delta=0.1, cnu_memories=8), authority=0.0)
+                                              delta=0.1, cnu_memories=0), authority=0.0)
 ag.behav.add_transit("init", "got_streams", action="get_streams")
 ag.behav.add_transit("got_streams", "got_agents", action="get_agents")
 ag.behav.add_transit("got_agents", "teacher_engaged", action="get_engagement", args={"min_auth": 1.0, "max_auth": 1.0})

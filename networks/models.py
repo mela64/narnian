@@ -834,7 +834,8 @@ class BasicImagePredictor(torch.nn.Module):
 
 class BasicImagePredictorCNU(torch.nn.Module):
 
-    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"), seed: int = -1, delta: int = 1, scramble: bool = False):
+    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"),
+                 seed: int = -1, delta: int = 1, scramble: bool = False):
         super(BasicImagePredictorCNU, self).__init__()
         self.device = device
         set_seed(seed)
