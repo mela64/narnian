@@ -1,3 +1,4 @@
+import torch
 from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
@@ -10,6 +11,7 @@ from basic.basic_streams import (SmoothHFHA, SmoothHFLA, SmoothLFHA, SmoothLFLA,
 
 # creating environment
 env = BasicEnvironment("env", title="Signal School")
+device = torch.device("cpu")
 
 # adding streams to the environment
 env.add_stream(Stream.create(name="smoHfHa", creator=env.name, stream=BufferedStream().wrap(SmoothHFHA(), steps=1000)))
@@ -52,7 +54,7 @@ ag.add_transit("time_to_eval_again", "not_good", action="nop")
 env.add_agent(ag)
 
 # creating student agent named Mario
-ag = BasicAgent("Mario", model=BasicHLModel(attributes=env.shared_attributes,
+ag = BasicAgent("Mario", model=BasicHLModel(attributes=env.shared_attributes, device=device,
                                             delta=0.1, cnu_memories=20, seed=42), authority=0.0)
 
 # getting generic info from the environment
