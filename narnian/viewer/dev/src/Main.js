@@ -675,6 +675,22 @@ export default function Main() {
             return null;
         }
 
+        function isEval(label) {
+            const match = label.match(/eval(\d+)/);
+            if (match) {
+                return parseInt(match[1], 10);
+            }
+            return null;
+        }
+
+        function isExpect(label) {
+            const match = label.match(/expect(\d+)/);
+            if (match) {
+                return parseInt(match[1], 10);
+            }
+            return null;
+        }
+
         callAPI('/get_list_of_streams', "agent_name=" + _agentName_,
             (x) => {
 
@@ -724,9 +740,11 @@ export default function Main() {
                     // check stream name: is it a generated/target stream?
                     const generatedNum = isGenerated(newStreamButtons[z].mergedLabels[0]);
                     const targetNum = isTarget(newStreamButtons[z].mergedLabels[0]);
+                    const evalNum = isEval(newStreamButtons[z].mergedLabels[0]);
+                    const expectNum = isExpect(newStreamButtons[z].mergedLabels[0]);
 
                     // if the name of the stream is "generatedX" or "targetX", we check if we find the paired stream
-                    if (generatedNum || targetNum) {
+                    if ((generatedNum || targetNum) || (evalNum || expectNum)) {
 
                         // altering case: we need to merge "generatedX" and "targetX", let's search for the other guy
                         const suffix = newStreamButtons[z].mergedLabels[0].slice(-3) // get "[y]" or "[d]"
@@ -749,7 +767,7 @@ export default function Main() {
                                 if (generatedNum !== isTarget(newStreamButtons[zz].mergedLabels[0])) {
                                     continue;
                                 }
-                            } else {
+                            } else if (targetNum && targetNum >= 0) {
 
                                 // given "generatedX", we want a target that ends with the same "X", and vice-versa
                                 if (targetNum !== isGenerated(newStreamButtons[zz].mergedLabels[0])) {
@@ -757,34 +775,53 @@ export default function Main() {
                                 }
                             }
 
-                            const generatedZ = (generatedNum && generatedNum >= 0) ? z : zz;
-                            const targetZ = (generatedNum && generatedNum >= 0) ? zz : z;
+                            // looking for the other stream of the pair
+                            if (evalNum && evalNum >= 0) {
+
+                                // given "evalX", we want an "expect" that ends with the same "X", and vice-versa
+                                if (evalNum !== isExpect(newStreamButtons[zz].mergedLabels[0])) {
+                                    continue;
+                                }
+                            } else if (expectNum && expectNum >= 0) {
+
+                                // given "expectX", we want an "eval" that ends with the same "X", and vice-versa
+                                if (expectNum !== isEval(newStreamButtons[zz].mergedLabels[0])) {
+                                    continue;
+                                }
+                            }
+
+                            const generatedOrEvalZ =
+                                ((generatedNum && generatedNum >= 0) || (targetNum && targetNum >= 0)) ?
+                                    ((generatedNum && generatedNum >= 0) ? z : zz) : ((evalNum && evalNum >= 0) ? z : zz);
+                            const targetOrExpectZ =
+                                ((generatedNum && generatedNum >= 0) || (targetNum && targetNum >= 0)) ?
+                                    ((generatedNum && generatedNum >= 0) ? zz : z) : ((evalNum && evalNum >= 0) ? zz : z);
 
                             // if a pair "generatedX" and "targetX" was found... merge!
                             const mergedIds =
-                                [...newStreamButtons[generatedZ].mergedIds,
-                                    ...newStreamButtons[targetZ].mergedIds];
+                                [...newStreamButtons[generatedOrEvalZ].mergedIds,
+                                    ...newStreamButtons[targetOrExpectZ].mergedIds];
                             const mergedLabels =
-                                [...newStreamButtons[generatedZ].mergedLabels,
-                                    ...newStreamButtons[targetZ].mergedLabels];
+                                [...newStreamButtons[generatedOrEvalZ].mergedLabels,
+                                    ...newStreamButtons[targetOrExpectZ].mergedLabels];
 
                             // creating the new button about the merged streams
                             const newStreamButton = {
-                                id: newStreamButtons[generatedZ].id,
-                                label: newStreamButtons[generatedZ].label,
-                                icon: newStreamButtons[generatedZ].icon,
+                                id: newStreamButtons[generatedOrEvalZ].id,
+                                label: newStreamButtons[generatedOrEvalZ].label,
+                                icon: newStreamButtons[generatedOrEvalZ].icon,
                                 mergedIds: mergedIds,
                                 mergedLabels: mergedLabels,
                                 mergedButtons: [],
-                                agentButtonId: newStreamButtons[generatedZ].agentButtonId
+                                agentButtonId: newStreamButtons[generatedOrEvalZ].agentButtonId
                             };
 
                             // saving
                             alteredNewStreamButtons.push(newStreamButton);
 
                             // let's avoid looking again for this button in the original array
-                            newStreamButtons[generatedZ] = null;
-                            newStreamButtons[targetZ] = null;
+                            newStreamButtons[generatedOrEvalZ] = null;
+                            newStreamButtons[targetOrExpectZ] = null;
                             isPaired = true;
                             break; // stop searching
                         }

@@ -42,7 +42,11 @@ ag.add_transit("got_agents", "basic/behaviours/teach-playlist_eval-playlist-last
 # testing generalization
 ag.add_transit("finished_work", "generalize", action="ask_gen",
                args={"du_hash": env.name + ":squLfLa",  "dhat_hash": env.name + ":squLfLa", "ask_steps": 1000})
-ag.add_transit("generalize", "end", action="done_gen")
+ag.add_transit("generalize", "time_to_eval_again", action="done_gen")
+ag.add_state_action("time_to_eval_again", action="eval",
+                    args={"stream_hash": env.name + ":squLfLa", "what": "y", "how": "mse", "steps": 1000})
+ag.add_transit("time_to_eval_again", "very_good", action="compare_eval", args={"cmp": "<=", "thres": 0.2})
+ag.add_transit("time_to_eval_again", "not_good", action="nop")
 
 # adding agent to environment
 env.add_agent(ag)

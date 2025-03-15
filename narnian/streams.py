@@ -157,8 +157,12 @@ class BufferedStream(Stream):
     def get_first_step(self):
         return self.first_k
 
-    def append_data(self, y: torch.Tensor, d: torch.Tensor | None):
-        assert Stream.k == (self.last_k + 1), \
+    def set_first_step(self, first_k):
+        self.first_k = first_k
+        self.last_k = self.first_k - 1
+
+    def append_data(self, y: torch.Tensor, d: torch.Tensor | None, instantaneous: bool = False):
+        assert instantaneous or Stream.k == (self.last_k + 1), \
             "BufferedStream can only store data over a single contiguous time interval"
 
         # switching from probabilities to token indices

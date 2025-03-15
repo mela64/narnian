@@ -2,7 +2,7 @@ from narnian.model import Model
 from narnian.agent import Agent
 from typing_extensions import Self
 from collections.abc import Iterable
-from narnian.streams import Stream, BufferedStream
+from narnian.streams import Stream, BufferedStream, Attributes
 
 
 class BasicAgent(Agent):
@@ -22,6 +22,7 @@ class BasicAgent(Agent):
         self.cur_preferred_stream = 0  # id of the current preferred stream from the list
         self.last_recorded_stream_num = 0  # numerical index of to the last recorded stream, if any (1: first)
         self.last_generated_stream_num = 0  # numerical index of to the last generated stream, if any (1: first)
+        self.last_eval_stream_num = 0  # numerical index of to the last evaluated stream, if any (1: first)
         self.failed_communicating_completion = None  # it keeps track of failed __complete_do actions
         self.commands_to_send.append("stop_current_action")
         self.commands_to_send.append("kill")
@@ -1008,6 +1009,30 @@ class BasicAgent(Agent):
 
         stream_a = self.known_streams[stream_a_hash]
         stream_b = self.known_streams[stream_b_hash]
+        z = 0 if what == "y" else 1
+
+        # increasing the number of the last generated stream ("generated1", "generated2", ...)
+        self.last_eval_stream_num += 1
+
+        # creating new buffered streams to store the evaluated data (for visualization purposes only)
+        eva_stream = BufferedStream(use_static_descriptor=False)
+        eva_stream.set_name("eval" + str(self.last_eval_stream_num))
+        eva_stream.set_creator(f"{self.name}")
+        eva_stream.set_meta("Visualization purposes only: the evaluated data stream")
+        eva_stream.attributes = stream_a.attributes
+        eva_stream.set_first_step(stream_a.get_first_step())
+
+        # creating a new buffered stream to store the expected/target data (for visualization purposes only)
+        exp_stream = BufferedStream(use_static_descriptor=False)
+        exp_stream.set_name("expect" + str(self.last_eval_stream_num))
+        exp_stream.set_creator(f"{self.name}")
+        exp_stream.set_meta("Visualization purposes only: the expected (target) data stream")
+        exp_stream.attributes = stream_b.attributes
+        exp_stream.set_first_step(stream_a.get_first_step())  # it must be "exp_stream" and "stream_a." (NOT stream_b.)
+
+        # storing a reference to the just generated streams
+        self.known_streams[eva_stream.get_hash()] = eva_stream
+        self.known_streams[exp_stream.get_hash()] = exp_stream
 
         if not isinstance(stream_a, BufferedStream):
             self.err(f"Can only compare buffered streams and {stream_a_hash} is not buffered")
@@ -1023,23 +1048,25 @@ class BasicAgent(Agent):
         a_first_k = stream_a.get_first_step()
         b_first_k = stream_b.get_first_step()
 
-        z = 0 if what == "y" else 1
-
         # comparing data (averaging)
         o = 0.
         for k in range(0, steps):
 
             # signals or descriptors
-            a = stream_a[a_first_k + k][z]
-            b = stream_b[b_first_k + k][z]
+            a = stream_a[a_first_k + k]
+            b = stream_b[b_first_k + k]
 
             # checking
-            if a is None or b is None:
+            if a[z] is None or b[z] is None:
                 self.err("Cannot compare signals/descriptors if one or both of them are None")
                 return -1., False
 
             # comparing
-            o = o + self.model.compare(a, b, how)
+            o = o + self.model.compare(a[z], b[z], how)
+
+            # storing (visualization purposes only)
+            eva_stream.append_data(a[0], a[1], instantaneous=True)
+            exp_stream.append_data(b[0], b[1], instantaneous=True)
 
         return o / steps, True
 
