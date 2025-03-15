@@ -67,7 +67,7 @@ class FiniteStateMachine:
 
         self.actionable = obj
 
-    def set_wildcards(self, wildcards: dict[str, str] | None):
+    def set_wildcards(self, wildcards: dict[str, str | float | int] | None):
         """Set the dictionary of wildcards used during the loading process."""
 
         self.wildcards = wildcards if wildcards is not None else {}

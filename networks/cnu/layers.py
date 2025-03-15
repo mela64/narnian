@@ -46,6 +46,10 @@ class LinearCNU(CNUs):
         if device is not None:
             self.to(device)
 
+        # clearing
+        if not self.bias:
+            self.bias = None
+
     def forward(self, x):
 
         # getting weights
@@ -65,8 +69,6 @@ class LinearCNU(CNUs):
         # batched linear projection: matmul([b,out_features,in_features], [b,in_features,1]) = [b,out_features,1]
         # that we squeeze to [b,out_features]
         o = torch.matmul(weights, x.unsqueeze(2)).squeeze(2)  # [b,out_features]
-        # print(bias)
-        # print(self.M[0, 0])
         if bias is not None:
             o += bias
         return o

@@ -11,13 +11,12 @@
         "asked_learn": [null, null, 4],
         "done_learn": [null, null, 5],
         "change_stream": ["next_pref_stream", {}, 6],
-        "exam_time": [null, null, 7],
-        "time_to_work": [null, null, 8],
-        "asked_pred": [null, null, 9],
-        "done_pred": [null, null, 10],
-        "time_to_eval": ["eval", {"stream_hash": "<agent_name>:recorded1", "what": "d", "how": "max", "steps": "<eval_steps>"}, 11],
-        "bad": [null, null, 12],
-        "good": [null, null, 13]
+        "time_to_work": [null, null, 7],
+        "asked_gen": [null, null, 8],
+        "done_gen": [null, null, 9],
+        "time_to_eval": ["eval", {"stream_hash": "<playlist>", "what": "y", "how": "mse", "steps": "<eval_steps>"}, 10],
+        "bad": [null, null, 11],
+        "good": ["next_pref_stream", {}, 12]
     },
     "transitions": {
         "ready_to_teach": {
@@ -32,35 +31,39 @@
             "time_to_teach": [["nop", {}, false, 4]]
         },
         "time_to_teach": {
-            "asked_learn": [["ask_learn_pred", {"yhat_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": "<learn_steps>"}, false, 5]]
+            "asked_learn": [["ask_learn_gen", {"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": "<learn_steps>"}, false, 5]]
         },
         "asked_learn": {
-            "done_learn": [["done_learn_pred", {}, false, 6]]
+            "done_learn": [["done_learn_gen", {}, false, 6]]
         },
         "done_learn": {
-            "done_learn": [["done_learn_pred", {}, false, 7]],
+            "done_learn": [["done_learn_gen", {}, false, 7]],
             "change_stream": [["nop", {}, false, 8]]
         },
         "change_stream": {
-            "student_engaged": [["check_pref_stream", {"what": "not_first"}, false, 9]],
-            "exam_time": [["check_pref_stream", {"what": "first"}, false, 10]]
-        },
-        "exam_time": {
-            "time_to_work": [["share_streams", {}, false, 11]]
+            "time_to_teach": [["check_pref_stream", {"what": "not_last_round"}, false, 9]],
+            "time_to_work": [["check_pref_stream", {"what": "last_round"}, false, 10]]
         },
         "time_to_work": {
-            "asked_pred": [["ask_pred", {"yhat_hash": "<agent_name>:recorded1", "ask_steps": "<eval_steps>"}, false, 12]]
+            "asked_gen": [["ask_gen", {"du_hash": "<playlist>",  "dhat_hash": "<playlist>", "ask_steps": "<eval_steps>"}, false, 12]]
         },
-        "asked_pred": {
-            "done_pred": [["done_pred", {}, false, 13]]
+        "asked_gen": {
+            "done_gen": [["done_gen", {}, false, 13]]
         },
-        "done_pred": {
-            "done_pred": [["done_pred", {}, false, 14]],
-            "time_to_eval": [["nop", {}, false, 15]]
+        "done_gen": {
+            "done_gen": [["done_gen", {}, false, 14]],
+            "time_to_eval": [["nop", {}, false, 10]]
         },
         "time_to_eval": {
             "good": [["compare_eval", {"cmp": "<=", "thres": "<cmp_thres>"}, false, 16]],
             "bad": [["nop", {}, false, 17]]
+        },
+        "good": {
+            "time_to_work": [["check_pref_stream", {"what": "not_first"}, false, 18]],
+            "finished_work": [["check_pref_stream", {"what": "first"}, false, 19]]
+        },
+        "bad": {
+            "time_to_teach": [["first_pref_stream", {}, false, 20]]
         }
     },
     "action": null,

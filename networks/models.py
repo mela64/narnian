@@ -323,14 +323,14 @@ class _CTE(torch.nn.Module):
             # Output projection matrix
             self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
         else:
-            self.W = LinearCNU(h_dim, h_dim, bias=False, device=device,
+            self.W = LinearCNU(h_dim, h_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
             self.I = torch.eye(h_dim, requires_grad=False, device=device)  # Identity matrix
             # Input projection matrix
-            self.B = LinearCNU(u_dim + du_dim, h_dim, bias=False, device=device,
+            self.B = LinearCNU(u_dim + du_dim, h_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
             # Output projection matrix
-            self.C = LinearCNU(h_dim, y_dim, bias=False, device=device,
+            self.C = LinearCNU(h_dim, y_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
 
         # Hidden state initialization
@@ -391,17 +391,29 @@ class _CTE(torch.nn.Module):
             if self.forward_count % self.project_every == 0:
                 self.adjust_eigs()
 
+        if not isinstance(self.W, LinearCNU):
+            weight_W = self.W.weight
+            B = self.B
+            C = self.C
+        else:
+            udu = torch.cat([du, u], dim=1)
+            weight_W = self.W.compute_weights(udu).view(self.W.out_features, self.W.in_features)
+            weight_B = self.B.compute_weights(udu).view(self.B.out_features, self.B.in_features)
+            weight_C = self.C.compute_weights(udu).view(self.C.out_features, self.C.in_features)
+            B = lambda x: torch.nn.functional.linear(x, weight_B)
+            C = lambda x: torch.nn.functional.linear(x, weight_C)
+
         # handle inputs
         du, u = self.handle_inputs(du, u)
 
         # Antisymmetric matrix construction
-        A = 0.5 * (self.W.weight - self.W.weight.t())
+        A = 0.5 * (weight_W - weight_W.t())
         A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
         rec = F.linear(h, A_expm, self.W.bias)  # Recurrent component
 
         # Input processing component
         A_inv = torch.linalg.inv(A)
-        inp = A_inv @ (A_expm - self.I) @ self.B(torch.cat([du, u], dim=1)).unsqueeze(-1)
+        inp = A_inv @ (A_expm - self.I) @ B(torch.cat([du, u], dim=1)).unsqueeze(-1)
 
         # Handle locality
         h_new = rec + inp.squeeze(-1)   # updated hidden state
@@ -416,51 +428,12 @@ class _CTE(torch.nn.Module):
         # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
-        y = self.C(self.sigma(self.h))
+        y = C(self.sigma(self.h))
 
         # store the new state for the next iteration
         self.h_next = h_new.detach()
-        self.forward_count += 1
 
         return y
-
-
-class AntisymmetricExpGenerator(_CTE):
-    """Antisymmetric Matrix Exponential Generator implementing continuous-time dynamics.
-
-    Uses antisymmetric weight matrix with matrix exponential for stable hidden state evolution.
-
-    Args:
-        u_shape: Input shape (tuple of integers)
-        d_dim: Input descriptor dimension
-        y_dim: Output dimension
-        h_dim: Hidden state dimension
-        delta: Time step for discrete approximation
-        device: Computation device (CPU/GPU)
-    """
-
-    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
-                 sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu"), cnu_memories: int = 0):
-        super(AntisymmetricExpGenerator, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, sigma, project_every, local, device, cnu_memories)
-
-    @torch.no_grad()
-    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        # h = torch.randn((1, self.h_init.data.shape[1]))
-        # # Antisymmetric matrix construction
-        # A = 0.5 * (self.W.weight - self.W.weight.t()) # - 0.1 * torch.eye(self.W.weight.shape[0])
-        # A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
-        # # Input processing component (constant)
-        # A_inv = torch.linalg.inv(A)
-        # # inp = A_inv @ (A_expm - self.I) @ self.B(udu).unsqueeze(-1)
-        # for _ in range(200):
-        #     # h = F.linear(h, A_expm, self.W.bias) + inp.squeeze(-1)
-        #     h = F.linear(h, A_expm, self.W.bias)  # + self.B(udu)
-        # return h
-        return self.B(udu).detach() / torch.sum(udu)  # this is the init
-
-    @staticmethod
-    def handle_inputs(du, u):
-        return torch.zeros_like(du), torch.zeros_like(u)
 
 
 class _CTB(torch.nn.Module):
@@ -640,7 +613,7 @@ class _CTBE(torch.nn.Module):
         else:
             self.omega = CNUs(q=1, d=u_dim + du_dim, u=self.order,
                               delta=1, beta_k=delta, scramble=False, m=cnu_memories)
-            self.B = LinearCNU(u_dim + du_dim, h_dim, bias=False, device=device,key_size=u_dim + du_dim,
+            self.B = LinearCNU(u_dim + du_dim, h_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
             self.C = LinearCNU(h_dim, y_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
@@ -711,10 +684,10 @@ class _CTBE(torch.nn.Module):
         else:
             udu = torch.cat([du, u], dim=1)
             omega = self.omega.compute_weights(udu).view(-1)
-            B = lambda x: torch.nn.functional.linear(x, self.B.compute_weights(udu)
-                                                     .view(self.B.out_features, self.B.in_features))
-            C = lambda x: torch.nn.functional.linear(x, self.C.compute_weights(udu)
-                                                     .view(self.C.out_features, self.C.in_features))
+            weight_B = self.B.compute_weights(udu).view(self.B.out_features, self.B.in_features)
+            weight_C = self.C.compute_weights(udu).view(self.C.out_features, self.C.in_features)
+            B = lambda x: torch.nn.functional.linear(x, weight_B)
+            C = lambda x: torch.nn.functional.linear(x, weight_C)
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
@@ -799,10 +772,9 @@ class BasicPredictor(torch.nn.Module):
 
 class BasicImagePredictor(torch.nn.Module):
 
-    def __init__(self, d_dim: int, device: torch.device = torch.device("cpu"), seed: int = -1):
+    def __init__(self, d_dim: int, device: torch.device = torch.device("cpu")):
         super(BasicImagePredictor, self).__init__()
         self.device = device
-        set_seed(seed)
 
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.Resize(32),
@@ -835,10 +807,9 @@ class BasicImagePredictor(torch.nn.Module):
 class BasicImagePredictorCNU(torch.nn.Module):
 
     def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"),
-                 seed: int = -1, delta: int = 1, scramble: bool = False):
+                 delta: int = 1, scramble: bool = False):
         super(BasicImagePredictorCNU, self).__init__()
         self.device = device
-        set_seed(seed)
 
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.Resize(32),

@@ -109,6 +109,7 @@ class CNUs(torch.nn.Module):
             self.key_counter.scatter_add_(dim=1,
                                           index=top1_indices_qb,
                                           src=torch.ones_like(top1_indices_qb, dtype=self.key_counter.dtype))
+
         # updating keys with the ad-hoc scheme (also refreshing top-stuff: responses, indices, alpha)
         if self.training and self.upd_k == 'ad_hoc_WTA':
             top_responses_bqk, top_indices_bqk, top_alpha_bqk = \

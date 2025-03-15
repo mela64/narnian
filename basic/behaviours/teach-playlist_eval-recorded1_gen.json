@@ -16,8 +16,8 @@
         "asked_gen": [null, null, 9],
         "done_gen": [null, null, 10],
         "time_to_eval": ["eval", {"stream_hash": "<agent_name>:recorded1", "what": "y", "how": "mse", "steps": "<eval_steps>"}, 11],
-        "all_bad": [null, null, 12],
-        "some_good": [null, null, 13]
+        "bad": [null, null, 12],
+        "good": [null, null, 13]
     },
     "transitions": {
         "ready_to_teach": {
@@ -59,8 +59,8 @@
             "time_to_eval": [["nop", {}, false, 15]]
         },
         "time_to_eval": {
-            "some_good": [["compare_eval", {"cmp": "<=", "thres": "<cmp_thres>"}, false, 16]],
-            "all_bad": [["nop", {}, false, 17]]
+            "good": [["compare_eval", {"cmp": "<=", "thres": "<cmp_thres>"}, false, 16]],
+            "bad": [["nop", {}, false, 17]]
         }
     },
     "action": null,

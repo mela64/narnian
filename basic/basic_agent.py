@@ -607,6 +607,17 @@ class BasicAgent(Agent):
         self.out(f"Moving to the next preferred stream ({self.preferred_streams[self.cur_preferred_stream]}){suffix}")
         return True
 
+    def first_pref_stream(self):
+        """Moves to the next stream in the list of preferred ones."""
+
+        if len(self.preferred_streams) == 0:
+            self.err(f"Cannot move to the first stream because the list of preferred streams is empty")
+            return False
+
+        self.cur_preferred_stream = 0
+        self.out(f"Moving to the first preferred stream ({self.preferred_streams[self.cur_preferred_stream]})")
+        return True
+
     def check_pref_stream(self, what: str = "last") -> bool:
         """Check the current preferred stream."""
 

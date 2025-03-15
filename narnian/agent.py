@@ -145,7 +145,7 @@ class Agent:
         else:
             return False
 
-    def add_transit(self, *args, wildcards: dict[str, str] | None = None, **kwargs):
+    def add_transit(self, *args, wildcards: dict[str, str | float | int] | None = None, **kwargs):
         self.behav.set_wildcards(wildcards)
         self.behav.add_transit(*args, **kwargs)
 

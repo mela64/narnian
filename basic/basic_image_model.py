@@ -1,5 +1,6 @@
 import torch
 from narnian.model import Model
+from networks.models import set_seed
 from narnian.attributes import Attributes
 from networks.models import BasicImagePredictor, BasicImagePredictorCNU
 
@@ -13,11 +14,12 @@ class BasicImageModel(Model):
         # getting shape info from attributes (it is needed to build the generator/predictor)
         assert len(attributes) == 2, "Only two attributes are supported/expected (about y and d)"
         d_dim = attributes[1].shape.numel()
+        set_seed(seed)
 
         # calling constructor
         super(BasicImageModel, self).__init__(None,
-                                              BasicImagePredictor(d_dim=d_dim, device=device, seed=seed),
-                                              attributes, device=device, seed=seed)
+                                              BasicImagePredictor(d_dim=d_dim, device=device),
+                                              attributes, device=device)
 
         # extra stuff
         self.optim = torch.optim.SGD(self.predictor.parameters(), lr=lr)
@@ -55,6 +57,7 @@ class BasicImageModelCNU(Model):
         # getting shape info from attributes (it is needed to build the generator/predictor)
         assert len(attributes) == 2, "Only two attributes are supported/expected (about y and d)"
         d_dim = attributes[1].shape.numel()
+        set_seed(seed)
 
         # keeping the same learning rate
         if lr_head is None:
@@ -63,7 +66,7 @@ class BasicImageModelCNU(Model):
         # calling constructor
         super(BasicImageModelCNU, self).__init__(None,
                                                  BasicImagePredictorCNU(d_dim=d_dim, mem_units=mem_units,
-                                                                        device=device, seed=seed, delta=delta,
+                                                                        device=device, delta=delta,
                                                                         scramble=scramble),
                                                  attributes, device=device, seed=seed)
 

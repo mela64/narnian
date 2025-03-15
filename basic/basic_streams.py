@@ -103,3 +103,67 @@ class CombSin(Stream):
         y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases)).view(1, 1)
         d = self.static_d
         return self.adapt_to_attributes(y, d)
+
+
+class SmoothHFLA(CombSin):
+    def __init__(self):
+        freqs = [0.11, 0.07, 0.05]
+        coeffs = [0.4, 0.08, 0.08]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
+        self.attributes[1] = Attributes((3,), ['3sin', 'hf', 'la'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SmoothHFHA(CombSin):
+    def __init__(self):
+        freqs = [0.11, 0.07, 0.05]
+        coeffs = [0.8, 0.16, 0.16]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
+        self.attributes[1] = Attributes((3,), ['3sin', 'hf', 'ha'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SmoothLFLA(CombSin):
+    def __init__(self):
+        freqs = [0.11, 0.07, 0.05]
+        coeffs = [0.08, 0.08, 0.4]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
+        self.attributes[1] = Attributes((3,), ['3sin', 'lf', 'la'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SmoothLFHA(CombSin):
+    def __init__(self):
+        freqs = [0.11, 0.07, 0.05]
+        coeffs = [0.16, 0.16, 0.8]
+        super().__init__(f_cap=freqs, c_cap=coeffs, delta=0.1, order=3)
+        self.attributes[1] = Attributes((3,), ['3sin', 'lf', 'ha'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SquareHFHA(Square):
+    def __init__(self):
+        super().__init__(freq=0.06, phase=0.5, delta=0.1, ampl=1.0)
+        self.attributes[1] = Attributes((3,), ['square', 'hf', 'ha'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SquareHFLA(Square):
+    def __init__(self):
+        super().__init__(freq=0.06, phase=0.5, delta=0.1, ampl=0.5)
+        self.attributes[1] = Attributes((3,), ['square', 'hf', 'la'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SquareLFHA(Square):
+    def __init__(self):
+        super().__init__(freq=0.03, phase=0.5, delta=0.1, ampl=1.0)
+        self.attributes[1] = Attributes((3,), ['square', 'lf', 'ha'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
+
+
+class SquareLFLA(Square):
+    def __init__(self):
+        super().__init__(freq=0.03, phase=0.5, delta=0.1, ampl=0.5)
+        self.attributes[1] = Attributes((3,), ['square', 'lf', 'la'], labeling_rule="geq0.5")
+        self.static_d = torch.ones((1, 3))
