@@ -249,8 +249,10 @@ class _DiagC(torch.nn.Module):
         """ Forward pass with complex-valued transformation. """
 
         # Handle missing inputs
-        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim), device=self.device, dtype=torch.cfloat)
-        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim), device=self.device, dtype=torch.cfloat)
+        u = u.flatten(1).to(self.device) if u is not None else torch.zeros((1, self.u_dim),
+                                                                           device=self.device, dtype=torch.cfloat)
+        du = du.to(self.device) if du is not None else torch.zeros((1, self.du_dim),
+                                                                   device=self.device, dtype=torch.cfloat)
 
         # Reset hidden state if first step
         if first:
@@ -315,21 +317,16 @@ class _CTE(torch.nn.Module):
         du_dim = d_dim
 
         # Antisymmetric weight matrix (W - W^T)
+        self.W = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
+        self.I = torch.eye(h_dim, requires_grad=False, device=device)  # Identity matrix
+
+        # Input projection matrix
+        self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
+
+        # Output projection matrix
         if cnu_memories <= 0:
-            self.W = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
-            self.I = torch.eye(h_dim, requires_grad=False, device=device)  # Identity matrix
-            # Input projection matrix
-            self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
-            # Output projection matrix
             self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
         else:
-            self.W = LinearCNU(h_dim, h_dim, bias=False, device=device, key_size=u_dim + du_dim,
-                               delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
-            self.I = torch.eye(h_dim, requires_grad=False, device=device)  # Identity matrix
-            # Input projection matrix
-            self.B = LinearCNU(u_dim + du_dim, h_dim, bias=False, device=device, key_size=u_dim + du_dim,
-                               delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
-            # Output projection matrix
             self.C = LinearCNU(h_dim, y_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
 
@@ -391,29 +388,26 @@ class _CTE(torch.nn.Module):
             if self.forward_count % self.project_every == 0:
                 self.adjust_eigs()
 
-        if not isinstance(self.W, LinearCNU):
-            weight_W = self.W.weight
-            B = self.B
+        if not isinstance(self.C, LinearCNU):
             C = self.C
         else:
             udu = torch.cat([du, u], dim=1)
-            weight_W = self.W.compute_weights(udu).view(self.W.out_features, self.W.in_features)
-            weight_B = self.B.compute_weights(udu).view(self.B.out_features, self.B.in_features)
             weight_C = self.C.compute_weights(udu).view(self.C.out_features, self.C.in_features)
-            B = lambda x: torch.nn.functional.linear(x, weight_B)
-            C = lambda x: torch.nn.functional.linear(x, weight_C)
+
+            def C(x):
+                return torch.nn.functional.linear(x, weight_C)
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
 
         # Antisymmetric matrix construction
-        A = 0.5 * (weight_W - weight_W.t())
+        A = 0.5 * (self.W.weight - self.W.weight.t())
         A_expm = torch.linalg.matrix_exp(A * self.delta)  # Matrix exponential
         rec = F.linear(h, A_expm, self.W.bias)  # Recurrent component
 
         # Input processing component
         A_inv = torch.linalg.inv(A)
-        inp = A_inv @ (A_expm - self.I) @ B(torch.cat([du, u], dim=1)).unsqueeze(-1)
+        inp = A_inv @ (A_expm - self.I) @ self.B(torch.cat([du, u], dim=1)).unsqueeze(-1)
 
         # Handle locality
         h_new = rec + inp.squeeze(-1)   # updated hidden state
@@ -606,15 +600,11 @@ class _CTBE(torch.nn.Module):
         self.order = h_dim // 2
 
         # Learnable rotational frequencies
+        self.omega = torch.nn.Parameter(torch.empty(self.order, device=device))
+        self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         if cnu_memories <= 0:
-            self.omega = torch.nn.Parameter(torch.empty(self.order, device=device))
-            self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
             self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
         else:
-            self.omega = CNUs(q=1, d=u_dim + du_dim, u=self.order,
-                              delta=1, beta_k=delta, scramble=False, m=cnu_memories)
-            self.B = LinearCNU(u_dim + du_dim, h_dim, bias=False, device=device, key_size=u_dim + du_dim,
-                               delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
             self.C = LinearCNU(h_dim, y_dim, bias=False, device=device, key_size=u_dim + du_dim,
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
 
@@ -637,7 +627,7 @@ class _CTBE(torch.nn.Module):
 
     def reset_parameters(self) -> None:
         """Initialize rotational frequencies"""
-        if isinstance(self.omega, torch.nn.Parameter):
+        if not isinstance(self.omega, CNUs):
             torch.nn.init.uniform_(self.omega)
         else:
             torch.nn.init.uniform_(self.omega.M)
@@ -677,25 +667,22 @@ class _CTBE(torch.nn.Module):
             if self.forward_count % self.project_every == 0:
                 self.adjust_eigs()
 
-        if isinstance(self.omega, torch.nn.Parameter):
-            omega = self.omega
-            B = self.B
+        if not isinstance(self.C, LinearCNU):
             C = self.C
         else:
             udu = torch.cat([du, u], dim=1)
-            omega = self.omega.compute_weights(udu).view(-1)
-            weight_B = self.B.compute_weights(udu).view(self.B.out_features, self.B.in_features)
             weight_C = self.C.compute_weights(udu).view(self.C.out_features, self.C.in_features)
-            B = lambda x: torch.nn.functional.linear(x, weight_B)
-            C = lambda x: torch.nn.functional.linear(x, weight_C)
+
+            def C(x):
+                return torch.nn.functional.linear(x, weight_C)
 
         # handle inputs
         du, u = self.handle_inputs(du, u)
         udu = torch.cat([du, u], dim=1)
 
         # Trigonometric terms for exact rotation
-        cos_t = torch.cos(omega * self.delta)
-        sin_t = torch.sin(omega * self.delta)
+        cos_t = torch.cos(self.omega * self.delta)
+        sin_t = torch.sin(self.omega * self.delta)
 
         # Rotational update
         h1 = cos_t * h_pair[..., 0] + sin_t * h_pair[..., 1]
@@ -703,9 +690,9 @@ class _CTBE(torch.nn.Module):
         rec = torch.stack([h1, h2], dim=-1).flatten(start_dim=1)
 
         # Input processing
-        u_hat = B(udu).view(-1, self.order, 2)
-        inp1 = (sin_t * u_hat[..., 0] - (cos_t - 1) * u_hat[..., 1]) / omega
-        inp2 = ((cos_t - 1) * u_hat[..., 0] + sin_t * u_hat[..., 1]) / omega
+        u_hat = self.B(udu).view(-1, self.order, 2)
+        inp1 = (sin_t * u_hat[..., 0] - (cos_t - 1) * u_hat[..., 1]) / self.omega
+        inp2 = ((cos_t - 1) * u_hat[..., 0] + sin_t * u_hat[..., 1]) / self.omega
         inp = torch.stack([inp1, inp2], dim=-1).flatten(start_dim=1)
 
         # Handle locality
@@ -731,7 +718,7 @@ class _CTBE(torch.nn.Module):
 
 
 class BasicPredictor(torch.nn.Module):
-    """Simple Predictive Network with Tanh Nonlinearity
+    """Simple Predictive Network with Tanh non-linearity
 
     Args:
         y_dim: Input observation dimension
@@ -879,22 +866,20 @@ class BasicTokenGenerator(torch.nn.Module):
         return y
 
 
-class BasicTokenGeneratorCTE(torch.nn.Module):
+class BasicTokenGeneratorCTE(_CTE):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(BasicTokenGeneratorCTE, self).__init__()
         self.device = device
         set_seed(seed)
 
-        self.net = AntisymmetricExpGenerator((emb_dim,), d_dim, y_dim, h_dim,
-                                             delta=1.0, local=False, device=device)
+        super(_CTE, self).__init__((emb_dim,), d_dim, y_dim, h_dim, delta=1.0, local=False, device=device)
         self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
 
     def forward(self, u, du, first=False):
         if u is not None:
             u = self.embeddings(u.to(self.device))
-        y = self.net(u, du, first=first)
+        y = super().forward(u, du, first=first)
         return y
 
 

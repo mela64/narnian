@@ -61,8 +61,6 @@ ag.add_transit("got_agents", "./basic/behaviours/listening_to_teacher.json", act
 # adding agent to environment
 env.add_agent(ag)
 
-env.save()
-
 # printing
 print(env)
 for ag in env.agents.values():
