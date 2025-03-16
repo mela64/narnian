@@ -59,11 +59,11 @@ class GenLinSSM(torch.nn.Module):
         return y
 
 
-class GenLinSSMToken(torch.nn.Module):
+class GenRNNToken(torch.nn.Module):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(GenLinSSMToken, self).__init__()
+        super(GenRNNToken, self).__init__()
         self.device = device
         set_seed(seed)
 

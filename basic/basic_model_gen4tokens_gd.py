@@ -1,7 +1,7 @@
 import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
-from networks.models import GenLinSSMToken
+from networks.models import GenRNNToken
 
 
 class BasicTokenModel(Model):
@@ -17,10 +17,9 @@ class BasicTokenModel(Model):
         y_dim = len(attributes[0])  # the length of the vocabulary
 
         # creating the model (superclass)
-        # can be one of: { BasicTokenGenerator, BasicTokenGeneratorCTE, BasicTokenGeneratorLM }
         super(BasicTokenModel, self).__init__(
-            generator=GenLinSSMToken(num_emb=num_emb, emb_dim=16, d_dim=d_dim, y_dim=y_dim,
-                                     h_dim=100, device=device, seed=seed),
+            generator=GenRNNToken(num_emb=num_emb, emb_dim=16, d_dim=d_dim, y_dim=y_dim,
+                                  h_dim=100, device=device, seed=seed),
             predictor=None,
             attributes=attributes, device=device, seed=seed)
 
