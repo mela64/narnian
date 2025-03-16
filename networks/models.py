@@ -4,8 +4,8 @@ import numpy as np
 import torchvision
 from typing import Callable
 import torch.nn.functional as F
-from networks.cnu.layers import LinearCNU
 from networks.cnu.cnus import CNUs
+from networks.cnu.layers import LinearCNU
 
 
 def hard_tanh(x: torch.Tensor) -> torch.Tensor:
@@ -19,15 +19,91 @@ def set_seed(seed: int) -> None:
         np.random.seed(0)
 
 
-class BasicGenerator(torch.nn.Module):
-    """ Basic generator model with linear transformations and a recurrent hidden state """
-    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = F.tanh,
-                 project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
-        super(BasicGenerator, self).__init__()
+class GenLinSSM(torch.nn.Module):
+
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
+        super(GenLinSSM, self).__init__()
+        self.device = device
+        set_seed(seed)
+
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
-        
+
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
+        self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
+        self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
+        self.h_init = torch.randn((1, h_dim), device=device)
+        self.u_init = torch.zeros((1, u_dim), device=device)
+        self.h = None
+        self.u_dim = u_dim
+        self.du_dim = du_dim
+
+    def forward(self, u, du, first=False):
+        if first:
+            h = self.h_init
+        else:
+            h = self.h.detach()
+        if u is None:
+            u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
+        else:
+            u = u.to(self.device)
+        if du is None:
+            du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
+        else:
+            du = du.to(self.device)
+
+        self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
+        y = self.C(self.h)
+        return y
+
+
+class GenLinSSMToken(torch.nn.Module):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
+        super(GenLinSSMToken, self).__init__()
+        self.device = device
+        set_seed(seed)
+
+        u_dim = emb_dim
+        du_dim = d_dim
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
+        self.B = torch.nn.Linear(u_dim, h_dim, bias=False, device=device)
+        self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
+        self.h_init = torch.randn((1, h_dim), device=device)
+        self.u_init = torch.zeros((1, u_dim), device=device)
+        self.h = None
+        self.y = None
+        self.u_dim = u_dim
+        self.du_dim = du_dim
+
+    def forward(self, u, du, first=False):
+        if first:
+            h = self.h_init
+            u = self.u_init
+        else:
+            h = self.h.detach()
+            u = self.embeddings((torch.argmax(self.y.detach(), dim=1) if self.y.shape[1] > 1
+                                 else self.y.squeeze(1).detach()).to(self.device))
+
+        self.h = torch.tanh(self.A(h) + self.B(u))
+        self.y = self.C(self.h)
+        return self.y
+
+
+class GenCSSM(torch.nn.Module):
+
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = F.tanh,
+                 project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
+        super(GenCSSM, self).__init__()
+        u_shape = torch.Size(u_shape)
+        u_dim = u_shape.numel()
+        du_dim = d_dim
+
         # Define linear transformation matrices for state update and output mapping
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)  # Recurrent weight matrix
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)  # Input-to-hidden mapping
@@ -59,9 +135,7 @@ class BasicGenerator(torch.nn.Module):
 
     @staticmethod
     def handle_inputs(du, u):
-        # in the general case DO NOTHING
-        # return du, u
-        return torch.zeros_like(du), torch.zeros_like(u)
+        return du, u
 
     def forward(self, u, du, first=False):
         """ Forward pass that updates the hidden state and computes the output. """
@@ -76,6 +150,7 @@ class BasicGenerator(torch.nn.Module):
             self.forward_count = 0
         else:
             h = self.h_next
+
         # track the gradients on h from here on
         h.requires_grad_()
 
@@ -110,11 +185,11 @@ class BasicGenerator(torch.nn.Module):
         return y
 
 
-class _DiagR(torch.nn.Module):
+class GenCDiagR(torch.nn.Module):
     """ Diagonal matrix-based generator with real-valued transformations """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = lambda x: x,
                  project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
-        super(_DiagR, self).__init__()
+        super(GenCDiagR, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -201,11 +276,11 @@ class _DiagR(torch.nn.Module):
         return y
 
 
-class _DiagC(torch.nn.Module):
+class GenCDiagC(torch.nn.Module):
     """ Diagonal matrix-based generator with complex-valued transformations """
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, sigma: Callable = lambda x: x,
                  project_every: int = 0, local: bool = False, device: torch.device = torch.device("cpu")):
-        super(_DiagC, self).__init__()
+        super(GenCDiagC, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -294,7 +369,7 @@ class _DiagC(torch.nn.Module):
         return y.real
 
 
-class _CTE(torch.nn.Module):
+class GenCTE(torch.nn.Module):
     """Antisymmetric Matrix Exponential Generator implementing continuous-time dynamics.
 
     Uses antisymmetric weight matrix with matrix exponential for stable hidden state evolution.
@@ -311,7 +386,7 @@ class _CTE(torch.nn.Module):
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
                  sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False,
                  device: torch.device = torch.device("cpu"), cnu_memories: int = 0):
-        super(_CTE, self).__init__()
+        super(GenCTE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -430,7 +505,42 @@ class _CTE(torch.nn.Module):
         return y
 
 
-class _CTB(torch.nn.Module):
+
+class GenCTEInitStateBZeroInput(GenCTE):
+
+    def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
+                 sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False,
+                 device: torch.device = torch.device("cpu"), cnu_memories: int = 0):
+        super(GenCTEInitStateBZeroInput, self).__init__(u_shape, d_dim, y_dim, h_dim, delta, sigma, project_every,
+                                                        local, device, cnu_memories)
+
+    @torch.no_grad()
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.B(udu).detach() / torch.sum(udu)
+
+    @staticmethod
+    def handle_inputs(du, u):
+        return torch.zeros_like(du), torch.zeros_like(u)
+
+
+class GenCTEToken(GenCTE):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
+        self.device = device
+        set_seed(seed)
+
+        super(GenCTE, self).__init__((emb_dim,), d_dim, y_dim, h_dim, delta=1.0, local=False, device=device)
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
+
+    def forward(self, u, du, first=False):
+        if u is not None:
+            u = self.embeddings(u.to(self.device))
+        y = super().forward(u, du, first=first)
+        return y
+
+
+class GenCTB(torch.nn.Module):
     """Block Antisymmetric Generator using 2x2 parameterized rotation blocks.
 
     Implements structured antisymmetric dynamics through learnable rotational frequencies.
@@ -448,7 +558,7 @@ class _CTB(torch.nn.Module):
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float = None,
                  alpha: float = 0., sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False,
                  device: torch.device = torch.device("cpu")):
-        super(_CTB, self).__init__()
+        super(GenCTB, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -574,7 +684,7 @@ class _CTB(torch.nn.Module):
         return y
 
 
-class _CTBE(torch.nn.Module):
+class GenCTBE(torch.nn.Module):
     """Antisymmetric Generator with Exact Matrix Exponential Blocks.
 
     Implements precise rotational dynamics using trigonometric parameterization.
@@ -591,7 +701,7 @@ class _CTBE(torch.nn.Module):
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int, delta: float,
                  sigma: Callable = lambda x: x, project_every: int = 0, local: bool = False,
                  device: torch.device = torch.device("cpu"), cnu_memories: int = 0):
-        super(_CTBE, self).__init__()
+        super(GenCTBE, self).__init__()
         u_shape = torch.Size(u_shape)
         u_dim = u_shape.numel()
         du_dim = d_dim
@@ -717,17 +827,25 @@ class _CTBE(torch.nn.Module):
         return y
 
 
-class BasicPredictor(torch.nn.Module):
-    """Simple Predictive Network with Tanh non-linearity
 
-    Args:
-        y_dim: Input observation dimension
-        d_dim: Prediction dimension
-        h_dim: Hidden state dimension
-    """
+class GenCTBEInitStateBZeroInput(GenCTBE):
+    def __init__(self, u_shape, d_dim, y_dim, h_dim, delta, local, cnu_memories: int = 0):
+        super().__init__(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim, delta=delta, local=local,
+                         cnu_memories=cnu_memories)
+
+    @torch.no_grad()
+    def init_h(self, udu: torch.Tensor) -> torch.Tensor:
+        return self.B(udu).detach() / torch.sum(udu)
+
+    @staticmethod
+    def handle_inputs(du, u):
+        return torch.zeros_like(du), torch.zeros_like(u)
+
+
+class PredLinSSM(torch.nn.Module):
 
     def __init__(self, y_dim: int, d_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
-        super(BasicPredictor, self).__init__()
+        super(PredLinSSM, self).__init__()
         self.device = device
 
         # System matrices
@@ -741,26 +859,53 @@ class BasicPredictor(torch.nn.Module):
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y: torch.Tensor, first: bool = False) -> torch.Tensor:
-        """Simple nonlinear prediction step"""
         y = y.to(self.device)
 
         if first:
             self.h = self.h_init
 
-        # State update
+        # state update
         h = self.A(self.h) + self.B(y)
-        d = self.C(torch.tanh(h))  # Nonlinear projection
+        d = self.C(h)
 
-        # Detach state for next iteration
+        # detach state for next iteration
         self.h.data = h.detach()
 
         return d
 
 
-class BasicImagePredictor(torch.nn.Module):
+class PredLinSSMToken(torch.nn.Module):
+
+    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
+        super(PredLinSSMToken, self).__init__()
+        self.device = device
+        set_seed(seed)
+
+        y_dim = emb_dim
+        self.embeddings = torch.nn.Embedding(num_emb, emb_dim, device=self.device)
+
+        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=self.device)
+        self.B = torch.nn.Linear(y_dim, h_dim, bias=False, device=self.device)
+        self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=self.device)
+        self.register_buffer("h", torch.randn((1, h_dim), device=self.device))
+        self.register_buffer("h_init", self.h.clone())
+        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
+
+    def forward(self, y, first=False):
+        if first:
+            self.h.data = self.h_init
+        y = self.embeddings(y.to(self.device))  # added this
+        h = self.A(self.h) + self.B(y)
+        d = self.C(h)
+        self.h.data = h.detach()
+        return d
+
+
+class PredCNN(torch.nn.Module):
 
     def __init__(self, d_dim: int, device: torch.device = torch.device("cpu")):
-        super(BasicImagePredictor, self).__init__()
+        super(PredCNN, self).__init__()
         self.device = device
 
         self.transforms = torchvision.transforms.Compose([
@@ -791,11 +936,11 @@ class BasicImagePredictor(torch.nn.Module):
         return self.net(self.transforms(y).to(self.device))
 
 
-class BasicImagePredictorCNU(torch.nn.Module):
+class PredCNNCNU(torch.nn.Module):
 
-    def __init__(self, d_dim: int, mem_units: int, device: torch.device = torch.device("cpu"),
+    def __init__(self, d_dim: int, cnu_memories: int, device: torch.device = torch.device("cpu"),
                  delta: int = 1, scramble: bool = False):
-        super(BasicImagePredictorCNU, self).__init__()
+        super(PredCNNCNU, self).__init__()
         self.device = device
 
         self.transforms = torchvision.transforms.Compose([
@@ -818,130 +963,9 @@ class BasicImagePredictorCNU(torch.nn.Module):
             torch.nn.Flatten(),
             torch.nn.Linear(256 * 3 * 3, 2048),
             torch.nn.ReLU(inplace=True),
-            LinearCNU(2048, d_dim, key_mem_units=mem_units, delta=delta, scramble=scramble),
+            LinearCNU(2048, d_dim, key_mem_units=cnu_memories, delta=delta, scramble=scramble),
             torch.nn.Sigmoid()
         ).to(self.device)
 
     def forward(self, y, first=False):
         return self.net(self.transforms(y).to(self.device))
-
-
-class BasicTokenGenerator(torch.nn.Module):
-
-    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(BasicTokenGenerator, self).__init__()
-        self.device = device
-        set_seed(seed)
-
-        u_dim = emb_dim
-        du_dim = d_dim
-        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
-
-        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
-        self.B = lambda x: 0.  # killing every input
-        self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h_init = torch.randn((1, h_dim), device=device)
-        self.u_init = torch.zeros((1, u_dim), device=device)
-        self.h = None
-        self.u_dim = u_dim
-        self.du_dim = du_dim
-
-    def forward(self, u, du, first=False):
-        if first:
-            h = self.h_init
-        else:
-            h = self.h.detach()
-        if u is None:
-            u = torch.zeros((1, self.u_dim), dtype=torch.float32, device=self.device)
-        else:
-            u = self.embeddings(u.to(self.device))  # added this
-        if du is None:
-            du = torch.zeros((1, self.du_dim), dtype=torch.float32, device=self.device)
-        else:
-            du = du.to(self.device)
-
-        self.h = torch.tanh(self.A(h) + self.B(torch.cat([du, u], dim=1)))
-        y = self.C(self.h)
-        return y
-
-
-class BasicTokenGeneratorCTE(_CTE):
-
-    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu"), seed: int = -1):
-        self.device = device
-        set_seed(seed)
-
-        super(_CTE, self).__init__((emb_dim,), d_dim, y_dim, h_dim, delta=1.0, local=False, device=device)
-        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
-
-    def forward(self, u, du, first=False):
-        if u is not None:
-            u = self.embeddings(u.to(self.device))
-        y = super().forward(u, du, first=first)
-        return y
-
-
-class BasicTokenGeneratorLM(torch.nn.Module):
-
-    def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
-                 device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(BasicTokenGeneratorLM, self).__init__()
-        self.device = device
-        set_seed(seed)
-
-        u_dim = emb_dim
-        du_dim = d_dim
-        self.embeddings = torch.nn.Embedding(num_emb, emb_dim)
-
-        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
-        self.B = torch.nn.Linear(u_dim, h_dim, bias=False, device=device)
-        self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h_init = torch.randn((1, h_dim), device=device)
-        self.u_init = torch.zeros((1, u_dim), device=device)
-        self.h = None
-        self.y = None
-        self.u_dim = u_dim
-        self.du_dim = du_dim
-
-    def forward(self, u, du, first=False):
-        if first:
-            h = self.h_init
-            u = self.u_init
-        else:
-            h = self.h.detach()
-            u = self.embeddings((torch.argmax(self.y.detach(), dim=1) if self.y.shape[1] > 1
-                                 else self.y.squeeze(1).detach()).to(self.device))
-
-        self.h = torch.tanh(self.A(h) + self.B(u))
-        self.y = self.C(self.h)
-        return self.y
-
-
-class BasicTokenPredictor(torch.nn.Module):
-
-    def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int,
-                 device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(BasicTokenPredictor, self).__init__()
-        self.device = device
-        set_seed(seed)
-
-        y_dim = emb_dim
-        self.embeddings = torch.nn.Embedding(num_emb, emb_dim, device=self.device)
-
-        self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=self.device)
-        self.B = torch.nn.Linear(y_dim, h_dim, bias=False, device=self.device)
-        self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=self.device)
-        self.register_buffer("h", torch.randn((1, h_dim), device=self.device))
-        self.register_buffer("h_init", self.h.clone())
-        self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
-
-    def forward(self, y, first=False):
-        if first:
-            self.h.data = self.h_init
-        y = self.embeddings(y.to(self.device))  # added this
-        h = self.A(self.h) + self.B(y)
-        d = self.C(torch.tanh(h))
-        self.h.data = h.detach()
-        return d

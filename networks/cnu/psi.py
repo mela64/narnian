@@ -1,6 +1,6 @@
+import math
 import torch
 import torch.nn.functional as F
-import math
 
 
 def psi(x, mode, key_size, normalize=True):
@@ -31,6 +31,7 @@ def resize1d(I, key_size):
     else:
         I = F.interpolate(I.unsqueeze(1), size=key_size, mode="linear").squeeze(1)
     return I
+
 
 def resize2d(I, key_size):
     b, c, h, w = I.shape

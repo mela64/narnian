@@ -3,7 +3,7 @@ from narnian.server import Server
 from narnian.streams import Stream
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
-from basic.basic_model import BasicModel
+from basic.basic_model_gen4all_pred4all_gd import BasicModel
 from basic.basic_streams import Sin, Square
 from basic.basic_environment import BasicEnvironment
 

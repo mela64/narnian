@@ -3,7 +3,7 @@ from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
 from narnian.streams import Stream, ImageDataset
-from basic.basic_image_model import BasicImageModel, BasicImageModelCNU
+from basic.basic_model_pred4images_gd import BasicImageModel, BasicImageModelCNU
 from basic.basic_environment import BasicEnvironment
 
 # creating environment
@@ -45,7 +45,7 @@ ag.add_transit("exam_prepared", "basic/behaviours/teach-playlist_eval-recorded1_
                wildcards={"<agent_name>": ag.name, "<learn_steps>": 40, "<eval_steps>": 30, "<cmp_thres>": 0.4})
 
 # promoting students that were positively evaluated
-ag.add_transit("some_good", "promote", action="set_authority", args={"agent": "<valid_cmp>", "auth": 1.0})
+ag.add_transit("good", "promote", action="set_authority", args={"agent": "<valid_cmp>", "auth": 1.0})
 
 # freeing students
 ag.add_transit("promote", "habilitate", action="send_disengagement")
@@ -58,7 +58,7 @@ ag.add_transit("habilitate", "done_teaching", action="wait_for_actions",
 env.add_agent(ag)
 
 # creating student agent named Mario
-ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attributes, mem_units=5,
+ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attributes, cnu_memories=5,
                                                   lr=0.0001, lr_head=0.005, device=device, seed=42), authority=0.0)
 
 # in principle, he is like Dr. Green...
@@ -93,8 +93,8 @@ for ag in env.agents.values():
     print(ag)
 
 # creating server
-#Server(env=env)
+Server(env=env)
 
 # running
-env.run(steps=411)
+env.run()
 

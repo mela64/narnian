@@ -8,6 +8,7 @@ class Attributes:
     def __init__(self, shape: tuple[int] | torch.Size | None, labels: list[str] | None,
                  labeling_rule: str = "max", data_type: str = "misc",
                  inv_img_transform: torchvision.transforms = None):
+        """Attributes of each component of a stream."""
 
         # type of data
         assert data_type in ["misc", "img", "token_ids"], "Invalid data type"

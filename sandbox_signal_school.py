@@ -2,9 +2,9 @@ import torch
 from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
-from basic.basic_hl_model import BasicHLModel
 from narnian.streams import Stream, BufferedStream
 from basic.basic_environment import BasicEnvironment
+from basic.basic_model_gen4all_hl import BasicHLModel
 from basic.basic_streams import (SmoothHFHA, SmoothHFLA, SmoothLFHA, SmoothLFLA,
                                  SquareHFHA, SquareHFLA, SquareLFHA, SquareLFLA)
 

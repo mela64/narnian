@@ -1,7 +1,7 @@
-import torch
 import math
-import torch.nn.functional as F
+import torch
 from .psi import psi
+import torch.nn.functional as F
 
 
 class CNUs(torch.nn.Module):
@@ -106,9 +106,9 @@ class CNUs(torch.nn.Module):
         if self.debug:
             # getting the top-1 indices for the current mini-batch
             top1_indices_qb = top_indices_bqk[..., 0].t()
-            self.key_counter.scatter_add_(dim=1,
-                                          index=top1_indices_qb,
-                                          src=torch.ones_like(top1_indices_qb, dtype=self.key_counter.dtype))
+            self.key_counter.data.scatter_add_(dim=1,
+                                               index=top1_indices_qb,
+                                               src=torch.ones_like(top1_indices_qb, dtype=self.key_counter.dtype))
 
         # updating keys with the ad-hoc scheme (also refreshing top-stuff: responses, indices, alpha)
         if self.training and self.upd_k == 'ad_hoc_WTA':
@@ -190,7 +190,8 @@ class CNUs(torch.nn.Module):
             self.eta.fill_(self.tau_eta)
 
     def reset_counter(self):
-        self.key_counter = torch.zeros_like(self.key_counter)
+        if self.debug:
+            self.key_counter.data = torch.zeros_like(self.key_counter)
 
     def __top_k_attention(self, x_bd):
         # matmul([b,d], [d,qm]) = [b,qm], then reshaped (view) to [b,q,m]

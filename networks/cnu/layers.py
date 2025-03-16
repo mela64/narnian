@@ -1,8 +1,8 @@
-import torch
 import math
+import torch
+from .cnus import CNUs
 import torch.nn.functional as F
 from collections.abc import Iterable
-from .cnus import CNUs
 
 
 class LinearCNU(CNUs):
@@ -55,7 +55,7 @@ class LinearCNU(CNUs):
         # getting weights
         W = self.compute_weights(x)
 
-        # ensuring the shape is right (needed when neurons share the same same keys)
+        # ensuring the shape is right (needed when neurons share the same keys)
         W = W.reshape((x.shape[0], self.out_features, -1))  # [b,q,1] => [b, out_features,(in_features + 1-if-bias)]
 
         # splitting into weights and biases
@@ -153,7 +153,7 @@ class Conv2d(CNUs):
 
         # size of each key
         if key_size is not None:
-            if isinstance(key_size, (tuple,list)):
+            if isinstance(key_size, (tuple, list)):
                 key_size = math.prod(key_size)
             kwargs['d'] = key_size
         else:

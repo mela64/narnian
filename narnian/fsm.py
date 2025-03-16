@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 
 class FiniteStateMachine:
-    DEBUG = True
+    DEBUG = False
 
     def __init__(self, actionable: object, wildcards: dict[str, str] | None = None):
         self.initial_state = None

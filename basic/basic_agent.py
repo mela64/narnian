@@ -2,7 +2,7 @@ from narnian.model import Model
 from narnian.agent import Agent
 from typing_extensions import Self
 from collections.abc import Iterable
-from narnian.streams import Stream, BufferedStream, Attributes
+from narnian.streams import Stream, BufferedStream
 
 
 class BasicAgent(Agent):
@@ -24,6 +24,8 @@ class BasicAgent(Agent):
         self.last_generated_stream_num = 0  # numerical index of to the last generated stream, if any (1: first)
         self.last_eval_stream_num = 0  # numerical index of to the last evaluated stream, if any (1: first)
         self.failed_communicating_completion = None  # it keeps track of failed __complete_do actions
+
+        # commands that can be handled by the agent
         self.commands_to_send.append("stop_current_action")
         self.commands_to_send.append("kill")
         self.commands_to_receive.append("stop_current_action")

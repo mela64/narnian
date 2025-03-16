@@ -9,6 +9,8 @@ class BasicEnvironment(Environment):
         """Create a new basic environment."""
 
         super(BasicEnvironment, self).__init__(name, title)
+
+        # commands that can be handled by this environment
         self.commands_to_send.append("kill")
         self.commands_to_receive.append("kill")
 

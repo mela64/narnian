@@ -2,9 +2,9 @@ import torch
 from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
-from narnian.streams import Stream, Tokens, BufferedStream
-from basic.basic_token_model import BasicTokenModel
 from basic.basic_environment import BasicEnvironment
+from narnian.streams import Stream, Tokens, BufferedStream
+from basic.basic_model_gen4tokens_gd import BasicTokenModel
 
 # creating environment
 env = BasicEnvironment("env", title="Cat Library")

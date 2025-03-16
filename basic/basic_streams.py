@@ -1,4 +1,3 @@
-import json
 import math
 import torch
 from narnian.streams import Stream
@@ -87,18 +86,15 @@ class CombSin(Stream):
             raise Exception(f"expected float or list for c_cap, not {type(c_cap)}")
 
         # check all the dimensions
-        assert len(self.coeffs) == len(self.freqs), f"specify the same number of coefficients and frequencies (got {len(self.coeffs)} and {len(self.freqs)} respectively)."
+        assert len(self.coeffs) == len(self.freqs), \
+            (f"specify the same number of coefficients and frequencies (got {len(self.coeffs)} "
+             f"and {len(self.freqs)} respectively).")
         self.delta = delta
         self.attributes = [Attributes((1,), None),
                            Attributes((1,), [self.name.lower()])]
         self.static_d = torch.ones((1, 1))
 
-        import json
-        with open(self.name.lower() + '.json', 'w') as f:
-            json.dump({"freqs": str(self.freqs), "coeffs": str(self.coeffs)}, f)
-
     def __getitem__(self, step) -> tuple[torch.Tensor, torch.Tensor] | tuple[None, None]:
-        """returns the input/output pair of sequences and the boolean masks."""
         t = step * self.delta
         y = torch.sum(self.coeffs * torch.sin(2 * math.pi * self.freqs * t + self.phases)).view(1, 1)
         d = self.static_d

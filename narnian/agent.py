@@ -1,5 +1,3 @@
-import os
-import pickle
 import inspect
 from .model import Model
 from .streams import Stream

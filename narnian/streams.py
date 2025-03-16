@@ -1,5 +1,4 @@
 import os
-import re
 import csv
 import math
 import torch
@@ -10,7 +9,7 @@ from .attributes import Attributes
 
 
 class Stream(torch.utils.data.Dataset):
-    k = -1
+    k = -1  # this is the time step signal for all the environment, that is automatically updated for all streams
 
     def __init__(self):
         self.name = "unk"
