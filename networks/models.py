@@ -225,9 +225,7 @@ class GenCDiagR(torch.nn.Module):
 
     @staticmethod
     def handle_inputs(du, u):
-        # in the general case DO NOTHING
-        # return du, u
-        return torch.zeros_like(du), torch.zeros_like(u)
+        return du, u
 
     def forward(self, u, du, first=False):
         """ Forward pass with diagonal transformation. """
@@ -316,9 +314,7 @@ class GenCDiagC(torch.nn.Module):
 
     @staticmethod
     def handle_inputs(du, u):
-        # in the general case DO NOTHING
-        return torch.zeros_like(du), torch.zeros_like(u)
-        # return du, u
+        return du, u
 
     def forward(self, u, du, first=False):
         """ Forward pass with complex-valued transformation. """
@@ -431,7 +427,6 @@ class GenCTE(torch.nn.Module):
 
     @staticmethod
     def handle_inputs(du, u):
-        # in the general case DO NOTHING
         return du, u
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
@@ -626,9 +621,7 @@ class GenCTB(torch.nn.Module):
 
     @staticmethod
     def handle_inputs(du, u):
-        # in the general case DO NOTHING
-        return torch.zeros_like(du), torch.zeros_like(u)
-        # return du, u
+        return du, u
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Forward pass through block-structured dynamics"""
@@ -752,9 +745,7 @@ class GenCTBE(torch.nn.Module):
 
     @staticmethod
     def handle_inputs(du, u):
-        # in the general case DO NOTHING
-        return torch.zeros_like(du), torch.zeros_like(u)
-        # return du, u
+        return du, u
 
     def forward(self, u: torch.Tensor, du: torch.Tensor, first: bool = False) -> torch.Tensor:
         """Exact matrix exponential forward pass"""
