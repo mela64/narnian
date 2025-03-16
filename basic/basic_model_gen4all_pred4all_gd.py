@@ -1,7 +1,7 @@
 import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
-from networks.models import GenLinSSM, PredLinSSM
+from networks.models import GenRNN, PredRNN
 
 
 class BasicModel(Model):
@@ -16,8 +16,8 @@ class BasicModel(Model):
         y_dim = attributes[0].shape.numel()
 
         # creating the model (superclass)
-        super(BasicModel, self).__init__(GenLinSSM(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150),
-                                         PredLinSSM(y_dim=y_dim, d_dim=d_dim, h_dim=3),
+        super(BasicModel, self).__init__(GenRNN(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150),
+                                         PredRNN(y_dim=y_dim, d_dim=d_dim, h_dim=10),
                                          attributes, device=device)
 
         # extra stuff

@@ -19,11 +19,11 @@ def set_seed(seed: int) -> None:
         np.random.seed(0)
 
 
-class GenLinSSM(torch.nn.Module):
+class GenRNN(torch.nn.Module):
 
     def __init__(self, u_shape: tuple[int], d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(GenLinSSM, self).__init__()
+        super(GenRNN, self).__init__()
         self.device = device
         set_seed(seed)
 
@@ -833,10 +833,10 @@ class GenCTBEInitStateBZeroInput(GenCTBE):
         return torch.zeros_like(du), torch.zeros_like(u)
 
 
-class PredLinSSM(torch.nn.Module):
+class PredRNN(torch.nn.Module):
 
     def __init__(self, y_dim: int, d_dim: int, h_dim: int, device: torch.device = torch.device("cpu")):
-        super(PredLinSSM, self).__init__()
+        super(PredRNN, self).__init__()
         self.device = device
 
         # System matrices
@@ -856,7 +856,7 @@ class PredLinSSM(torch.nn.Module):
             self.h = self.h_init
 
         # state update
-        h = self.A(self.h) + self.B(y)
+        h = torch.tanh(self.A(self.h) + self.B(y))
         d = self.C(h)
 
         # detach state for next iteration
@@ -865,11 +865,11 @@ class PredLinSSM(torch.nn.Module):
         return d
 
 
-class PredLinSSMToken(torch.nn.Module):
+class PredRNNToken(torch.nn.Module):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int,  h_dim: int,
                  device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(PredLinSSMToken, self).__init__()
+        super(PredRNNToken, self).__init__()
         self.device = device
         set_seed(seed)
 
@@ -887,7 +887,7 @@ class PredLinSSMToken(torch.nn.Module):
         if first:
             self.h.data = self.h_init
         y = self.embeddings(y.to(self.device))  # added this
-        h = self.A(self.h) + self.B(y)
+        h = torch.tanh(self.A(self.h) + self.B(y))
         d = self.C(h)
         self.h.data = h.detach()
         return d
