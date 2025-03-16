@@ -79,7 +79,7 @@ env.add_agent(ag)
 
 # creating another student agent named Luigi
 ag = BasicAgent("Luigi", model=BasicImageModel(attributes=env.shared_attributes,
-                                               lr=0.0025, device=device, seed=42), authority=0.0) # 0.003
+                                               lr=0.0025, device=device, seed=42), authority=0.0)
 
 # he really acts like Mario
 ag.behave_as(env.agents["Mario"])
