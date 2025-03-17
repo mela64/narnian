@@ -12,5 +12,5 @@ module.exports = {
       xl: '1280px', // Extra large screen
     },
   },
-  plugins: [],
+  plugins: [require("tailwind-scrollbar-hide")],
 };

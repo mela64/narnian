@@ -36,6 +36,7 @@ npm install framer-motion
 npm install lucide-react
 npm install react-dnd
 npm install react-dnd-html5-backend
+npm install tailwind-scrollbar-hide
 ```
 
 - Fix/update packages:

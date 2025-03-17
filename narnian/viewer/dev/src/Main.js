@@ -17,7 +17,9 @@ import {
     GraduationCap,
     Save,
     Upload,
-    Download
+    Download,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 
 let clickTimeout; // timer that triggers a reaction to the click action
@@ -1112,6 +1114,14 @@ export default function Main() {
                                         </button>
                                     </h2>
 
+                                    <StreamButtonContainer
+                                        _streamButtons_={streamButtons}
+                                        _agentButton_={agent_button}
+                                        _handleClick_={handleClick}
+                                        _handleDoubleClick_={handleDoubleClick}
+                                        _handleDrop_={handleDrop}
+                                        _checkIfActive_={checkIfActive}/>
+
                                     <div className={`grid grid-cols-1 ${(openFSMPanels.includes(agent_button.id) &&
                                         openConsolePanels.includes(agent_button.id)) ?
                                         "sm:grid-cols-2" : "sm:grid-cols-1"} gap-4 ${offline ? "hidden" : ""}`}>
@@ -1141,41 +1151,6 @@ export default function Main() {
                                                 </div>
                                             </div>
                                         }
-
-                                    </div>
-
-                                    <div className="flex gap-4 justify-center w-full flex-wrap">
-                                        {streamButtons[agent_button.id]?.map((streamButton) => (
-                                            <AnimatePresence key={streamButton.mergedIds.join("-")}>
-                                                <motion.div initial={{opacity: 0, scale: 0.9}}
-                                                            animate={{opacity: 1, scale: 1}}
-                                                            exit={{opacity: 0, scale: 0.9}}
-                                                            transition={{duration: 0.2}}>
-
-                                                    <DraggableStreamButton
-                                                        _streamButton_={streamButton}
-                                                        _onDrop_={(droppedStreamButton) =>
-                                                            handleDrop(
-                                                                droppedStreamButton.agentButtonId,
-                                                                droppedStreamButton.id,
-                                                                streamButton.agentButtonId,
-                                                                streamButton.id)}
-                                                        _onDoubleClick_={() =>
-                                                            handleDoubleClick(
-                                                                streamButton.agentButtonId,
-                                                                streamButton.id)}
-                                                        _onClick_={() =>
-                                                            handleClick(
-                                                                streamButton.agentButtonId,
-                                                                streamButton.id)}
-                                                        _checkIfActive_={() =>
-                                                            checkIfActive(
-                                                                streamButton.agentButtonId,
-                                                                streamButton.id)}
-                                                    />
-                                                </motion.div>
-                                            </AnimatePresence>
-                                        ))}
                                     </div>
 
                                     <div className={`gap-4 mt-6r  
@@ -1187,15 +1162,17 @@ export default function Main() {
                                             : "grid sm:grid-cols-2") : "grid sm:grid-cols-3"}`}>
                                         {openStreamPanels[agent_button.id]?.map((id) => {
                                             const shouldHidePlotFigure = id < 0;
-                                            if (id < 0) { id = -id; }
+                                            if (id < 0) {
+                                                id = -id;
+                                            }
 
                                             const streamButton = streamButtons[agent_button.id]?.find(
                                                 (btn) => btn.id === id
                                             );
                                             return (
                                                 <div key={id}
-                                                    style={{visibility: shouldHidePlotFigure ? "hidden" : "visible"}}
-                                                    className={`min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
+                                                     style={{visibility: shouldHidePlotFigure ? "hidden" : "visible"}}
+                                                     className={`min-h-[500px] p-0 pt-4 pb-8 bg-gray-50 border
                                                     rounded-xl shadow text-center 
                                                     ${shouldHidePlotFigure ? "hidden" : ""}`}>
                                                     <h3 className="font-medium flex items-center justify-center">
@@ -1245,15 +1222,105 @@ function DraggableStreamButton({_streamButton_, _onDrop_, _onDoubleClick_, _onCl
     return (
         <div
             className={`flex h-6 items-center justify-center px-3 py-4 rounded-2xl shadow-md select-none cursor-move 
-            text-center transition-colors whitespace-nowrap ${ 
+            text-center transition-colors whitespace-nowrap ${
                 _checkIfActive_() ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"
             } ${isDragging ? "opacity-50" : "opacity-100"}`}
             onClick={() => _onClick_(_streamButton_)}
             onDoubleClick={() => _onDoubleClick_(_streamButton_)}
-            ref={(node) => { if (node) drag(drop(node)); }}
+            ref={(node) => {
+                if (node) drag(drop(node));
+            }}
         >
             <span className="w-5 h-5 flex items-center justify-center">{_streamButton_.icon}</span>
             <span className="ml-1">{_streamButton_.label}</span>
         </div>
     );
 }
+
+const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
+                                   _handleClick_, _handleDoubleClick_, _handleDrop_, _checkIfActive_ }) => {
+    const containerRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    // check if scrolling is possible
+    const updateScrollState = () => {
+        if (containerRef.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+            setCanScrollLeft(scrollLeft > 0);
+            setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
+        }
+    };
+
+    // scroll left or right
+    const scroll = (direction) => {
+        if (containerRef.current) {
+            const scrollAmount = containerRef.current.clientWidth / 2; // Scroll by half the container width
+            containerRef.current.scrollBy({ left: direction * scrollAmount, behavior: "smooth" });
+        }
+    };
+
+    // update scroll state on mount and on resize
+    useEffect(() => {
+        updateScrollState();
+        const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+        out("[StreamButtonContainer] useEffect *** updating scroll state to scrollLeft=" +
+            scrollLeft + ", scrollWidth=" + scrollWidth + ", clientWidth=" + clientWidth + " ***");
+        window.addEventListener("resize", updateScrollState);
+        return () => window.removeEventListener("resize", updateScrollState);
+    }, []);
+
+    return (
+        <div className="relative flex items-center w-full">
+            {canScrollLeft && (
+                <button className="absolute top-1/2 -translate-y-1/4 left-0 z-10 bg-white shadow-md rounded-full p-2"
+                        onClick={() => scroll(-1)}>
+                    <ChevronLeft size={24}/>
+                </button>
+            )}
+
+            <div ref={containerRef}
+                 className="flex gap-4 justify-start w-full overflow-x-auto scrollbar-hide
+                 scroll-smooth whitespace-nowrap px-10 pb-2" onScroll={updateScrollState}>
+                {_streamButtons_[_agentButton_.id]?.map((streamButton) => (
+                    <AnimatePresence key={streamButton.mergedIds.join("-")}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <DraggableStreamButton
+                                _streamButton_={streamButton}
+                                _onDrop_={(droppedStreamButton) =>
+                                    _handleDrop_(
+                                        droppedStreamButton.agentButtonId,
+                                        droppedStreamButton.id,
+                                        streamButton.agentButtonId,
+                                        streamButton.id
+                                    )
+                                }
+                                _onDoubleClick_={() =>
+                                    _handleDoubleClick_(streamButton.agentButtonId, streamButton.id)
+                                }
+                                _onClick_={() =>
+                                    _handleClick_(streamButton.agentButtonId, streamButton.id)
+                                }
+                                _checkIfActive_={() =>
+                                    _checkIfActive_(streamButton.agentButtonId, streamButton.id)
+                                }
+                            />
+                        </motion.div>
+                    </AnimatePresence>
+                ))}
+            </div>
+
+            {canScrollRight && (
+                <button className="absolute top-1/2 -translate-y-1/4 right-0 z-10 bg-white shadow-md rounded-full p-2"
+                        onClick={() => scroll(1)}>
+                    <ChevronRight size={24}/>
+                </button>
+            )}
+        </div>
+    );
+};
