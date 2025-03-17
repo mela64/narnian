@@ -256,7 +256,14 @@ class Environment:
                     self.skip_clear_for -= 1
 
             self.step += 1
-            if self.steps is not None and self.step == self.steps:  # or (not state_changed and not in_action):
+
+            # if nothing is changing anymore, let's stop (warning: recall that the stop condition must always be ONLY
+            # on the number of steps, for compatibility with the viewer)
+            if not state_changed and not in_action:
+                self.steps = self.step  # recall to not "break" here, keep it like this
+
+            # stop condition on the number of steps
+            if self.steps is not None and self.step == self.steps:
                 break
 
     def send_command(self, command: str, dest_agent: Agent, data: dict | None = None) -> bool:
