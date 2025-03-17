@@ -59,11 +59,11 @@ class GenRNN(torch.nn.Module):
         return y
 
 
-class GenRNNToken(torch.nn.Module):
+class GenRNNTokenLM(torch.nn.Module):
 
     def __init__(self, num_emb: int, emb_dim: int, d_dim: int, y_dim: int, h_dim: int,
                  device: torch.device = torch.device("cpu"), seed: int = -1):
-        super(GenRNNToken, self).__init__()
+        super(GenRNNTokenLM, self).__init__()
         self.device = device
         set_seed(seed)
 
@@ -402,10 +402,10 @@ class GenCTE(torch.nn.Module):
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
 
         # Hidden state initialization
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
-        self.h_init = self.h.clone()
-        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
-        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.h_init = torch.randn((1, h_dim), device=device)  # buffer
+        self.h_next = torch.empty((1, h_dim), device=device)  # buffer
+        self.h = None
+        self.dh = None
         self.sigma = sigma  # the non-linear activation function
 
         # System parameters
@@ -450,6 +450,7 @@ class GenCTE(torch.nn.Module):
             self.forward_count = 0
         else:
             h = self.h_next
+
         # track the gradients on h from here on
         h.requires_grad_()
 
@@ -498,7 +499,6 @@ class GenCTE(torch.nn.Module):
         self.h_next = h_new.detach()
 
         return y
-
 
 
 class GenCTEInitStateBZeroInput(GenCTE):
@@ -818,7 +818,6 @@ class GenCTBE(torch.nn.Module):
         return y
 
 
-
 class GenCTBEInitStateBZeroInput(GenCTBE):
     def __init__(self, u_shape, d_dim, y_dim, h_dim, delta, local, cnu_memories: int = 0):
         super().__init__(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim, delta=delta, local=local,
@@ -845,7 +844,7 @@ class PredRNN(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=device)
 
         # Hidden state
-        self.register_buffer("h", torch.randn(1, h_dim, device=device))
+        self.h = torch.randn(1, h_dim, device=device)
         self.register_buffer("h_init", self.h.clone())
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 

@@ -187,7 +187,7 @@ export default function Main() {
         out("[Main] useEffect *** fetching data (list of streams for all agents) ***");
 
         agentButtons.forEach((agentButton) => {
-            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id);
+            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id, true); // fava
         });
     }, [isPaused, agentButtons]);
 
@@ -236,7 +236,7 @@ export default function Main() {
             if (prev.includes(_agentButtonId_)) {
                 return prev.filter((pid) => pid !== _agentButtonId_);
             } else {
-                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_);  // for all
+                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, true);  // for all fava
                 return [...prev, _agentButtonId_];
             }
         });
@@ -659,7 +659,7 @@ export default function Main() {
     }
 
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
-    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_) {
+    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _ownedStreamsOnly_) {
 
         function isGenerated(label) {
             const match = label.match(/generated(\d+)/);
@@ -739,7 +739,7 @@ export default function Main() {
                         continue;
                     }
 
-                    // check stream name: is it a generated/target stream?
+                    // check stream name: is it a generated/target or eval/expect stream?
                     const generatedNum = isGenerated(newStreamButtons[z].mergedLabels[0]);
                     const targetNum = isTarget(newStreamButtons[z].mergedLabels[0]);
                     const evalNum = isEval(newStreamButtons[z].mergedLabels[0]);
@@ -819,7 +819,9 @@ export default function Main() {
                             };
 
                             // saving
-                            alteredNewStreamButtons.push(newStreamButton);
+                            if (!_ownedStreamsOnly_ || (_ownedStreamsOnly_ &&
+                                newStreamButton.mergedLabels[0].toLowerCase().startsWith(_agentName_.toLowerCase())))
+                                alteredNewStreamButtons.push(newStreamButton)
 
                             // let's avoid looking again for this button in the original array
                             newStreamButtons[generatedOrEvalZ] = null;
@@ -832,7 +834,9 @@ export default function Main() {
                     if (!isPaired) {
 
                         // simple case: nothing to alter, just get the button as it is
-                        alteredNewStreamButtons.push(newStreamButtons[z]);
+                        if (!_ownedStreamsOnly_ || (_ownedStreamsOnly_ &&
+                            newStreamButtons[z].mergedLabels[0].toLowerCase().startsWith(_agentName_.toLowerCase())))
+                            alteredNewStreamButtons.push(newStreamButtons[z])
                     }
                 }
 
@@ -1122,13 +1126,22 @@ export default function Main() {
                                         _handleDrop_={handleDrop}
                                         _checkIfActive_={checkIfActive}/>
 
-                                    <div className={`grid grid-cols-1 ${(openFSMPanels.includes(agent_button.id) &&
-                                        openConsolePanels.includes(agent_button.id)) ?
-                                        "sm:grid-cols-2" : "sm:grid-cols-1"} gap-4 ${offline ? "hidden" : ""}`}>
-
+                                    <div className={`gap-4 mt-6  
+                                        ${(() => {
+                                        const numOpened =
+                                            openFSMPanels.includes(agent_button.id) +
+                                            openConsolePanels.includes(agent_button.id) +
+                                            (openStreamPanels[agent_button.id]?.filter((id) => id > 0).length
+                                                || 0);
+                                        return `grid ${numOpened === 1 ? "sm:grid-cols-1 max-w-[900px] mx-auto" :
+                                            ((numOpened === 2 ||
+                                                openAgentPanels?.filter((id) => id > 0).length > 1) ?
+                                                "sm:grid-cols-2" :
+                                                "sm:grid-cols-3")}`;
+                                    })()}`}>
                                         {openFSMPanels.includes(agent_button.id) &&
-                                            <div className="h-[400px] w-full flex justify-center">
-                                                <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
+                                            <div className="h-[500px] w-full flex justify-center">
+                                                <div className="w-full p-0 pt-4 pb-5 bg-gray-100
                                                         rounded-xl shadow text-center">
                                                     <h3 className="font-medium">Behaviour</h3>
                                                     <FSM _agentName_={agent_button.label}
@@ -1138,10 +1151,9 @@ export default function Main() {
                                                 </div>
                                             </div>
                                         }
-
                                         {openConsolePanels.includes(agent_button.id) &&
-                                            <div className="h-[400px] w-full flex justify-center">
-                                                <div className="max-w-[500px] w-full p-0 pt-4 pb-5 bg-gray-100
+                                            <div className="h-[500px] w-full flex justify-center">
+                                                <div className="w-full p-0 pt-4 pb-5 bg-gray-100
                                                         rounded-xl shadow text-center">
                                                     <h3 className="font-medium">Console</h3>
                                                     <Console _agentName_={agent_button.label}
@@ -1151,15 +1163,6 @@ export default function Main() {
                                                 </div>
                                             </div>
                                         }
-                                    </div>
-
-                                    <div className={`gap-4 mt-6r  
-                                        ${openStreamPanels[agent_button.id]?.filter((id) => id > 0)
-                                        .length <= 2 ?
-                                        (openStreamPanels[agent_button.id]?.filter((id) => id > 0)
-                                            .length <= 1 ?
-                                            " grid sm:grid-cols-1 max-w-[900px] mx-auto"
-                                            : "grid sm:grid-cols-2") : "grid sm:grid-cols-3"}`}>
                                         {openStreamPanels[agent_button.id]?.map((id) => {
                                             const shouldHidePlotFigure = id < 0;
                                             if (id < 0) {
@@ -1273,22 +1276,25 @@ const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
     return (
         <div className="relative flex items-center w-full">
             {canScrollLeft && (
-                <button className="absolute top-1/2 -translate-y-1/4s left-0 z-10 bg-white shadow-md rounded-full p-2"
+                <button className="absolute top-1/2 -translate-y-1/4s left-6 z-10 bg-white shadow-md rounded-full p-2"
                         onClick={() => scroll(-1)}>
                     <ChevronLeft size={24}/>
                 </button>
             )}
 
+            <button className="w-6 h-6 text-white bg-blue-500 items-center justify-center ml-2">
+                O
+            </button>
             <div ref={containerRef}
                  className="flex gap-4 justify-start w-full overflow-x-auto scrollbar-hide
                  scroll-smooth whitespace-nowrap px-10 pb-2" onScroll={updateScrollState}>
                 {_streamButtons_[_agentButton_.id]?.map((streamButton) => (
                     <AnimatePresence key={streamButton.mergedIds.join("-")}>
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.2 }}
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
                         >
                             <DraggableStreamButton
                                 _streamButton_={streamButton}
