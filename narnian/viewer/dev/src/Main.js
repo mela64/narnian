@@ -1273,7 +1273,7 @@ const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
     return (
         <div className="relative flex items-center w-full">
             {canScrollLeft && (
-                <button className="absolute top-1/2 -translate-y-1/4 left-0 z-10 bg-white shadow-md rounded-full p-2"
+                <button className="absolute top-1/2 -translate-y-1/4s left-0 z-10 bg-white shadow-md rounded-full p-2"
                         onClick={() => scroll(-1)}>
                     <ChevronLeft size={24}/>
                 </button>
