@@ -1,8 +1,8 @@
 import torch
 from narnian.model import Model
-from networks.models import set_seed
+from modules.networks import set_seed
 from narnian.attributes import Attributes
-from networks.models import PredCNN, PredCNNCNU
+from modules.networks import PredCNN, PredCNNCNU
 
 
 class BasicImageModel(Model):

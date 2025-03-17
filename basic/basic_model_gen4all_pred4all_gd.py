@@ -1,7 +1,7 @@
 import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
-from networks.models import GenRNN, PredRNN
+from modules.networks import GenRNN, PredRNN
 
 
 class BasicModel(Model):

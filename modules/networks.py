@@ -4,8 +4,8 @@ import numpy as np
 import torchvision
 from typing import Callable
 import torch.nn.functional as F
-from networks.cnu.cnus import CNUs
-from networks.cnu.layers import LinearCNU
+from modules.cnu.cnus import CNUs
+from modules.cnu.layers import LinearCNU
 
 
 def hard_tanh(x: torch.Tensor) -> torch.Tensor:

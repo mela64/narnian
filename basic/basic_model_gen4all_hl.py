@@ -2,7 +2,7 @@ import torch
 from narnian.model import Model
 from basic.utils.hl_utils import HL
 from narnian.attributes import Attributes
-from networks.models import set_seed, GenCTBEInitStateBZeroInput
+from modules.networks import set_seed, GenCTBEInitStateBZeroInput
 
 
 class BasicHLModel(Model):
