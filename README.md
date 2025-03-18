@@ -112,8 +112,14 @@ To execute the Signal School simulation, run the following command:
 python sandbox_signal_school.py
 ```
 
+---
 
 ### Basic 
+Qui aggiungere un toy example guidato su come usare l'estensione basic
 
 ---
+
+### References
+
+- [bla bla](https://arxiv.org/abs)
 
