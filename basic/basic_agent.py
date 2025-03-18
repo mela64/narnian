@@ -473,7 +473,7 @@ class BasicAgent(Agent):
         return self.__complete_do("learn_gen_and_pred", agent, ret) \
             if self.get_action_step() == steps - 1 else ret
 
-    def done_learn_gen_pred(self, agent: Self, streams: dict):
+    def done_learn_gen_and_pred(self, agent: Self, streams: dict):
         """Confirm learning to generate."""
 
         if len(self.engaged_agents) == 0 or agent not in self.engaged_agents:

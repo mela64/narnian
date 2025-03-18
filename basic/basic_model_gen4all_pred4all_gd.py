@@ -1,7 +1,8 @@
 import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
-from modules.networks import GenRNN, PredRNN
+from modules.networks import PredRNN
+from modules.networks import GenCTBEInitStateBZeroInput
 
 
 class BasicModel(Model):
@@ -15,10 +16,12 @@ class BasicModel(Model):
         d_dim = attributes[1].shape.numel()
         y_dim = attributes[0].shape.numel()
 
+        generator = GenCTBEInitStateBZeroInput(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=0.1,
+                                               local=False, cnu_memories=0)
+        predictor = PredRNN(y_dim=y_dim, d_dim=d_dim, h_dim=10)
+
         # creating the model (superclass)
-        super(BasicModel, self).__init__(GenRNN(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=150),
-                                         PredRNN(y_dim=y_dim, d_dim=d_dim, h_dim=10),
-                                         attributes, device=device)
+        super(BasicModel, self).__init__(generator, predictor, attributes, device=device)
 
         # extra stuff
         self.optim = torch.optim.SGD(list(self.generator.parameters()) + list(self.predictor.parameters()), lr=lr)

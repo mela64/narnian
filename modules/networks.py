@@ -34,15 +34,14 @@ class GenRNN(torch.nn.Module):
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=device)
         self.B = torch.nn.Linear(u_dim + du_dim, h_dim, bias=False, device=device)
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
-        self.h_init = torch.randn((1, h_dim), device=device)
-        self.u_init = torch.zeros((1, u_dim), device=device)
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
         self.h = None
         self.u_dim = u_dim
         self.du_dim = du_dim
 
     def forward(self, u, du, first=False):
         if first:
-            h = self.h_init
+            h = self.h_init.data
         else:
             h = self.h.detach()
         if u is None:
@@ -110,10 +109,10 @@ class GenCSSM(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)  # Hidden-to-output mapping
 
         # Hidden state initialization
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
-        self.h_init = self.h.clone()
-        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
-        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
+        self.register_buffer('h_next', torch.randn((1, h_dim), device=device))
+        self.h = None
+        self.dh = None
         self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
@@ -131,7 +130,7 @@ class GenCSSM(torch.nn.Module):
         pass
 
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.h_init
+        return self.h_init.data
 
     @staticmethod
     def handle_inputs(du, u):
@@ -149,7 +148,7 @@ class GenCSSM(torch.nn.Module):
             h = self.init_h(torch.cat([du, u], dim=1))
             self.forward_count = 0
         else:
-            h = self.h_next
+            h = self.h_next.data
 
         # track the gradients on h from here on
         h.requires_grad_()
@@ -173,13 +172,12 @@ class GenCSSM(torch.nn.Module):
             # in the non-local version we keep track in self.h of the new value of the state
             self.h = h_new
             self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
-        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
         y = self.C(self.sigma(self.h))
 
         # store the new state for the next iteration
-        self.h_next = h_new.detach()
+        self.h_next.data = h_new.detach()
         self.forward_count += 1
 
         return y
@@ -200,10 +198,10 @@ class GenCDiagR(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device)
 
         # Hidden state initialization
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
-        self.h_init = self.h.clone()
-        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
-        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
+        self.register_buffer('h_next', torch.randn((1, h_dim), device=device))
+        self.h = None
+        self.dh = None
         self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
@@ -221,7 +219,7 @@ class GenCDiagR(torch.nn.Module):
         self.diag.weight.copy_(torch.sign(self.diag.weight))
 
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.h_init
+        return self.h_init.data
 
     @staticmethod
     def handle_inputs(du, u):
@@ -239,7 +237,7 @@ class GenCDiagR(torch.nn.Module):
             h = self.init_h(torch.cat([du, u], dim=1))
             self.forward_count = 0
         else:
-            h = self.h_next
+            h = self.h_next.data
         # track the gradients on h from here on
         h.requires_grad_()
 
@@ -262,13 +260,12 @@ class GenCDiagR(torch.nn.Module):
             # in the non-local version we keep track in self.h of the new value of the state
             self.h = h_new
             self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
-        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
         y = self.C(self.sigma(self.h))
 
         # store the new state for the next iteration
-        self.h_next = h_new.detach()
+        self.h_next.data = h_new.detach()
         self.forward_count += 1
 
         return y
@@ -289,10 +286,10 @@ class GenCDiagC(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, y_dim, bias=False, device=device, dtype=torch.cfloat)
 
         # Hidden state initialization
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True, dtype=torch.cfloat)
-        self.h_init = self.h.clone()
-        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False, dtype=torch.cfloat)
-        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True, dtype=torch.cfloat)
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
+        self.register_buffer('h_next', torch.randn((1, h_dim), device=device))
+        self.h = None
+        self.dh = None
         self.sigma = sigma  # the non-linear activation function
 
         # Store input dimensions and device
@@ -310,7 +307,7 @@ class GenCDiagC(torch.nn.Module):
         self.diag.weight.div_(self.diag.weight.abs())
 
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.h_init
+        return self.h_init.data
 
     @staticmethod
     def handle_inputs(du, u):
@@ -330,7 +327,7 @@ class GenCDiagC(torch.nn.Module):
             h = self.init_h(torch.cat([du, u], dim=1))
             self.forward_count = 0
         else:
-            h = self.h_next
+            h = self.h_next.data
         # track the gradients on h from here on
         h.requires_grad_()
 
@@ -353,13 +350,12 @@ class GenCDiagC(torch.nn.Module):
             # in the non-local version we keep track in self.h of the new value of the state
             self.h = h_new
             self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
-        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
         y = self.C(self.sigma(self.h))
 
         # store the new state for the next iteration
-        self.h_next = h_new.detach()
+        self.h_next.data = h_new.detach()
         self.forward_count += 1
 
         return y.real
@@ -402,8 +398,8 @@ class GenCTE(torch.nn.Module):
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
 
         # Hidden state initialization
-        self.h_init = torch.randn((1, h_dim), device=device)  # buffer
-        self.h_next = torch.empty((1, h_dim), device=device)  # buffer
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
+        self.register_buffer('h_next', torch.randn((1, h_dim), device=device))
         self.h = None
         self.dh = None
         self.sigma = sigma  # the non-linear activation function
@@ -423,7 +419,7 @@ class GenCTE(torch.nn.Module):
         pass
 
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.h_init
+        return self.h_init.data
 
     @staticmethod
     def handle_inputs(du, u):
@@ -449,7 +445,7 @@ class GenCTE(torch.nn.Module):
             h = self.init_h(torch.cat([du, u], dim=1))
             self.forward_count = 0
         else:
-            h = self.h_next
+            h = self.h_next.data
 
         # track the gradients on h from here on
         h.requires_grad_()
@@ -490,13 +486,13 @@ class GenCTE(torch.nn.Module):
             # in the non-local version we keep track in self.h of the new value of the state
             self.h = h_new
             self.dh = (self.h - h) / self.delta     # (h_new - h_old) / delta
-        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
         y = C(self.sigma(self.h))
 
         # store the new state for the next iteration
-        self.h_next = h_new.detach()
+        self.h_next.data = h_new
+        self.forward_count += 1
 
         return y
 
@@ -583,10 +579,10 @@ class GenCTB(torch.nn.Module):
             self.register_buffer('alpha', torch.zeros_like(self.omega.data, device=device))
 
         # Hidden state initialization
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
-        self.h_init = self.h.clone()
-        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
-        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
+        self.register_buffer('h_next', torch.randn((1, h_dim), device=device))
+        self.h = None
+        self.dh = None
         self.sigma = sigma  # the non-linear activation function
 
         # System parameters
@@ -617,7 +613,7 @@ class GenCTB(torch.nn.Module):
                 self.ones.div_(module)
 
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.h_init
+        return self.h_init.data
 
     @staticmethod
     def handle_inputs(du, u):
@@ -634,7 +630,7 @@ class GenCTB(torch.nn.Module):
             h = self.init_h(torch.cat([du, u], dim=1))
             self.forward_count = 0
         else:
-            h = self.h_next
+            h = self.h_next.data
         # track the gradients on h from here on
         h.requires_grad_()
         h_pair = h.view(-1, self.order, 2)  # Reshape to (batch, blocks, 2)
@@ -665,13 +661,12 @@ class GenCTB(torch.nn.Module):
             # in the non-local version we keep track in self.h of the new value of the state
             self.h = h_new
             self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
-        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
         y = self.C(self.sigma(self.h))
 
         # store the new state for the next iteration
-        self.h_next = h_new.detach()
+        self.h_next.data = h_new.detach()
         self.forward_count += 1
 
         return y
@@ -712,10 +707,10 @@ class GenCTBE(torch.nn.Module):
                                delta=1, beta_k=delta, scramble=False, key_mem_units=cnu_memories, shared_keys=True)
 
         # Hidden state initialization
-        self.h = torch.randn((1, h_dim), device=device, requires_grad=True)
-        self.h_init = self.h.clone()
-        self.h_next = torch.empty((1, h_dim), device=device, requires_grad=False)
-        self.dh = torch.zeros_like(self.h, device=device, requires_grad=True)
+        self.register_buffer('h_init', torch.randn((1, h_dim), device=device))
+        self.register_buffer('h_next', torch.randn((1, h_dim), device=device))
+        self.h = None
+        self.dh = None
         self.sigma = sigma  # the non-linear activation function
 
         # System parameters
@@ -741,7 +736,7 @@ class GenCTBE(torch.nn.Module):
         pass
 
     def init_h(self, udu: torch.Tensor) -> torch.Tensor:
-        return self.h_init
+        return self.h_init.data
 
     @staticmethod
     def handle_inputs(du, u):
@@ -758,7 +753,7 @@ class GenCTBE(torch.nn.Module):
             h = self.init_h(torch.cat([du, u], dim=1))
             self.forward_count = 0
         else:
-            h = self.h_next
+            h = self.h_next.data
         # track the gradients on h from here on
         h.requires_grad_()
         h_pair = h.view(-1, self.order, 2)
@@ -806,13 +801,12 @@ class GenCTBE(torch.nn.Module):
             # in the non-local version we keep track in self.h of the new value of the state
             self.h = h_new
             self.dh = (self.h - h) / self.delta  # (h_new - h_old) / delta
-        # self.h.retain_grad()
 
         # Compute output using a nonlinear activation function
         y = C(self.sigma(self.h))
 
         # store the new state for the next iteration
-        self.h_next = h_new.detach()
+        self.h_next.data = h_new.detach()
         self.forward_count += 1
 
         return y
@@ -844,22 +838,22 @@ class PredRNN(torch.nn.Module):
         self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=device)
 
         # Hidden state
-        self.h = torch.randn(1, h_dim, device=device)
-        self.register_buffer("h_init", self.h.clone())
+        self.register_buffer("h_init", torch.randn(1, h_dim, device=device))
+        self.h = None
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y: torch.Tensor, first: bool = False) -> torch.Tensor:
         y = y.to(self.device)
 
         if first:
-            self.h = self.h_init
+            self.h = self.h_init.data
 
         # state update
         h = torch.tanh(self.A(self.h) + self.B(y))
         d = self.C(h)
 
         # detach state for next iteration
-        self.h.data = h.detach()
+        self.h = h.detach()
 
         return d
 
@@ -878,17 +872,17 @@ class PredRNNToken(torch.nn.Module):
         self.A = torch.nn.Linear(h_dim, h_dim, bias=False, device=self.device)
         self.B = torch.nn.Linear(y_dim, h_dim, bias=False, device=self.device)
         self.C = torch.nn.Linear(h_dim, d_dim, bias=False, device=self.device)
-        self.register_buffer("h", torch.randn((1, h_dim), device=self.device))
-        self.register_buffer("h_init", self.h.clone())
+        self.register_buffer("h_init", torch.randn((1, h_dim), device=self.device))
+        self.h = None
         self.local = False  # if True the state update is computed locally in time (i.e., kept out from the graph)
 
     def forward(self, y, first=False):
         if first:
-            self.h.data = self.h_init
+            self.h = self.h_init.data
         y = self.embeddings(y.to(self.device))  # added this
         h = torch.tanh(self.A(self.h) + self.B(y))
         d = self.C(h)
-        self.h.data = h.detach()
+        self.h = h.detach()
         return d
 
 
