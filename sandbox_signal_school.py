@@ -42,13 +42,13 @@ ag.add_transit("got_contacts", "basic/behaviours/teach-playlist_eval-playlist-la
                wildcards={"<agent_name>": ag.name, "<learn_steps>": 1000, "<eval_steps>": 1000, "<cmp_thres>": 0.2})
 
 # testing generalization
-ag.add_transit("finished_work", "generalize", action="ask_gen",
+ag.add_transit("finished_work", "hard_exam_in_progress", action="ask_gen",
                args={"du_hash": env.name + ":squLfLa",  "dhat_hash": env.name + ":squLfLa", "ask_steps": 1000})
-ag.add_transit("generalize", "time_to_eval_again", action="done_gen")
-ag.add_state_action("time_to_eval_again", action="eval",
+ag.add_transit("hard_exam_in_progress", "eval_time_again", action="done_gen")
+ag.add_state_action("eval_time_again", action="eval",
                     args={"stream_hash": env.name + ":squLfLa", "what": "y", "how": "mse", "steps": 1000})
-ag.add_transit("time_to_eval_again", "very_good", action="compare_eval", args={"cmp": "<=", "thres": 0.2})
-ag.add_transit("time_to_eval_again", "not_good", action="nop")
+ag.add_transit("eval_time_again", "very_good", action="compare_eval", args={"cmp": "<=", "thres": 0.2})
+ag.add_transit("eval_time_again", "not_good", action="nop")
 
 # adding agent to environment
 env.add_agent(ag)

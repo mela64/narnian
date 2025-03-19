@@ -543,12 +543,12 @@ class BasicAgent(Agent):
                 alias = 'mark'
 
             if outcome:
-                msgs.append(f"Agent {agent.name} passed with {alias} {eval_result}/{thres})")
+                msgs.append(f"Agent {agent.name} passed with {alias} {eval_result}/{thres}")
                 self.valid_cmp_agents.append(agent)
             else:
                 msgs.append(f"Agent {agent.name} did not pass")
 
-            if len(msgs) > 0:
+            if len(msgs) > 1:
                 msgs[-1] = msgs[-1].lower()[0] + msgs[-1][1:]
 
         if len(self.valid_cmp_agents) == 0:
