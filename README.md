@@ -1,6 +1,14 @@
-# NARNIAN - NAtuRe iNspired Intelligent AgeNts
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/torch)
 
+
+<center>
+
+![d](imgs/its_narnian.jpg)
+
+</center>
+
+#  <center> NARNIAN - NAtuRe iNspired Intelligent AgeNts </center>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/torch)
 
 ## What is it?
 
@@ -71,6 +79,17 @@ narnian/
 #### Basic Instance
 A basic instance of the Narnian framework is available in the **./basic** folder. It contains an example of a simulated environment where agents named students and a teacher coexist. The teacher records information from the environment and then teaches the students using that information. After a learning run, the students are evaluated on their capabilities, and the teacher decides if a student is ready to become a teacher or if it needs more assistance with several runs.
 
+```	
+narnian/
+├── basic/
+|   ├── utils
+|   |   ├── hl_utils.py
+│   ├── <r>basic_agent.py <r>           # Manages an agent's behavior, communication, and interactions
+│   ├── attributes.py       # Manages attributes and labels for streams
+│   ├── basic_environment.py      # Defines the environment where agents and streams interact
+│   ├── basic_model_*.py            # Contains the core simulation models
+│   ├── basic_streams.py          # Handles real-time data streams      
+```
 
 ### Examples
 
