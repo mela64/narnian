@@ -95,24 +95,5 @@ for ag in env.agents.values():
 # creating server
 Server(env=env)
 
-env.save()
-
 # running
-env.run(checkpoints=[
-    {"agent": "Dr. Green",
-     "state": "student_engaged",
-     "show":
-         {
-             "Mario": ["behavior", env.name + ":albatross", env.name + ":all"],
-             "Luigi": ["console", env.name + ":giraffe"]
-         }
-     },
-    {"agent": "Luigi",
-     "state": "done_learning_to_pred",
-     "show":
-         {
-             "Mario": ["behavior", env.name + ":giraffe"],
-             "Luigi": ["behavior", env.name + ":all"]
-         }
-     }
-])
+env.run()
