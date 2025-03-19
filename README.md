@@ -63,36 +63,67 @@ python sandbox_example.py # A simple example of a Narnian simulation.
 
 Narnian is structured as follows:
 
-<div style="font-family: monospace;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>narnian Folder Tree</title>
+  <style>
+    .agent       { color: red; }
+    .attributes  { color: blue; }
+    .environment { color: green; }
+    .model       { color: purple; }
+    .streams     { color: orange; }
+    pre { font-family: monospace; }
+  </style>
+</head>
+<body>
 <pre>
 narnian/
 ├── narnian/
-│   ├── __init__.py               # Package initializer
-│   ├── <span style="color: red;">agents.py</span>           # Manages an agent's behavior, communication, and interactions
-│   ├── <span style="color: blue;">attributes.py</span>      # Manages attributes and labels for streams
-│   ├── <span style="color: green;">environment.py</span>    # Defines the environment where agents and streams interact
-│   ├── fsm.py                    # Implements Finite State Machines for agent behaviors
-│   ├── <span style="color: purple;">model.py</span>         # Contains the core simulation models
-│   ├── server.py                 # Manages a server which makes the narnian world accessible through a web app
-│   ├── <span style="color: orange;">streams.py</span>       # Handles real-time data streams
+│   ├── __init__.py         # Package initializer
+│   ├── <span class="agent">agents.py</span>           # Manages an agent's behavior, communication, and interactions
+│   ├── <span class="attributes">attributes.py</span>       # Manages attributes and labels for streams
+│   ├── <span class="environment">environment.py</span>      # Defines the environment where agents and streams interact
+│   ├── fsm.py              # Implements Finite State Machines for agent behaviors
+│   ├── <span class="model">model.py</span>            # Contains the core simulation models
+│   ├── server.py           # Manages a server which makes the narnian world accessible through a web app
+│   ├── <span class="streams">streams.py</span>          # Handles real-time data streams      
 </pre>
-</div>
+</body>
+</html>
 
 #### Basic Instance
 A basic instance of the Narnian framework is available in the **./basic** folder. It contains an example of a simulated environment where agents named students and a teacher coexist. The teacher records information from the environment and then teaches the students using that information. After a learning run, the students are evaluated on their capabilities, and the teacher decides if a student is ready to become a teacher or if it needs more assistance with several runs.
 
-<div style="font-family: monospace;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>narnian Basic Folder Tree</title>
+  <style>
+    .agent       { color: red; }
+    .attributes  { color: blue; }
+    .environment { color: green; }
+    .model       { color: purple; }
+    .streams     { color: orange; }
+    pre { font-family: monospace; }
+  </style>
+</head>
+<body>
 <pre>
 narnian/
 ├── basic/
-│   ├── utils
+│   ├── utils/
 │   │   ├── hl_utils.py
-│   ├── <span style="color: red;">basic_agent.py</span>      
-│   ├── <span style="color: green;">basic_environment.py</span>
-│   ├── <span style="color: purple;">basic_model_*.py</span>
-│   ├── <span style="color: orange;">basic_streams.py</span>
+│   ├── <span class="agent">basic_agent.py</span>           # Manages an agent's behavior, communication, and interactions
+│   ├── <span class="attributes">attributes.py</span>       # Manages attributes and labels for streams
+│   ├── <span class="environment">basic_environment.py</span>      # Defines the environment where agents and streams interact
+│   ├── <span class="model">basic_model_*.py</span>            # Contains the core simulation models
+│   ├── <span class="streams">basic_streams.py</span>          # Handles real-time data streams      
 </pre>
-</div>
+</body>
+</html>
 
 ### Examples
 
