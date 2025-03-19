@@ -149,6 +149,10 @@ export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
             if (index >= receivedText.length) {
                 clearInterval(interval);
             }
+            else if (index >= 250) {
+                setDisplayedText((prev) => receivedText.slice(0, index + 1) + "...");
+                clearInterval(interval);
+            }
         }, 100); // 0.1 seconds per character
 
         return () => clearInterval(interval);
@@ -227,9 +231,9 @@ export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
 
     return (
         <div className="relative">
-            <div className="absolute top-1/2 transform left-7 -translate-y-1/2 z-50">
+            <div className="absolute top-1/2 transform left-7 -translate-y-1/2 z-50 max-h-48">
                 <div
-                    className={`relative flex justify-center items-center w-[400px] h-16 bg-white border-2 border-black
+                    className={`relative flex justify-center items-center w-[400px] min-h-16 max-h-48 bg-white border-2 border-black
             rounded-full p-4 shadow-lg ${(!receivedText || receivedText.length === 0) ? "hidden": ""}`}>
                     <motion.p
                         className="text-center text-base"

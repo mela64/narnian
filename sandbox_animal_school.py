@@ -3,8 +3,8 @@ from narnian.server import Server
 from narnian.model import EmptyModel
 from basic.basic_agent import BasicAgent
 from narnian.streams import Stream, ImageDataset
-from basic.basic_model_pred4images_gd import BasicImageModel, BasicImageModelCNU
 from basic.basic_environment import BasicEnvironment
+from basic.basic_model_pred4images_gd import BasicImageModel, BasicImageModelCNU
 
 # creating environment
 env = BasicEnvironment("Env", title="Animal School")

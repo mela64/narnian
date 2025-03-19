@@ -1,64 +1,64 @@
 {
-    "initial_state": "ready_to_teach",
-    "state": "ready_to_teach",
+    "initial_state": "looking_for_students",
+    "state": "looking_for_students",
     "prev_state": null,
     "limbo_state": null,
     "state_actions": {
-        "ready_to_teach": ["find_agent_to_engage", {"min_auth": 0.0, "max_auth": 0.0}, 0],
+        "looking_for_students": ["find_agent_to_engage", {"min_auth": 0.0, "max_auth": 0.0}, 0],
         "student_found": [null, null, 1],
         "student_engaged": [null, null, 2],
-        "time_to_teach": [null, null, 3],
-        "asked_learn": [null, null, 4],
-        "done_learn": [null, null, 5],
-        "change_stream": ["next_pref_stream", {}, 6],
-        "exam_time": [null, null, 7],
-        "time_to_work": [null, null, 8],
-        "asked_gen": [null, null, 9],
-        "done_gen": [null, null, 10],
-        "time_to_eval": ["eval", {"stream_hash": "<agent_name>:recorded1", "what": "y", "how": "mse", "steps": "<eval_steps>"}, 11],
+        "teaching_time": [null, null, 3],
+        "lecture_in_progress": [null, null, 4],
+        "student_finished_following": [null, null, 5],
+        "change_lecture": ["next_pref_stream", {}, 6],
+        "done_teaching": [null, null, 7],
+        "exam_time": [null, null, 8],
+        "exam_in_progress": [null, null, 9],
+        "student_finished_exam": [null, null, 10],
+        "eval_time": ["eval", {"stream_hash": "<agent_name>:recorded1", "what": "y", "how": "mse", "steps": "<eval_steps>"}, 11],
         "bad": [null, null, 12],
         "good": [null, null, 13]
     },
     "transitions": {
-        "ready_to_teach": {
+        "looking_for_students": {
             "student_found": [["send_engagement", {}, false, 0]]
         },
         "student_found": {
-            "ready_to_teach": [["nop", {}, false, 1]],
+            "looking_for_students": [["nop", {}, false, 1]],
             "student_engaged": [["got_engagement", {}, false, 2]]
         },
         "student_engaged": {
             "student_engaged": [["got_engagement", {}, false, 3]],
-            "time_to_teach": [["nop", {}, false, 4]]
+            "teaching_time": [["nop", {}, false, 4]]
         },
-        "time_to_teach": {
-            "asked_learn": [["ask_learn_gen", {"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": "<learn_steps>"}, false, 5]]
+        "teaching_time": {
+            "lecture_in_progress": [["ask_learn_gen", {"du_hash": "<playlist>", "yhat_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": "<learn_steps>"}, false, 5]]
         },
-        "asked_learn": {
-            "done_learn": [["done_learn_gen", {}, false, 6]]
+        "lecture_in_progress": {
+            "student_finished_following": [["done_learn_gen", {}, false, 6]]
         },
-        "done_learn": {
-            "done_learn": [["done_learn_gen", {}, false, 7]],
-            "change_stream": [["nop", {}, false, 8]]
+        "student_finished_following": {
+            "student_finished_following": [["done_learn_gen", {}, false, 7]],
+            "change_lecture": [["nop", {}, false, 8]]
         },
-        "change_stream": {
-            "student_engaged": [["check_pref_stream", {"what": "not_first"}, false, 9]],
-            "exam_time": [["check_pref_stream", {"what": "first"}, false, 10]]
+        "change_lecture": {
+            "teaching_time": [["check_pref_stream", {"what": "not_first"}, false, 9]],
+            "done_teaching": [["check_pref_stream", {"what": "first"}, false, 10]]
+        },
+        "done_teaching": {
+            "exam_time": [["share_streams", {}, false, 11]]
         },
         "exam_time": {
-            "time_to_work": [["share_streams", {}, false, 11]]
+            "exam_in_progress": [["ask_gen", {"du_hash": "<agent_name>:recorded1",  "dhat_hash": "<agent_name>:recorded1", "ask_steps": "<eval_steps>"}, false, 12]]
         },
-        "time_to_work": {
-            "asked_gen": [["ask_gen", {"du_hash": "<agent_name>:recorded1",  "dhat_hash": "<agent_name>:recorded1", "ask_steps": "<eval_steps>"}, false, 12]]
+        "exam_in_progress": {
+            "student_finished_exam": [["done_gen", {}, false, 13]]
         },
-        "asked_gen": {
-            "done_gen": [["done_gen", {}, false, 13]]
+        "student_finished_exam": {
+            "student_finished_exam": [["done_gen", {}, false, 14]],
+            "eval_time": [["nop", {}, false, 15]]
         },
-        "done_gen": {
-            "done_gen": [["done_gen", {}, false, 14]],
-            "time_to_eval": [["nop", {}, false, 15]]
-        },
-        "time_to_eval": {
+        "eval_time": {
             "good": [["compare_eval", {"cmp": "<=", "thres": "<cmp_thres>"}, false, 16]],
             "bad": [["nop", {}, false, 17]]
         }

@@ -44,8 +44,6 @@ Thumbs.db        # Windows
 .ipynb_checkpoints/
 
 # Misc
-/*.json
-/*.JSON
 /*.pdf
 /*.PDF
 output/
