@@ -694,10 +694,6 @@ video {
   height: 3rem;
 }
 
-.h-16 {
-  height: 4rem;
-}
-
 .h-5 {
   height: 1.25rem;
 }
@@ -712,6 +708,14 @@ video {
 
 .h-full {
   height: 100%;
+}
+
+.max-h-48 {
+  max-height: 12rem;
+}
+
+.min-h-16 {
+  min-height: 4rem;
 }
 
 .min-h-\[500px\] {
