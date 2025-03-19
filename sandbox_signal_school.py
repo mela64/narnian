@@ -76,4 +76,4 @@ for ag in env.agents.values():
 Server(env=env)
 
 # running
-env.run()
+env.run(checkpoints="sandbox_signal_school_checkpoints.json")
