@@ -9,7 +9,7 @@ Narnian is a nature-inspired framework that simulates an evolving ecosystem of i
 ## Dictionary of Key Concepts
 
 - **Agents**  
-  Narnian is roled by Agents, an agent is an entity that can interact with the environment. Agents can be human or artificial, and they can have different levels of intelligence and different learning capabilities. Agents can be controlled by the user, or they can be controlled by the framework itself. An agent can be a student, a teacher, or any other entity that can interact with the environment. Each agent is represented by its Finite State Machine (FSM) which role its behavior.
+  Narnian is roled by Agents, an agent is an entity that can interact with the environment and with the other agents living in it. Agents can be human or artificial, and they can have different levels of intelligence and different learning capabilities. Agents can be controlled by the user, or they can be controlled by the framework itself. An agent can be a student, a teacher, or any other entity that can interact with the environment. Each agent is represented by its Finite State Machine (FSM) which role its behavior.
 
 - **Streams**  
   Real-time data flows representing sensory informations or descriptors from the environment.
