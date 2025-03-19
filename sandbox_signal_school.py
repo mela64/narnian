@@ -33,7 +33,7 @@ ag = BasicAgent("Dr. Green", model=EmptyModel(), authority=1.0)
 ag.add_transit("init", "basic/behaviours/getting_from_env.json", action="nop")
 
 # engaging students, teaching and, afterward, evaluating students
-ag.add_transit("got_agents", "basic/behaviours/teach-playlist_eval-playlist-lastrep_looped_gen.json",
+ag.add_transit("got_contacts", "basic/behaviours/teach-playlist_eval-playlist-lastrep_looped_gen.json",
                action="set_pref_streams", args={"stream_hashes": [env.name + ":smoHfHa", env.name + ":smoHfLa",
                                                                   env.name + ":smoLfHa", env.name + ":smoLfLa",
                                                                   env.name + ":squHfHa", env.name + ":squHfLa",
@@ -61,7 +61,7 @@ ag = BasicAgent("Mario", model=BasicHLModel(attributes=env.shared_attributes, de
 ag.add_transit("init", "basic/behaviours/getting_from_env.json", action="nop")
 
 # generic behaviour of a student who listens to the requests from the teacher
-ag.add_transit("got_agents", "./basic/behaviours/listening_to_teacher.json", action="get_engagement",
+ag.add_transit("got_contacts", "./basic/behaviours/listening_to_teacher.json", action="get_engagement",
                args={"min_auth": 1.0, "max_auth": 1.0})
 
 # adding agent to environment

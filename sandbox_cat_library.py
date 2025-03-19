@@ -25,7 +25,7 @@ ag = BasicAgent("Dr. Green", model=EmptyModel(), authority=1.0)
 ag.add_transit("init", "basic/behaviours/getting_from_env.json", action="nop")
 
 # preparing book
-ag.add_transit("got_agents", "book_prepared", action="record",
+ag.add_transit("got_contacts", "book_prepared", action="record",
                args={"stream_hash": env.name + ":cats", "steps": 998})
 
 # engaging students, teaching and, afterward, evaluating students
@@ -44,10 +44,10 @@ ag = BasicAgent("Mario", model=BasicTokenModel(attributes=env.shared_attributes,
 ag.behave_as(env.agents["Dr. Green"])
 
 # ...however, he is not ready yet to prepare books and teach
-ag.wait_for_actions(ag, "got_agents", "book_prepared", wait=True)
+ag.wait_for_actions(ag, "got_contacts", "book_prepared", wait=True)
 
 # generic behaviour of a student who listens to the requests from the teacher
-ag.add_transit("got_agents", "basic/behaviours/listening_to_teacher.json", action="get_engagement",
+ag.add_transit("got_contacts", "basic/behaviours/listening_to_teacher.json", action="get_engagement",
                args={"min_auth": 1.0, "max_auth": 1.0})
 
 # adding agent to environment

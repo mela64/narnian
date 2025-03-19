@@ -171,7 +171,9 @@ class Server:
 
     def get_play_pause_status(self):
         ret = {'status': None,
-               'still_to_play': self.env.skip_clear_for}
+               'still_to_play': self.env.skip_clear_for,
+               'show': self.env.what_to_show_on_checkpoint,
+               'checkpoint_available': (self.env.next_checkpoint >= 0)}
         if self.env.step == self.env.steps:
             ret['status'] = 'ended'
         elif self.env.step_event.is_set():
@@ -271,11 +273,23 @@ class Server:
 
     def get_console(self):
         agent_name = request.args.get('agent_name')
+        last_only = request.args.get('last_only')
         agent = self.env.agents[agent_name] if agent_name != self.env.name else self.env
-        return Server.pack_data({'output_messages': agent.output_messages,
-                                 'output_messages_count': agent.output_messages_count,
-                                 'output_messages_last_pos': agent.output_messages_last_pos,
-                                 'output_messages_ids': agent.output_messages_ids})
+        behav = self.env.agents[agent_name].behav if agent_name != self.env.name else self.env.behav
+        state = behav.states[behav.state][2] if behav.state is not None else None
+        action = behav.action[2] if behav.action is not None else None
+        if last_only is None or not last_only:
+            return Server.pack_data({'output_messages': agent.output_messages,
+                                     'output_messages_count': agent.output_messages_count,
+                                     'output_messages_last_pos': agent.output_messages_last_pos,
+                                     'output_messages_ids': agent.output_messages_ids,
+                                     'behav_status': {'state': state, 'action': action}})
+        else:
+            return Server.pack_data({'output_messages': [agent.output_messages[agent.output_messages_last_pos]],
+                                     'output_messages_count': 1,
+                                     'output_messages_last_pos': 0,
+                                     'output_messages_ids': [agent.output_messages_ids[agent.output_messages_last_pos]],
+                                     'behav_status': {'state': state, 'action': action}})
 
     def save(self):
         return Server.pack_data(self.env.save())

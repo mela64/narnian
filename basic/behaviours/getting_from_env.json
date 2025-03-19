@@ -1,19 +1,19 @@
 {
-    "initial_state": "ready_to_get",
-    "state": "ready_to_get",
+    "initial_state": "waiting_for_info",
+    "state": "waiting_for_info",
     "prev_state": null,
     "limbo_state": null,
     "state_actions": {
-        "ready_to_get": [null, null, 0],
+        "waiting_for_info": [null, null, 0],
         "got_streams": [null, null, 1],
-        "got_agents": [null, null, 2]
+        "got_contacts": [null, null, 2]
     },
     "transitions": {
-        "ready_to_get": {
+        "waiting_for_info": {
             "got_streams": [["get_streams", {}, false, 0]]
         },
         "got_streams": {
-            "got_agents": [["get_agents", {}, false, 1]]
+            "got_contacts": [["get_agents", {}, false, 1]]
         }
     },
     "action": null,

@@ -21,6 +21,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
 
     // state of the SVG area (structured as {width: a, height: b})
     const [svgSize, setSvgSize] = useState({width: 0, height: 0});
+    const svgSizeRef = useRef(svgSize);
 
     // flag to recall when the data is being loaded through the API call
     const [loading, setLoading] = useState(true);
@@ -114,7 +115,14 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             if (svgRef.current) {
                 const {width, height} = svgRef.current.getBoundingClientRect();
                 out("[FSM] handleResize -> setSvgSize to width: " + width + ", height: " + height);
-                setSvgSize({width, height});
+                if (svgSizeRef.current.width === 0 && svgSizeRef.current.height === 0) {
+                    setSvgSize(() => {
+                            const newSize = {width, height};
+                            svgSizeRef.current = newSize;
+                            return newSize;
+                        }
+                    );
+                }
             }
         };
 
@@ -172,7 +180,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         const zoomToEdge = (edge) => {
             const centerX = (edge.source.x + edge.target.x) / 2;
             const centerY = (edge.source.y + edge.target.y) / 2;
-            const scale = 2;
+            const scale = 1.3;
             d3_interrupt(svg, activeZoomTransitionRef.current);  // stopping other possibly running transitions (zooms)
             activeZoomTransitionRef.current = svg.transition().duration(750)
                 .call(zoom.transform, d3_zoomIdentity.translate(width / 2, height / 2)
@@ -180,7 +188,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         };
 
         const zoomToNode = (node) => {
-            const scale = 2;
+            const scale = 1.3;
             d3_interrupt(svg, activeZoomTransitionRef.current);  // stopping other possibly running transitions (zooms)
             activeZoomTransitionRef.current = svg.transition().duration(750)
                 .call(zoom.transform, d3_zoomIdentity.translate(width / 2, height / 2)
@@ -310,8 +318,8 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             .attr("text-anchor", "middle")
             .style("font-size", "12px")
             .style("pointer-events", "none")
-            .attr("x", (d, i) => (d.source.x + d.target.x) / 2)
-            .attr("y", (d, i) => (d.source.y + d.target.y) / 2)
+            .attr("x", (d) => (0.3 * d.source.x + 0.7 * d.target.x))
+            .attr("y", (d) => (0.6 * d.source.y + 0.4 * d.target.y))
             .attr("id", (d) => (d.id))
             .style("cursor", "default")
             .on("click", (event, d) => {
@@ -370,8 +378,8 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
             link.attr("d", getLinkPath);
 
             // update also edge labels' positions
-            edgeLabel.attr("x", (d) => (d.source.x + d.target.x) / 2)
-                .attr("y", (d) => (d.source.y + d.target.y) / 2)
+            edgeLabel.attr("x", (d) => (0.3 * d.source.x + 0.7 * d.target.x))
+                .attr("y", (d) => (0.6 * d.source.y + 0.4 * d.target.y))
                 .each(function (d) {
                     const label = d3_select(this);
                     label.selectAll("tspan").attr("x", d3_select(this).attr("x"));

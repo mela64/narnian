@@ -5,6 +5,7 @@ import {motion, AnimatePresence} from "framer-motion";  // animated opening pane
 import FSM from "./FSM";
 import Console from "./Console";
 import PlotFigure from "./PlotFigure";
+import Balloon from "./Balloon";
 import {callAPI, out, showError} from "./utils";
 
 // icons
@@ -19,7 +20,8 @@ import {
     Upload,
     Download,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Hand
 } from "lucide-react";
 
 let clickTimeout; // timer that triggers a reaction to the click action
@@ -32,13 +34,17 @@ const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 // the structure representing the play/pause status, in its initial (unknown) setting
 const unknownPlayPauseStatus = {
     "status": "?",
-    "still_to_play": -1
+    "still_to_play": -1,
+    "show": null,
+    "checkpoint_available": false
 }
 
-// the structure representing the pause status
+// the structure representing the ended status
 const endedStatus = {
     "status": "ended",
-    "still_to_play": -1
+    "still_to_play": -1,
+    "show": null,
+    "checkpoint_available": false
 }
 
 export default function Main() {
@@ -47,18 +53,29 @@ export default function Main() {
     const [isFSMBusy, setIsFSMBusy] = useState(0);
     const [isConsoleBusy, setIsConsoleBusy] = useState(0);
     const [isPlotFigureBusy, setIsPlotFigureBusy] = useState(0);
+    const [isBalloonBusy, setIsBalloonBusy] = useState(0);
 
     // whenever an agent button is clicked, an agent panel is opened (with the FSM, console, streams, stream panels)
     const [agentButtons, setAgentButtons] = useState([]);
     const [openAgentPanels, setOpenAgentPanels] = useState([]);
+    const openAgentPanelsRef = useRef(openAgentPanels)
 
     // whenever the FSM or console buttons are clicked, they are shown or not
     const [openFSMPanels, setOpenFSMPanels] = useState([]);
+    const openFSMPanelsRef = useRef(openFSMPanels);
     const [openConsolePanels, setOpenConsolePanels] = useState([]);
+    const openConsolePanelsRef = useRef(openConsolePanels);
+    const [shownOwnedStreams, setShownOwnedStreams] = useState([]);
+    const [shownSignals, setShownSignals] = useState([]);
+    const [shownDescriptors, setShownDescriptors] = useState([]);
+    const shownOwnedStreamsRef = useRef(shownOwnedStreams);
+    const shownSignalsRef = useRef(shownSignals);
+    const shownDescriptorsRef = useRef(shownDescriptors);
 
     // whenever a stream button is clicked, a stream panel is opened (the one with the plot figure)
     const [streamButtons, setStreamButtons] = useState([]);
     const [openStreamPanels, setOpenStreamPanels] = useState({});
+    const [visibleStreamButtons, setVisibleStreamButtons] = useState([]);
 
     // the column-layout of the agent panels: 1 column when only 1 agent is shown, two columns otherwise
     const [gridCols, setGridCols] = useState("grid-cols-1");
@@ -70,6 +87,7 @@ export default function Main() {
 
     // the structure with the current play/pause status of the environment (see "unknownPlayPauseStatus" above)
     const [playPauseStatus, setPlayPauseStatus] = useState(unknownPlayPauseStatus);
+    const playPauseStatusRef = useRef(playPauseStatus);
 
     // flag that avoids asking the play/pause status more than once, when waiting for a reply from the API
     const playPauseStatusAskedRef = useRef(false);
@@ -79,6 +97,7 @@ export default function Main() {
 
     // the value of the selected play option: \u221E (inf), 1S, 1, 100, 1k, 100k
     const [selectedPlayOption, setSelectedPlayOption] = useState("1S");
+    const serverCommunicatedPlayStepsRef = useRef(-1)
 
     // references to "streamButtons" above and "openStreamPanels" above, used in click (and similar) callbacks
     const streamButtonsRef = useRef(streamButtons);
@@ -95,6 +114,10 @@ export default function Main() {
     const [offline, setOffline] = useState(false);
     const offlineRef = useRef(offline);
     const fileInputRef = useRef(null);
+
+    // background colors of the agent panels
+    const bgColors = ['bg-white', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-red-50',
+        'bg-indigo-50', 'bg-purple-50'];
 
     out("[Main]");
 
@@ -116,9 +139,9 @@ export default function Main() {
         out("[Main] useEffect *** fetching data (environment name) ***");
 
         callAPI('/get_env_name', null,
-            (x) => { envNameRef.current = x.name; setEnvTitle((prev) => {
+            (x) => { envNameRef.current = x.name; setEnvTitle(() => {
                 envTitleRef.current = x.title; return x.title; }); },
-            () => { envNameRef.current = "?"; setEnvTitle((prev) =>{
+            () => { envNameRef.current = "?"; setEnvTitle(() =>{
                 envTitleRef.current = "Offline"; return "Offline"; });
             setOffline(true); return false; },
             () => {
@@ -159,11 +182,33 @@ export default function Main() {
 
                     // if it is the first time (only!), we collect the button IDs in the other panel-associated lists
                     if (firstTime) {
-                        setOpenFSMPanels(agent_buttons.map(agent_button => agent_button.id));
-                        setOpenConsolePanels(agent_buttons.map(agent_button => agent_button.id));
+                        setOpenFSMPanels(() => {
+                            const panels = agent_buttons.map(agent_button => agent_button.id);
+                            openFSMPanelsRef.current = panels;
+                            return panels;
+                        });
+                        setOpenConsolePanels(() => {
+                            const panels = agent_buttons.map(agent_button => agent_button.id);
+                            openConsolePanelsRef.current = panels;
+                            return panels;
+                        });
+                        setShownSignals(() => {
+                            const ids = agent_buttons.map(agent_button => agent_button.id);
+                            shownSignalsRef.current = ids;
+                            return ids;
+                        });
+                        setShownDescriptors(() => {
+                            const ids = agent_buttons.map(agent_button => agent_button.id);
+                            shownDescriptorsRef.current = ids;
+                            return ids;
+                        });
+                        setShownOwnedStreams(() => {
+                            shownOwnedStreamsRef.current = [];
+                            return [];
+                        });
                     }
 
-                    setAgentButtons((prev) => {
+                    setAgentButtons(() => {
                         agentButtonsRef.current = agent_buttons
                         return agent_buttons;
                     });
@@ -171,25 +216,11 @@ export default function Main() {
             },
             () => {
                 if (!offlineRef.current) {
-                    setAgentButtons((prev) => {agentButtonsRef.current = []; return [];}); return true;
+                    setAgentButtons(() => {agentButtonsRef.current = []; return [];}); return true;
                 } else { return false; }},
             () => {});
     }, [envTitle, isPaused]);  // when the status of the loading env name operation changes, we get the agent list
     // it the authority changed, we need to update button graphics, so we also call this API when isPaused
-
-    // when paused, we get the list of streams for all the agents of the environment
-    useEffect(() => {
-        if (!isPaused) {
-            out("[Main] useEffect *** fetching data (list of streams for all agents) *** (skipping, not paused)");
-            return;
-        }
-
-        out("[Main] useEffect *** fetching data (list of streams for all agents) ***");
-
-        agentButtons.forEach((agentButton) => {
-            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id, true); // fava
-        });
-    }, [isPaused, agentButtons]);
 
     // getting the play/pause status of the environment when loading the page the first time
     useEffect(() => {
@@ -204,9 +235,18 @@ export default function Main() {
             () => {}, // "if playing" callback (do nothing)
             () => {
                 if (!offlineRef.current) {
-                    setPlayPauseStatus(unknownPlayPauseStatus);
+                    setPlayPauseStatus(() => {
+                        playPauseStatusRef.current = unknownPlayPauseStatus;
+                        return unknownPlayPauseStatus;
+                    });
                 } else {
-                    setIsPaused(() => { setPlayPauseStatus(endedStatus); return true; } );
+                    setIsPaused(() => {
+                        setPlayPauseStatus(() => {
+                            playPauseStatusRef.current = endedStatus;
+                            return endedStatus;
+                        });
+                        return true;
+                    });
                 }
             } // "if error" callback
         );
@@ -234,13 +274,103 @@ export default function Main() {
     const toggleAgentPanel = (_agentName_, _agentButtonId_) => {
         setOpenAgentPanels((prev) => {
             if (prev.includes(_agentButtonId_)) {
-                return prev.filter((pid) => pid !== _agentButtonId_);
+                const panels = prev.filter((pid) => pid !== _agentButtonId_);
+                openAgentPanelsRef.current = panels;
+                return panels;
             } else {
-                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, true);  // for all fava
-                return [...prev, _agentButtonId_];
+                getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_);  // for all
+                const panels = [...prev, _agentButtonId_];
+                openAgentPanelsRef.current = panels;
+                return panels;
             }
         });
     };
+
+    const toggleShowOwnedStreams = (_agentName_, _agentButtonId_) => {
+        setShownOwnedStreams((prev) => {
+            if (!prev.includes(_agentButtonId_)) {
+                const newData = [...prev, _agentButtonId_];
+                filterStreamButtons(_agentName_, _agentButtonId_,
+                    newData, shownSignalsRef.current, shownDescriptorsRef.current);
+                shownOwnedStreamsRef.current = newData;
+                return newData;
+            } else {
+                const newData = prev.filter((pid) => pid !== _agentButtonId_);
+                filterStreamButtons(_agentName_, _agentButtonId_,
+                    newData, shownSignalsRef.current, shownDescriptorsRef.current);
+                shownOwnedStreamsRef.current = newData;
+                return newData;
+            }
+        });
+    };
+
+    const toggleShowSignals = (_agentName_, _agentButtonId_) => {
+        setShownSignals((prev) => {
+            if (!prev.includes(_agentButtonId_)) {
+                const newData = [...prev, _agentButtonId_];
+                filterStreamButtons(_agentName_, _agentButtonId_,
+                    shownOwnedStreamsRef.current, newData, shownDescriptorsRef.current);
+                shownSignalsRef.current = newData;
+                return newData;
+            } else {
+                const newData = prev.filter((pid) => pid !== _agentButtonId_);
+                filterStreamButtons(_agentName_, _agentButtonId_,
+                    shownOwnedStreamsRef.current, newData, shownDescriptorsRef.current);
+                shownSignalsRef.current = newData;
+                return newData;
+            }
+        });
+    };
+
+    const toggleShowDescriptors = (_agentName_, _agentButtonId_) => {
+        setShownDescriptors((prev) => {
+            if (!prev.includes(_agentButtonId_)) {
+                const newData = [...prev, _agentButtonId_];
+                filterStreamButtons(_agentName_, _agentButtonId_,
+                    shownOwnedStreamsRef.current, shownSignalsRef.current, newData);
+                shownDescriptorsRef.current = newData;
+                return newData;
+            } else {
+                const newData = prev.filter((pid) => pid !== _agentButtonId_);
+                filterStreamButtons(_agentName_, _agentButtonId_,
+                    shownOwnedStreamsRef.current, shownSignalsRef.current, newData);
+                shownDescriptorsRef.current = newData;
+                return newData;
+            }
+        });
+    };
+
+    const filterStreamButtons = useCallback((_agentName_, _agentButtonId_,
+                                             _shownOwnedStreams_, _shownSignals_, _shownDescriptors_) => {
+        const keptButtons1 = streamButtonsRef.current[_agentButtonId_].filter((button) =>
+            !_shownOwnedStreams_.includes(_agentButtonId_) ||
+            (_shownOwnedStreams_.includes(_agentButtonId_)
+                && button.mergedLabels[0].toLowerCase().startsWith(_agentName_.toLowerCase()))
+        );
+        const keptButtons2 = keptButtons1.filter((button) =>
+            _shownSignals_.includes(_agentButtonId_) ||
+            (!_shownSignals_.includes(_agentButtonId_) && button.mergedLabels[0].endsWith("[d]"))
+        );
+        const keptButtons3 = keptButtons2.filter((button) =>
+            _shownDescriptors_.includes(_agentButtonId_) ||
+            (!_shownDescriptors_.includes(_agentButtonId_) && button.mergedLabels[0].endsWith("[y]"))
+        );
+        setVisibleStreamButtons((prev) => {
+            return {
+                ...prev,
+                [_agentButtonId_]: keptButtons3.map(button => button.id)
+            };
+        });
+
+        // close the stream panel, if opened
+        const discardedButtons = streamButtonsRef.current[_agentButtonId_]
+            .filter((button) => !keptButtons3.includes(button))
+        discardedButtons.forEach(button => {
+            if (openStreamPanelsRef.current[_agentButtonId_]?.includes(button.id)) {
+                toggleStreamPanel(_agentButtonId_, button.id);
+            }
+        });
+    }, []);
 
     // open a new stream panel (the one with the plot figure) or closes an already opened one
     // a "stream panel" is just an array with the list of "stream button IDs" that are currently "active"
@@ -259,9 +389,13 @@ export default function Main() {
     const toggleFSMPanel = (_agentButtonId_) => {
         setOpenFSMPanels((prev) => {
             if (prev.includes(_agentButtonId_)) {
-                return prev.filter((pid) => pid !== _agentButtonId_);
+                const panels = prev.filter((pid) => pid !== _agentButtonId_);
+                openFSMPanelsRef.current = panels;
+                return panels;
             } else {
-                return [...prev, _agentButtonId_];
+                const panels = [...prev, _agentButtonId_];
+                openFSMPanelsRef.current = panels;
+                return panels;
             }
         });
     };
@@ -270,9 +404,13 @@ export default function Main() {
     const toggleConsolePanel = (_agentButtonId_) => {
         setOpenConsolePanels((prev) => {
             if (prev.includes(_agentButtonId_)) {
-                return prev.filter((pid) => pid !== _agentButtonId_);
+                const panels = prev.filter((pid) => pid !== _agentButtonId_);
+                openConsolePanelsRef.current = panels;
+                return panels;
             } else {
-                return [...prev, _agentButtonId_];
+                const panels = [...prev, _agentButtonId_];
+                openConsolePanelsRef.current = panels;
+                return panels;
             }
         });
     };
@@ -482,7 +620,9 @@ export default function Main() {
                     });
 
                     // this is about agent-related buttons
-                    return prevOpenAgentPanels.filter(id => id >= 0);
+                    const panels = prevOpenAgentPanels.filter(id => id >= 0);
+                    openAgentPanelsRef.current = panels;
+                    return panels;
                 });
 
                 return true;
@@ -517,7 +657,9 @@ export default function Main() {
                     .filter((button) => !prevOpenAgentPanels.includes(button.id)) // only if not already in openAgentPanels
                     .map((button) => -button.id); // invert the sign of each added id
 
-                return [...prevOpenAgentPanels, ...newIds];
+                const panels = [...prevOpenAgentPanels, ...newIds];
+                openAgentPanelsRef.current = panels;
+                return panels;
             });
 
             // waiting for the data to be downloaded, stored, and then we can really finish save
@@ -547,26 +689,26 @@ export default function Main() {
                     out("[Upload] Done!");
 
                     // clear/close all panels
-                    setOpenAgentPanels([]);
-                    setOpenStreamPanels({});
+                    setOpenAgentPanels(() => {openAgentPanelsRef.current = []; return [];});
+                    setOpenStreamPanels(() => {openStreamPanelsRef.current = {}; return {};});
 
                     // setting up environment name
                     envNameRef.current = loadedData.envName;
-                    setEnvTitle((prev) => {
+                    setEnvTitle(() => {
                         envTitleRef.current = loadedData.envTitle; return loadedData.envTitle; });
 
                     // restoring data to be plotted
                     ioDataRef.current = loadedData.data;
 
                     // agent buttons: restoring icons
-                    loadedData.agentButtons = loadedData.agentButtons.map((btn, index) => ({
+                    loadedData.agentButtons = loadedData.agentButtons.map((btn) => ({
                         ...btn,
                         icon: btn.id === 1 ? agentButtonIcons[0] :  // here the ID of the envir is assumed to be 1
                             (btn.authority < 1.0 ? agentButtonIcons[1] : agentButtonIcons[2])
                     }));
 
                     // agent buttons: setting them up
-                    setAgentButtons((prev) =>{
+                    setAgentButtons(() =>{
 
                         // refreshing reference
                         agentButtonsRef.current = loadedData.agentButtons;
@@ -583,7 +725,7 @@ export default function Main() {
                     });
 
                     // stream buttons: setting them up
-                    setStreamButtons((prev) => {
+                    setStreamButtons(() => {
 
                         // refreshing reference
                         streamButtonsRef.current = loadedData.streamButtons;
@@ -659,7 +801,7 @@ export default function Main() {
     }
 
     // downloads the list of streams for a certain agent, and update the list of stream buttons accordingly
-    function getStreamsAndUpdateStreamButtons(_agentName_, _agentButtonId_, _ownedStreamsOnly_) {
+    const getStreamsAndUpdateStreamButtons = useCallback((_agentName_, _agentButtonId_) => {
 
         function isGenerated(label) {
             const match = label.match(/generated(\d+)/);
@@ -819,9 +961,7 @@ export default function Main() {
                             };
 
                             // saving
-                            if (!_ownedStreamsOnly_ || (_ownedStreamsOnly_ &&
-                                newStreamButton.mergedLabels[0].toLowerCase().startsWith(_agentName_.toLowerCase())))
-                                alteredNewStreamButtons.push(newStreamButton)
+                            alteredNewStreamButtons.push(newStreamButton)
 
                             // let's avoid looking again for this button in the original array
                             newStreamButtons[generatedOrEvalZ] = null;
@@ -834,9 +974,7 @@ export default function Main() {
                     if (!isPaired) {
 
                         // simple case: nothing to alter, just get the button as it is
-                        if (!_ownedStreamsOnly_ || (_ownedStreamsOnly_ &&
-                            newStreamButtons[z].mergedLabels[0].toLowerCase().startsWith(_agentName_.toLowerCase())))
-                            alteredNewStreamButtons.push(newStreamButtons[z])
+                        alteredNewStreamButtons.push(newStreamButtons[z])
                     }
                 }
 
@@ -849,15 +987,94 @@ export default function Main() {
 
                     // refreshing reference
                     streamButtonsRef.current = updatedStreamButtons;
+
+                    // if we asked to play until a checkpoint, and now we paused, it might be that we reached
+                    // such a checkpoint
+                    if (serverCommunicatedPlayStepsRef.current === -3) {
+
+                        // if it was a false alarm, then playPauseStatus.show will be null,
+                        // otherwise there will be data to show
+                        if (playPauseStatusRef.current.show !== null) {
+
+                            if (_agentName_ in playPauseStatusRef.current.show) {
+                                let closeStreams = true;
+                                const listOfThingsToShow = playPauseStatusRef.current.show[_agentName_];
+
+                                // parse le list of things to show
+                                listOfThingsToShow.forEach(thingToShow => {
+
+                                    if (thingToShow.toLowerCase() === "behavior") {
+                                        // skip
+                                    } else if (thingToShow.toLowerCase() === "console") {
+                                        // skip
+                                    } else {
+                                        closeStreams = false;
+
+                                        // regex to check if stream name ends with " [y]" or " [d]
+                                        const regex =
+                                            new RegExp(`^${thingToShow.toLowerCase()} \\[[yd]\\]$`);
+
+                                        const streamButtonIDsToShow =
+                                            streamButtonsRef.current[_agentButtonId_]
+                                                ?.filter((btn) => btn.mergedLabels.some((label) =>
+                                                    regex.test(label.toLowerCase())))
+                                                .map((btn) => btn.id) || [];
+
+                                        const newToOpen = streamButtonIDsToShow.filter(item =>
+                                            !openStreamPanelsRef.current[_agentButtonId_]?.includes(item)) ?? [];
+                                        const existingToKeep = openStreamPanelsRef.current[_agentButtonId_]
+                                            ?.filter(item => streamButtonIDsToShow.includes(item)) ?? [];
+
+                                        if (newToOpen.length > 0 ||
+                                            (existingToKeep.length > 0
+                                                && existingToKeep.length < openAgentPanelsRef.current.length)) {
+                                            setOpenStreamPanels((prev) => {
+                                                return {
+                                                    ...prev, [_agentButtonId_]:
+                                                        [...existingToKeep, ...newToOpen]
+                                                };
+                                            });
+                                        }
+                                    }
+                                });
+
+                                // close the things that were not mentioned in the list
+                                if (closeStreams) {
+                                    setOpenStreamPanels((prevOpenStreamPanels) => {
+                                        return {
+                                            ...prevOpenStreamPanels, [_agentButtonId_]: []
+                                        };
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+
+                        // filter only if not showing a checkpoint
+                        filterStreamButtons(_agentName_, _agentButtonId_,
+                            shownOwnedStreamsRef.current, shownSignalsRef.current, shownDescriptorsRef.current);
+                    }
                     return updatedStreamButtons;
                 });
             },
-            () => {
-                if (!offlineRef.current) { setStreamButtons((prev) => (prev)); return true; }
-                else { return false; }},
+            () => {return !offlineRef.current;},
             () => {
             });
-    }
+    }, [filterStreamButtons]);  // memoized
+
+    // when paused, we get the list of streams for all the agents of the environment
+    useEffect(() => {
+        if (!isPaused) {
+            out("[Main] useEffect *** fetching data (list of streams for all agents) *** (skipping, not paused)");
+            return;
+        }
+
+        out("[Main] useEffect *** fetching data (list of streams for all agents) ***");
+
+        agentButtons.forEach((agentButton) => {
+            getStreamsAndUpdateStreamButtons(agentButton.label, agentButton.id);
+        });
+    }, [isPaused, agentButtons, getStreamsAndUpdateStreamButtons]);  // last one is a memoized function
 
     // start the timer associated to the play button
     const startOrStopPlayTimer = () => {
@@ -893,11 +1110,111 @@ export default function Main() {
                         if (_playCallback_) {
                             _playCallback_();
                         }
-                        setIsPaused(() => { setPlayPauseStatus(x); return false; } );
+                        setIsPaused(() => {
+                            setPlayPauseStatus(() => {
+                                playPauseStatusRef.current = x;
+                                return x;
+                            });
+                            return false;
+                        });
                     } else if (x.status === "paused") {
-                        setIsPaused(() => { setPlayPauseStatus(x); return true; } );
+
+                        // if we asked to play until a checkpoint, and now we paused, it might be that we reached
+                        // such a checkpoint: let's open those agent panels that are involved in the checkpoint,
+                        // and let's close the ones that are not involved (do the same for consoles and FSMs)
+                        if (serverCommunicatedPlayStepsRef.current === -3) {
+
+                            // if it was a false alarm, then x.show will be null, otherwise there will be data to show
+                            if (x.show !== null) {
+
+                                // opening the agent-panels that are mentioned in the checkpoint
+                                // and closing the other ones
+                                const agentButtonIDsToShow = Object.keys(x.show).map((key) =>
+                                    agentButtonsRef.current.find((btn) => btn.label === key)?.id)
+                                    .filter(Boolean);
+                                const newToOpen = agentButtonIDsToShow.filter(item =>
+                                    !openAgentPanelsRef.current.includes(item));
+                                const existingToKeep = openAgentPanelsRef.current.filter(item =>
+                                    agentButtonIDsToShow.includes(item));
+                                if (newToOpen.length > 0 ||
+                                    (existingToKeep.length > 0 &&
+                                        existingToKeep.length < openAgentPanelsRef.current.length)) {
+                                    setOpenAgentPanels(() => {
+                                        const panels = [...existingToKeep, ...newToOpen];
+                                        openAgentPanelsRef.current = panels;
+                                        return panels;
+                                    });
+                                }
+
+                                // behaviors and consoles
+                                Object.entries(x.show).forEach(([agentName, listOfThingsToShow]) => {
+                                    let closeBehavior = true;
+                                    let closeConsole = true;
+
+                                    // find agent button ID
+                                    const agentButtonId =
+                                        agentButtonsRef.current.find((btn) => btn.label === agentName)?.id;
+
+                                    // parse le list of things to show
+                                    listOfThingsToShow.forEach(thingToShow => {
+
+                                        if (thingToShow.toLowerCase() === "behavior") {
+                                            closeBehavior = false;
+                                            if (!openFSMPanelsRef.current.includes(agentButtonId)) {
+                                                setOpenFSMPanels((prev) => {
+                                                    const panels = [...prev, agentButtonId];
+                                                    openFSMPanelsRef.current = panels;
+                                                    return panels;
+                                                });
+                                            }
+
+                                        } else if (thingToShow.toLowerCase() === "console") {
+                                            closeConsole = false;
+                                            if (!openConsolePanelsRef.current.includes(agentButtonId)) {
+                                                setOpenConsolePanels((prev) => {
+                                                    const panels = [...prev, agentButtonId];
+                                                    openConsolePanelsRef.current = panels;
+                                                    return panels;
+                                                });
+                                            }
+                                        }
+                                    });
+
+                                    // close the things that were not mentioned in the list
+                                    if (closeBehavior) {
+                                        setOpenFSMPanels((prev) => {
+                                            const panels = prev.filter((pid) => pid !== agentButtonId);
+                                            openFSMPanelsRef.current = panels;
+                                            return panels;
+                                        });
+                                    }
+
+                                    if (closeConsole) {
+                                        setOpenConsolePanels((prev) => {
+                                            const panels = prev.filter((pid) => pid !== agentButtonId);
+                                            openConsolePanelsRef.current = panels;
+                                            return panels;
+                                        });
+                                    }
+                                });
+                            }
+                        }
+
+                        setIsPaused(() => {
+                            setPlayPauseStatus(() => {
+                                playPauseStatusRef.current = x;
+                                return x;
+                            });
+                            return true;
+                        });
                     } else if (x.status === "ended") {
-                        setIsPaused(() => { setPlayPauseStatus(x); return true; } );
+                        setIsPaused(() => {
+                            setPlayPauseStatus(() => {
+                                playPauseStatusRef.current = x;
+                                return x;
+                            });
+                            return true;
+                        });
                     } else {
                         throw new Error("Unknown status: " + x.status);
                     }
@@ -918,7 +1235,7 @@ export default function Main() {
     const handleClickOnPlayPauseButton = () => {
 
         // if something is drawing/working/fetching-data, do not let it go
-        if (isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0) {
+        if (isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0 || isBalloonBusy > 0) {
             out("[Main] *** click on play/pause button *** (ignored due to other components busy)");
             return;
         } else {
@@ -928,13 +1245,15 @@ export default function Main() {
         if (playPauseStatus.status === "paused") {
 
             // getting play options (number of steps to run)
-            const steps = selectedPlayOption.endsWith("k") ?
+            serverCommunicatedPlayStepsRef.current = selectedPlayOption.endsWith("k") ?
                 parseInt(selectedPlayOption.replace('k', '')) * 1000 :
-                selectedPlayOption === "1S" ? -1 : selectedPlayOption === "\u221E" ? -2 : parseInt(selectedPlayOption)
+                selectedPlayOption === "1S" ? -1 : selectedPlayOption === "\u221E" ? -2 :
+                    selectedPlayOption === "\u2714" ? -3 : parseInt(selectedPlayOption)
 
             // asking to play
-            out("[Main] *** fetching data (ask-to-play for " + steps + " steps) ***");
-            callAPI('/ask_to_play', "steps=" + steps,
+            out("[Main] *** fetching data (ask-to-play for " +
+                serverCommunicatedPlayStepsRef.current + " steps) ***");
+            callAPI('/ask_to_play', "steps=" + serverCommunicatedPlayStepsRef.current,
                 (x) => {
                     out("[Main] server responded to the ask-to-play request, " +
                         "which was received by the sever when at step id: " + x);
@@ -1010,7 +1329,7 @@ export default function Main() {
                                                             (playPauseStatus.still_to_play !== 0 ? "bg-red-500" :
                                                                    "bg-blue-400" // "unexpected value still_to_play!"
                                                             )
-                                                    ) :  "bg-gray-400" // "unexpected status!"
+                                                    ) :  "bg-blue-400" // "unexpected status!"
                                             )
                                     )
                             }`}
@@ -1021,7 +1340,7 @@ export default function Main() {
 
                     <button onClick={handleClickOnPlayPauseButton}
                             className={`px-4 py-2 rounded-2xl bg-amber-200 
-                            ${(isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0) ? 
+                            ${(isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0 || isBalloonBusy > 0) ? 
                                 "hover:bg-gray-200" : "hover:bg-amber-300"}`}
                             style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }} >
 
@@ -1056,9 +1375,11 @@ export default function Main() {
 
                     <div className="flex gap-2 items-center"
                          style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
-                        {["1S", "1", "100", "1k", "100k", "\u221E"].map((option) => (
+                        {(playPauseStatus.checkpoint_available ? ["\u2714", "1S", "1", "100", "1k", "100k", "\u221E"] :
+                        ["1S", "1", "100", "1k", "100k", "\u221E"]).map((option) => (
                             <button key={option} onClick={() => setSelectedPlayOption(option)}
-                                className={selectedPlayOption === option ? "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
+                                className={selectedPlayOption === option ?
+                                    "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
                                     "px-2 py-0 rounded-2xl" : "h-6 text-sm bg-gray-100 hover:bg-gray-200 px-2 py-0 " +
                                     "rounded-2xl"}>
                                 {option}
@@ -1093,34 +1414,73 @@ export default function Main() {
                                             animate={{opacity: 1, height: shouldHideOthers ? 0 : "auto"}}
                                             exit={{opacity: 0, height: 0}}
                                             transition={{duration: 0.3}}
-                                            className={`w-full p-4 bg-white rounded-2xl shadow-lg border space-y-6 
+                                            className={`${bgColors[(agent_button.id - 1) % bgColors.length]} w-full 
+                                            p-4 rounded-2xl shadow-lg border 
                                                 ${shouldHideOthers ? "hidden" : ""}`}>
 
-                                    <h2 className="font-medium text-lg flex items-center justify-center">
-                                        <span className="mr-1">{agent_button.label}</span>
-                                        <button
-                                            className={`w-6 h-6 
+                                    <h2 className="font-medium text-lg flex items-center justify-between">
+                                        <div className="flex items-center">
+                                            <span className="mr-1 ml-5 text-xl">
+                                                {agent_button.label}
+                                            </span>
+                                            <Balloon _agentName_={agent_button.label}
+                                                     _isPaused_={isPaused}
+                                                     _setBusy_={setIsBalloonBusy}
+                                            />
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <button
+                                                className={`w-6 h-6 pb-0
                                                 ${openFSMPanels.includes(agent_button.id) ?
-                                                "text-white bg-blue-500" : "bg-gray-100"} rounded-full 
+                                                    "text-white bg-blue-500" : "bg-gray-100"} rounded-full 
                                                     flex items-center justify-center ml-2
                                                     ${offline ? "hidden" : ""}`}
-                                            onClick={() => toggleFSMPanel(agent_button.id)}>
-                                            B
-                                        </button>
-                                        <button
-                                            className={`w-6 h-6 
+                                                onClick={() => toggleFSMPanel(agent_button.id)}>
+                                                B
+                                            </button>
+                                            <button
+                                                className={`w-6 h-6 pb-0
                                                 ${openConsolePanels.includes(agent_button.id) ?
-                                                "text-white bg-blue-500" : "bg-gray-100"} rounded-full flex 
+                                                    "text-white bg-blue-500" : "bg-gray-100"} rounded-full flex 
                                                     items-center justify-center ml-2
                                                     ${offline ? "hidden" : ""}`}
-                                            onClick={() => toggleConsolePanel(agent_button.id)}>
-                                            C
-                                        </button>
+                                                onClick={() => toggleConsolePanel(agent_button.id)}>
+                                                C
+                                            </button>
+                                            <button
+                                                className={`w-6 h-6 top font-medium flex rounded-full text-white 
+                                            ${shownSignals.includes(agent_button.id) ?
+                                                    "text-white bg-blue-500" : "bg-gray-100"}
+                                             items-center justify-center ml-2 pb-0 ${offline ? "hidden" : ""}`}
+                                                onClick={() =>
+                                                    toggleShowSignals(agent_button.label, agent_button.id)}>
+                                                <Activity size={16}/>
+                                            </button>
+                                            <button
+                                                className={`w-6 h-6 top font-medium flex rounded-full text-white 
+                                            ${shownDescriptors.includes(agent_button.id) ?
+                                                    "text-white bg-blue-500" : "bg-gray-100"}
+                                             items-center justify-center ml-2 pb-0 ${offline ? "hidden" : ""}`}
+                                                onClick={() =>
+                                                    toggleShowDescriptors(agent_button.label, agent_button.id)}>
+                                                <Search size={16}/>
+                                            </button>
+                                            <button
+                                                className={`w-6 h-6 top font-medium flex rounded-full text-white 
+                                            ${shownOwnedStreams.includes(agent_button.id) ?
+                                                    "text-white bg-blue-500" : "bg-gray-100"}
+                                             items-center justify-center ml-2 pb-0 ${offline ? "hidden" : ""}`}
+                                                onClick={() =>
+                                                    toggleShowOwnedStreams(agent_button.label, agent_button.id)}>
+                                                <Hand size={16}/>
+                                            </button>
+                                        </div>
                                     </h2>
 
                                     <StreamButtonContainer
                                         _streamButtons_={streamButtons}
                                         _agentButton_={agent_button}
+                                        _visibleStreamButtons_={visibleStreamButtons}
                                         _handleClick_={handleClick}
                                         _handleDoubleClick_={handleDoubleClick}
                                         _handleDrop_={handleDrop}
@@ -1143,7 +1503,7 @@ export default function Main() {
                                             <div className="h-[500px] w-full flex justify-center">
                                                 <div className="w-full p-0 pt-4 pb-5 bg-gray-100
                                                         rounded-xl shadow text-center">
-                                                    <h3 className="font-medium">Behaviour</h3>
+                                                    <h3 className="font-medium">Behavior</h3>
                                                     <FSM _agentName_={agent_button.label}
                                                          _isPaused_={isPaused}
                                                          _setBusy_={setIsFSMBusy}
@@ -1205,7 +1565,7 @@ export default function Main() {
 
 // create a new stream button with several action handlers attached (given a streamButton structure)
 // it is interpreted and built as a React component: keep name with the starting capital letter (otherwise it fails!)
-function DraggableStreamButton({_streamButton_, _onDrop_, _onDoubleClick_, _onClick_, _checkIfActive_}) {
+function DraggableStreamButton({_streamButton_, _onDrop_, _onDoubleClick_, _onClick_, _checkIfActive_, _visible_}) {
 
     // drag action triggered
     const [{isDragging}, drag] = useDrag(() => ({
@@ -1224,9 +1584,10 @@ function DraggableStreamButton({_streamButton_, _onDrop_, _onDoubleClick_, _onCl
     // returning the <div>...</div> that will be displayed to represent the stream button
     return (
         <div
-            className={`flex h-6 items-center justify-center px-3 py-4 rounded-2xl shadow-md select-none cursor-move 
+            className={`${_visible_ ? "" : "hidden"} flex h-6 items-center justify-center px-3 py-4 rounded-2xl 
+            shadow-md select-none cursor-move 
             text-center transition-colors whitespace-nowrap ${
-                _checkIfActive_() ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"
+                _checkIfActive_() ? "bg-blue-600 text-white" : "bg-gray-50 hover:bg-gray-200"
             } ${isDragging ? "opacity-50" : "opacity-100"}`}
             onClick={() => _onClick_(_streamButton_)}
             onDoubleClick={() => _onDoubleClick_(_streamButton_)}
@@ -1240,11 +1601,13 @@ function DraggableStreamButton({_streamButton_, _onDrop_, _onDoubleClick_, _onCl
     );
 }
 
-const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
+const StreamButtonContainer = ({ _streamButtons_, _agentButton_, _visibleStreamButtons_,
                                    _handleClick_, _handleDoubleClick_, _handleDrop_, _checkIfActive_ }) => {
     const containerRef = useRef(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
+
+    out("[StreamButtonContainer] _visibleStreamButtons_=" + JSON.stringify(_visibleStreamButtons_));
 
     // check if scrolling is possible
     const updateScrollState = () => {
@@ -1271,23 +1634,21 @@ const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
             scrollLeft + ", scrollWidth=" + scrollWidth + ", clientWidth=" + clientWidth + " ***");
         window.addEventListener("resize", updateScrollState);
         return () => window.removeEventListener("resize", updateScrollState);
-    }, []);
+    }, [_visibleStreamButtons_]);
 
     return (
-        <div className="relative flex items-center w-full">
+        <div className="relative flex items-center w-full pt-7 pb-0">
+            {_visibleStreamButtons_[_agentButton_.id]?.length > 0 ? "Streams:" : ""}
             {canScrollLeft && (
-                <button className="absolute top-1/2 -translate-y-1/4s left-6 z-10 bg-white shadow-md rounded-full p-2"
+                <button className="border border-black absolute top left-[68px] z-10 bg-white shadow-md rounded-full p-2"
                         onClick={() => scroll(-1)}>
                     <ChevronLeft size={24}/>
                 </button>
             )}
 
-            <button className="w-6 h-6 text-white bg-blue-500 items-center justify-center ml-2">
-                O
-            </button>
             <div ref={containerRef}
                  className="flex gap-4 justify-start w-full overflow-x-auto scrollbar-hide
-                 scroll-smooth whitespace-nowrap px-10 pb-2" onScroll={updateScrollState}>
+                 scroll-smooth whitespace-nowrap px-10 pt-2 pb-2 mr-2 ml-6 mt-0" onScroll={updateScrollState}>
                 {_streamButtons_[_agentButton_.id]?.map((streamButton) => (
                     <AnimatePresence key={streamButton.mergedIds.join("-")}>
                         <motion.div
@@ -1315,6 +1676,8 @@ const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
                                 _checkIfActive_={() =>
                                     _checkIfActive_(streamButton.agentButtonId, streamButton.id)
                                 }
+                                _visible_={_visibleStreamButtons_[streamButton.agentButtonId]
+                                    .includes(streamButton.id)}
                             />
                         </motion.div>
                     </AnimatePresence>
@@ -1322,7 +1685,7 @@ const StreamButtonContainer = ({ _streamButtons_, _agentButton_,
             </div>
 
             {canScrollRight && (
-                <button className="absolute top-1/2 -translate-y-1/4 right-0 z-10 bg-white shadow-md rounded-full p-2"
+                <button className="border border-black absolute top right-0 z-10 bg-white shadow-md rounded-full p-2"
                         onClick={() => scroll(1)}>
                     <ChevronRight size={24}/>
                 </button>

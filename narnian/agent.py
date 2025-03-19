@@ -156,8 +156,6 @@ class Agent:
 
     def nop(self):
         """Do nothing."""
-
-        self.out(f"Dummy action")
         return True
 
     def send_agents(self, agent: Self):

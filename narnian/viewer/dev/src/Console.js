@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { callAPI, out } from "./utils";
 import { Inbox } from "lucide-react";  // icon
 
-export default function Console({ _agentName_, _isPaused_, _setBusy_}) {
+export default function Console({ _agentName_, _isPaused_, _setBusy_ }) {
     out("[Console] " +
         "_agentName_: " + _agentName_ + ", " +
         "_isPaused_: " + _isPaused_);

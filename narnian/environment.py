@@ -1,4 +1,5 @@
 import os
+import json
 import pickle
 import inspect
 import threading
@@ -24,6 +25,8 @@ class Environment:
         self.wait_event = None  # event that triggers a new "wait-for-step-event" case (manipulated by the server)
         self.skip_clear_for = 0
         self.shared_attributes = None
+        self.next_checkpoint = 0
+        self.what_to_show_on_checkpoint = None
         self.steps = None
         self.output_messages = [""] * 20
         self.output_messages_ids = [-1] * 20
@@ -204,7 +207,7 @@ class Environment:
         """Print an error message to the console, if enabled."""
         self.out("<FAILED> " + msg, show_state, show_act)
 
-    def run(self, steps: int | None = None):
+    def run(self, steps: int | None = None, checkpoints: list[dict] | str | None = None):
         """Run the environment."""
 
         assert steps is None or steps > 0, "Invalid number of steps"
@@ -218,8 +221,14 @@ class Environment:
             self.step_event = threading.Event()
             self.wait_event = threading.Event()
 
+        # loading checkpoints, if needed
+        if isinstance(checkpoints, str):  # if it is a string, then it is assumed to be a file name
+            with open(checkpoints, 'r') as file:
+                checkpoints = json.load(file)  # from filename to dictionary
+
         # main loop
         self.step = 0
+        self.next_checkpoint = 0 if checkpoints is not None else -1  # a negative value tells there are not checkpoints
         while True:
 
             # in server mode, we wait for an external event to go ahead (step_event.set())
@@ -243,6 +252,31 @@ class Environment:
                 state_changed = agent.behav.act_transitions() or state_changed
                 in_action = agent.behav.limbo_state is not None or in_action
 
+            # matching checkpoints
+            checkpoint_matched = False
+            self.what_to_show_on_checkpoint = None
+            if self.next_checkpoint >= 0:  # a negative value tells there are not checkpoints
+                checkpoint = checkpoints[self.next_checkpoint]
+                agent = checkpoint["agent"]
+                state = checkpoint["state"] if "state" in checkpoint else None
+                action = checkpoint["action"] if "action" in checkpoint else None
+
+                assert agent in self.agents, \
+                    f"Unknown agent in the checkpoint list: {agent}"
+                behav = self.agents[agent].behav
+                assert state is None or state in behav.states, \
+                    f"Unknown state in the checkpoint list: {state}"
+                assert action is None or action in behav.action_to_params, \
+                    f"Unknown action in the checkpoint list: {action}"
+
+                if (state is None or behav.state == state) and \
+                    (action is None or action == behav.action[0].__name__):
+                    checkpoint_matched = True
+                    self.next_checkpoint += 1
+                    self.what_to_show_on_checkpoint = checkpoint["show"]
+                    if self.next_checkpoint >= len(checkpoints):
+                        self.next_checkpoint = -1  # a negative value tells there are not checkpoints
+
             # in step mode, we clear the external event to be able to wait for a new one
             if self.using_server:
                 if self.skip_clear_for == 0:
@@ -251,6 +285,9 @@ class Environment:
                     pass
                 elif self.skip_clear_for == -1:  # play until next state
                     if state_changed:
+                        self.step_event.clear()
+                elif self.skip_clear_for == -3:  # play until next checkpoint:
+                    if checkpoint_matched:
                         self.step_event.clear()
                 else:
                     self.skip_clear_for -= 1
@@ -313,8 +350,6 @@ class Environment:
 
     def nop(self):
         """Do nothing."""
-
-        self.out(f"Dummy action")
         return True
 
     def send_streams_to_all(self):

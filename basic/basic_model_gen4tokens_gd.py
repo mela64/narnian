@@ -52,8 +52,6 @@ class BasicTokenModel(Model):
         self.optim.step()
 
         # teaching
-        self.generator.y = yhat  # only exploited by BasicTokenGeneratorLM
+        self.generator.y = yhat  # only exploited by LM-like generators
 
-        # printing
-        self.out("Loss: " + str(loss_as_float))
         return loss_as_float, y, yhat, d, dhat

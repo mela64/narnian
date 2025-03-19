@@ -84,8 +84,9 @@ class BasicAgent(Agent):
 
         at_least_one_sent = False
 
+        if len(self.engaged_agents) > 0:
+            self.out(f"Sending disengagement request to {', '.join([x.name for x in self.engaged_agents])}")
         for agent in self.engaged_agents:
-            self.out(f"Sending disengagement request to {agent.name}")
             if self.set_next_action(agent, "get_disengagement", {"agent": self}):
                 at_least_one_sent = True
             else:
@@ -114,8 +115,9 @@ class BasicAgent(Agent):
 
         at_least_one_sent = False
 
+        if len(self.target_agents) > 0:
+            self.out(f"Sending engagement request to {', '.join([x.name for x in self.target_agents])}")
         for target_agent in self.target_agents:
-            self.out(f"Sending engagement request to {target_agent.name}")
             if self.set_next_action(target_agent, "get_engagement", {"agent": self}):
                 at_least_one_sent = True
             else:
@@ -176,8 +178,8 @@ class BasicAgent(Agent):
 
         self.received_hashes = []
         at_least_one_completed = False
+        self.out(f"Asking {', '.join([x.name for x in involved_agents])} to generate signal")
         for agent in involved_agents:
-            self.out(f"Asking {agent.name} to generate signal")
             ret = self.__ask(for_what="gen", agent=agent,
                              u_hash=u_hash, du_hash=du_hash,
                              yhat_hash=None, dhat_hash=dhat_hash,
@@ -213,7 +215,7 @@ class BasicAgent(Agent):
     def pred(self, yhat_hash: str, steps: int = 100) -> bool:
         """Predict a descriptor."""
 
-        self.out(f"Predicting descriptor")
+        self.out(f"Predicting descriptor of {yhat_hash}")
         return self.__process_streams(u_hash=None, du_hash=None,
                                       yhat_hash=yhat_hash, dhat_hash=None,
                                       skip_gen=True, skip_pred=False,
@@ -229,8 +231,8 @@ class BasicAgent(Agent):
 
         self.received_hashes = []
         at_least_one_completed = False
+        self.out(f"Asking {', '.join([x.name for x in involved_agents])} to predict descriptor of {yhat_hash}")
         for agent in involved_agents:
-            self.out(f"Asking {agent.name} to predict descriptor")
             ret = self.__ask(for_what="pred", agent=agent,
                              u_hash=None, du_hash=None,
                              yhat_hash=yhat_hash, dhat_hash=None,
@@ -282,8 +284,8 @@ class BasicAgent(Agent):
 
         self.received_hashes = []
         at_least_one_completed = False
+        self.out(f"Asking {', '.join([x.name for x in involved_agents])} to generate signal and predict descriptor")
         for agent in involved_agents:
-            self.out(f"Asking {agent.name} to generate signal and predict descriptor")
             ret = self.__ask(for_what="gen_and_pred", agent=agent,
                              u_hash=u_hash, du_hash=du_hash,
                              yhat_hash=None, dhat_hash=None,
@@ -337,8 +339,9 @@ class BasicAgent(Agent):
 
         self.received_hashes = []
         at_least_one_completed = False
+        self.out(f"Asking {', '.join([x.name for x in involved_agents])} to learn to generate signal "
+                 f"{yhat_hash if yhat_hash != '<playlist>' else self.preferred_streams[self.cur_preferred_stream]}")
         for agent in involved_agents:
-            self.out(f"Asking {agent.name} to learn to generate signal")
             ret = self.__ask(for_what="learn_gen", agent=agent,
                              u_hash=u_hash, du_hash=du_hash,
                              yhat_hash=yhat_hash, dhat_hash=dhat_hash,
@@ -391,8 +394,9 @@ class BasicAgent(Agent):
 
         self.received_hashes = []
         at_least_one_completed = False
+        self.out(f"Asking {', '.join([x.name for x in involved_agents])} to learn to predict descriptor "
+                 f"{dhat_hash if dhat_hash != '<playlist>' else self.preferred_streams[self.cur_preferred_stream]}")
         for agent in involved_agents:
-            self.out(f"Asking {agent.name} to learn to predict descriptor")
             ret = self.__ask(for_what="learn_pred", agent=agent,
                              u_hash=None, du_hash=None,
                              yhat_hash=yhat_hash, dhat_hash=dhat_hash,
@@ -448,8 +452,11 @@ class BasicAgent(Agent):
 
         self.received_hashes = []
         at_least_one_completed = False
+        self.out(f"Asking {', '.join([x.name for x in involved_agents])} to learn to generate signal "
+                 f"{yhat_hash if yhat_hash != '<playlist>' else self.preferred_streams[self.cur_preferred_stream]} "
+                 f"and to learn to predict descriptor "
+                 f"{dhat_hash if dhat_hash != '<playlist>' else self.preferred_streams[self.cur_preferred_stream]}")
         for agent in involved_agents:
-            self.out(f"Asking {agent.name} to learn to generate signal and to learn to predict descriptor")
             ret = self.__ask(for_what="learn_gen_and_pred", agent=agent,
                              u_hash=u_hash, du_hash=du_hash,
                              yhat_hash=yhat_hash, dhat_hash=dhat_hash,
@@ -511,6 +518,7 @@ class BasicAgent(Agent):
         assert thres >= 0., f"Invalid evaluation threshold: {thres} (it must be in >= 0.)"
 
         self.valid_cmp_agents = []
+        msgs = []
 
         for agent, eval_result in self.eval_results:
             self.out(f"Checking if result {eval_result} {cmp} {thres}, for agent {agent.name}")
@@ -529,16 +537,25 @@ class BasicAgent(Agent):
             elif cmp == ">=" and eval_result >= thres:
                 outcome = True
 
+            if cmp[0] == "<":
+                alias = 'error level'
+            else:
+                alias = 'mark'
+
             if outcome:
-                self.out(f"Agent {agent.name} met the condition")
+                msgs.append(f"Agent {agent.name} passed the evaluation with {alias} {eval_result}/{thres})")
                 self.valid_cmp_agents.append(agent)
             else:
-                self.out(f"Agent {agent.name} did not meet the condition")
+                msgs.append(f"Agent {agent.name} did not pass the evaluation")
+
+            if len(msgs) > 0:
+                msgs[-1] = msgs[-1].lower()[0] + msgs[-1][1:]
 
         if len(self.valid_cmp_agents) == 0:
-            self.err(f"The evaluation did not meet the expected outcome for any agent")
+            self.err(f"The evaluation was not passed by any agents")
             return False
         else:
+            self.out(", ".join(msgs))
             return True
 
     def set_authority(self, agent: Self | str, auth: float):
@@ -667,6 +684,7 @@ class BasicAgent(Agent):
             return False
 
         at_least_one_completed = False
+        self.out(f"Sharing streams with {', '.join([x.name for x in involved_agents])}")
         for agent in involved_agents:
             ret = self.send_streams(agent)
             at_least_one_completed = at_least_one_completed or ret

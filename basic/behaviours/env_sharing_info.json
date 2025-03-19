@@ -1,22 +1,22 @@
 {
-    "initial_state": "ready_to_share",
-    "state": "ready_to_share",
+    "initial_state": "ready",
+    "state": "ready",
     "prev_state": null,
     "limbo_state": null,
     "state_actions": {
-        "ready_to_share": [null, null, 0],
+        "ready": [null, null, 0],
         "streams_enabled": [null, null, 1],
-        "streams_sent": [null, null, 2],
+        "streams_shared": [null, null, 2],
         "contacts_shared": [null, null, 3]
     },
     "transitions": {
-        "ready_to_share": {
+        "ready": {
             "streams_enabled": [["enable_all_streams", {}, false, 0]]
         },
         "streams_enabled": {
-            "streams_sent": [["send_streams_to_all", {}, false, 1]]
+            "streams_shared": [["send_streams_to_all", {}, false, 1]]
         },
-        "streams_sent": {
+        "streams_shared": {
             "contacts_shared": [["send_agents_to_all", {}, false, 2]]
         },
         "contacts_shared": {}

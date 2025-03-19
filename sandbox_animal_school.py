@@ -34,7 +34,7 @@ ag = BasicAgent("Dr. Green", model=EmptyModel(), authority=1.0)
 ag.add_transit("init", "basic/behaviours/getting_from_env.json", action="nop")
 
 # preparing exam
-ag.add_transit("got_agents", "exam_prepared", action="record",
+ag.add_transit("got_contacts", "exam_prepared", action="record",
                args={"stream_hash": env.name + ":all", "steps": 30})
 
 # engaging students, teaching and, afterward, evaluating students
@@ -51,8 +51,8 @@ ag.add_transit("good", "promote", action="set_authority", args={"agent": "<valid
 ag.add_transit("promote", "habilitate", action="send_disengagement")
 
 # telling promoted students that is time to teach
-ag.add_transit("habilitate", "done_teaching", action="wait_for_actions",
-               args={"agent": "<valid_cmp>", "from_state": "got_agents", "to_state": "exam_prepared", "wait": False})
+ag.add_transit("habilitate", "rest_time", action="wait_for_actions",
+               args={"agent": "<valid_cmp>", "from_state": "got_contacts", "to_state": "exam_prepared", "wait": False})
 
 # adding agent to environment
 env.add_agent(ag)
@@ -65,14 +65,14 @@ ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attribut
 ag.behave_as(env.agents["Dr. Green"])
 
 # ...however, he is not ready yet to prepare exams and teach
-ag.wait_for_actions(ag, "got_agents", "exam_prepared", wait=True)
+ag.wait_for_actions(ag, "got_contacts", "exam_prepared", wait=True)
 
 # generic behaviour of a student who listens to the requests from the teacher
-ag.add_transit("got_agents", "./basic/behaviours/listening_to_teacher.json", action="get_engagement",
+ag.add_transit("got_contacts", "./basic/behaviours/listening_to_teacher.json", action="get_engagement",
                args={"min_auth": 1.0, "max_auth": 1.0})
 
 # when the teacher will send the student back home
-ag.add_transit("teacher_engaged", "got_agents", action="get_disengagement")
+ag.add_transit("teacher_engaged", "got_contacts", action="get_disengagement")
 
 # adding agent to environment
 env.add_agent(ag)
@@ -95,6 +95,24 @@ for ag in env.agents.values():
 # creating server
 Server(env=env)
 
-# running
-env.run()
+env.save()
 
+# running
+env.run(checkpoints=[
+    {"agent": "Dr. Green",
+     "state": "student_engaged",
+     "show":
+         {
+             "Mario": ["behavior", env.name + ":albatross", env.name + ":all"],
+             "Luigi": ["console", env.name + ":giraffe"]
+         }
+     },
+    {"agent": "Luigi",
+     "state": "done_learning_to_pred",
+     "show":
+         {
+             "Mario": ["behavior", env.name + ":giraffe"],
+             "Luigi": ["behavior", env.name + ":all"]
+         }
+     }
+])
