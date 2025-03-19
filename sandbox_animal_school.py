@@ -12,16 +12,16 @@ device = torch.device("cpu")
 
 # adding streams to the environment
 env.add_stream(Stream.create(name="albatross", creator=env.name,
-                             stream=ImageDataset(image_dir="data/animals",
+                             stream=ImageDataset(image_dir="data/animals", single_class=True,
                                                  label_file_csv="data/animals/c1_skip_10i.csv")))
 env.add_stream(Stream.create(name="cheetah", creator=env.name,
-                             stream=ImageDataset(image_dir="data/animals",
+                             stream=ImageDataset(image_dir="data/animals", single_class=True,
                                                  label_file_csv="data/animals/c2_skip_10i.csv")))
 env.add_stream(Stream.create(name="giraffe", creator=env.name,
-                             stream=ImageDataset(image_dir="data/animals",
+                             stream=ImageDataset(image_dir="data/animals", single_class=True,
                                                  label_file_csv="data/animals/c3_skip_10i.csv")))
 env.add_stream(Stream.create(name="all", creator=env.name,
-                             stream=ImageDataset(image_dir="data/animals",
+                             stream=ImageDataset(image_dir="data/animals", single_class=True,
                                                  label_file_csv="data/animals/first3c_10i.csv")))
 
 # modeling behaviour of the environment
@@ -62,7 +62,7 @@ ag = BasicAgent("Mario", model=BasicImageModelCNU(attributes=env.shared_attribut
                                                   lr=0.0001, lr_head=0.005, device=device, seed=42), authority=0.0)
 
 # in principle, he is like Dr. Green...
-ag.behave_as(env.agents["Dr. Green"])
+ag.behave_as(env.agents["Dr. Green"], wildcards={"Dr. Green": ag.name})
 
 # ...however, he is not ready yet to prepare exams and teach
 ag.wait_for_actions(ag, "got_contacts", "exam_prepared", wait=True)
@@ -82,7 +82,7 @@ ag = BasicAgent("Luigi", model=BasicImageModel(attributes=env.shared_attributes,
                                                lr=0.0025, device=device, seed=42), authority=0.0)
 
 # he really acts like Mario
-ag.behave_as(env.agents["Mario"])
+ag.behave_as(env.agents["Mario"], wildcards={"Mario": ag.name})
 
 # adding agent to environment
 env.add_agent(ag)
@@ -96,4 +96,4 @@ for ag in env.agents.values():
 Server(env=env)
 
 # running
-env.run()
+env.run(checkpoints="sandbox_animal_school_checkpoints.json")

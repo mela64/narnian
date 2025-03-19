@@ -71,6 +71,7 @@ export default function Main() {
     const shownOwnedStreamsRef = useRef(shownOwnedStreams);
     const shownSignalsRef = useRef(shownSignals);
     const shownDescriptorsRef = useRef(shownDescriptors);
+    const showAllRef = useRef(shownSignals)
 
     // whenever a stream button is clicked, a stream panel is opened (the one with the plot figure)
     const [streamButtons, setStreamButtons] = useState([]);
@@ -114,6 +115,8 @@ export default function Main() {
     const [offline, setOffline] = useState(false);
     const offlineRef = useRef(offline);
     const fileInputRef = useRef(null);
+
+    const firstCheckpointWasAlreadyFoundRef = useRef(false);
 
     // background colors of the agent panels
     const bgColors = ['bg-white', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-red-50',
@@ -180,27 +183,26 @@ export default function Main() {
                             agent_authorities[index] < 1.0 ? agentButtonIcons[1] : agentButtonIcons[2]),
                     }));
 
+                    // saving a placeholder that includes all agent button IDs
+                    showAllRef.current = agent_buttons.map(agent_button => agent_button.id);
+
                     // if it is the first time (only!), we collect the button IDs in the other panel-associated lists
                     if (firstTime) {
                         setOpenFSMPanels(() => {
-                            const panels = agent_buttons.map(agent_button => agent_button.id);
-                            openFSMPanelsRef.current = panels;
-                            return panels;
+                            openFSMPanelsRef.current = showAllRef.current;
+                            return showAllRef.current;
                         });
                         setOpenConsolePanels(() => {
-                            const panels = agent_buttons.map(agent_button => agent_button.id);
-                            openConsolePanelsRef.current = panels;
-                            return panels;
+                            openConsolePanelsRef.current = showAllRef.current;
+                            return showAllRef.current;
                         });
                         setShownSignals(() => {
-                            const ids = agent_buttons.map(agent_button => agent_button.id);
-                            shownSignalsRef.current = ids;
-                            return ids;
+                            shownSignalsRef.current = showAllRef.current;
+                            return showAllRef.current;
                         });
                         setShownDescriptors(() => {
-                            const ids = agent_buttons.map(agent_button => agent_button.id);
-                            shownDescriptorsRef.current = ids;
-                            return ids;
+                            shownDescriptorsRef.current = showAllRef.current;
+                            return showAllRef.current;
                         });
                         setShownOwnedStreams(() => {
                             shownOwnedStreamsRef.current = [];
@@ -1048,6 +1050,11 @@ export default function Main() {
                                 }
                             }
                         }
+
+                        // kill all filters
+                        filterStreamButtons(_agentName_, _agentButtonId_,
+                            [], showAllRef.current, showAllRef.current);
+
                     } else {
 
                         // filter only if not showing a checkpoint
@@ -1198,6 +1205,11 @@ export default function Main() {
                                     }
                                 });
                             }
+                        }
+
+                        if (x.checkpoint_available && !firstCheckpointWasAlreadyFoundRef.current) {
+                            setSelectedPlayOption("\u2714");
+                            firstCheckpointWasAlreadyFoundRef.current = true;
                         }
 
                         setIsPaused(() => {

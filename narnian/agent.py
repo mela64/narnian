@@ -212,8 +212,9 @@ class Agent:
             self.known_streams[stream_name] = stream
         return True
 
-    def behave_as(self, agent: Self):
-        self.behav.include(agent.behav, copy=True)
+    def behave_as(self, agent: Self, wildcards: dict[str, str | float | int] | None = None):
+        self.behav.set_wildcards(wildcards)
+        self.behav.include(agent.behav, make_a_copy=True)
 
     @staticmethod
     def __string_args(args, values):

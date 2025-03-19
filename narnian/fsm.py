@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 import inspect
 import graphviz
 from typing_extensions import Self
@@ -243,10 +244,19 @@ class FiniteStateMachine:
             self.transitions[from_state][to_state].append((action_callable, args, wait, act_id))
             self.__tot_actions += 1
 
-    def include(self, fsm, copy=False):
+    def include(self, fsm, make_a_copy=False):
 
         # adding states before adding transitions, so that we also add inner state actions, if any
         for _state, (_action_callable, _args, _) in fsm.states.items():
+            if _args is not None:
+                _args = copy.deepcopy(_args)
+                for k, v in _args.items():
+                    if isinstance(v, str):
+                        for wildcard_from, wildcard_to in self.wildcards.items():
+                            if wildcard_from == v and not isinstance(wildcard_to, str):
+                                _args[k] = wildcard_to
+                            elif wildcard_from in v:
+                                _args[k] = v.replace(wildcard_from, wildcard_to)
             self.add_state_action(state=_state,
                                   action=_action_callable.__name__ if _action_callable is not None else None,
                                   args=_args, state_id=None)
@@ -255,10 +265,19 @@ class FiniteStateMachine:
         for _from_state, _to_states in fsm.transitions.items():
             for _to_state, _action_tuples in _to_states.items():
                 for (_action_callable, _args, _wait, _) in _action_tuples:
+                    if _args is not None:
+                        _args = copy.deepcopy(_args)
+                        for k, v in _args.items():
+                            if isinstance(v, str):
+                                for wildcard_from, wildcard_to in self.wildcards.items():
+                                    if wildcard_from == v and not isinstance(wildcard_to, str):
+                                        _args[k] = wildcard_to
+                                    elif wildcard_from in v:
+                                        _args[k] = v.replace(wildcard_from, wildcard_to)
                     self.add_transit(from_state=_from_state, to_state=_to_state, action=_action_callable.__name__,
                                      args=_args, wait=_wait, act_id=None)
 
-        if copy:
+        if make_a_copy:
             self.state = fsm.state
             self.prev_state = fsm.state
             self.initial_state = fsm.initial_state

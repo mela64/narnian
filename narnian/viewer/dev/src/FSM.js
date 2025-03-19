@@ -284,10 +284,20 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
 
         // Function to generate the "d" attribute for curved edges
         function getLinkPath(d) {
-            const dx = d.target.x - d.source.x;
-            const dy = d.target.y - d.source.y;
-            const dr = Math.sqrt(dx * dx + dy * dy) * 1.5; // Control radius for rounded edges
-            return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            if (d.source === d.target) {
+                const r = 20; // radius of the self-loop
+                const x = d.source.x;
+                const y = d.source.y;
+                return `M${x - r},${y} 
+                a${r},${r} 0 1,0 ${2 * r},0 
+                a${r},${r} 0 1,0 ${-2 * r},0 
+                M${x + r},${y} L${x + r + 5},${y}`;
+            } else {
+                const dx = d.target.x - d.source.x;
+                const dy = d.target.y - d.source.y;
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.5; // Control radius for rounded edges
+                return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            }
         }
 
         // adding edges to the SVG-graph "g", based on the pre-processed GraphViz edges in "graphData"

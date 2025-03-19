@@ -543,10 +543,10 @@ class BasicAgent(Agent):
                 alias = 'mark'
 
             if outcome:
-                msgs.append(f"Agent {agent.name} passed the evaluation with {alias} {eval_result}/{thres})")
+                msgs.append(f"Agent {agent.name} passed with {alias} {eval_result}/{thres})")
                 self.valid_cmp_agents.append(agent)
             else:
-                msgs.append(f"Agent {agent.name} did not pass the evaluation")
+                msgs.append(f"Agent {agent.name} did not pass")
 
             if len(msgs) > 0:
                 msgs[-1] = msgs[-1].lower()[0] + msgs[-1][1:]

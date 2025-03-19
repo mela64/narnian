@@ -8,12 +8,12 @@
         "student_found": [null, null, 1],
         "student_engaged": [null, null, 2],
         "teaching_time": [null, null, 3],
-        "lecture_ended": [null, null, 4],
+        "lecture_in_progress": [null, null, 4],
         "student_finished_following": [null, null, 5],
         "change_lecture": ["next_pref_stream", {}, 6],
         "done_teaching": [null, null, 7],
         "exam_time": [null, null, 8],
-        "exam_ended": [null, null, 9],
+        "exam_in_progress": [null, null, 9],
         "student_finished_exam": [null, null, 10],
         "eval_time": ["eval", {"stream_hash": "<agent_name>:recorded1", "what": "d", "how": "max", "steps": "<eval_steps>"}, 11],
         "bad": [null, null, 12],
@@ -32,9 +32,9 @@
             "teaching_time": [["nop", {}, false, 4]]
         },
         "teaching_time": {
-            "lecture_ended": [["ask_learn_pred", {"yhat_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": "<learn_steps>"}, false, 5]]
+            "lecture_in_progress": [["ask_learn_pred", {"yhat_hash": "<playlist>", "dhat_hash": "<playlist>", "ask_steps": "<learn_steps>"}, false, 5]]
         },
-        "lecture_ended": {
+        "lecture_in_progress": {
             "student_finished_following": [["done_learn_pred", {}, false, 6]]
         },
         "student_finished_following": {
@@ -49,9 +49,9 @@
             "exam_time": [["share_streams", {}, false, 11]]
         },
         "exam_time": {
-            "exam_ended": [["ask_pred", {"yhat_hash": "<agent_name>:recorded1", "ask_steps": "<eval_steps>"}, false, 12]]
+            "exam_in_progress": [["ask_pred", {"yhat_hash": "<agent_name>:recorded1", "ask_steps": "<eval_steps>"}, false, 12]]
         },
-        "exam_ended": {
+        "exam_in_progress": {
             "student_finished_exam": [["done_pred", {}, false, 13]]
         },
         "student_finished_exam": {

@@ -217,7 +217,10 @@ class Server:
         behav = self.env.agents[agent_name].behav if agent_name != self.env.name else self.env.behav
         state = behav.states[behav.state][2] if behav.state is not None else None
         action = behav.action[2] if behav.action is not None else None
-        return Server.pack_data({'state': state, 'action': action})
+        return Server.pack_data({'state': state, 'action': action,
+                                 'state_with_action': (behav.states[behav.state] is not None and
+                                                       behav.states[behav.state][0] is not None)
+                                 if (action is None and state is not None) else False})
 
     def get_list_of_agents(self):
         agent_name = request.args.get('agent_name')
@@ -283,13 +286,19 @@ class Server:
                                      'output_messages_count': agent.output_messages_count,
                                      'output_messages_last_pos': agent.output_messages_last_pos,
                                      'output_messages_ids': agent.output_messages_ids,
-                                     'behav_status': {'state': state, 'action': action}})
+                                     'behav_status': {'state': state, 'action': action,
+                                                      'state_with_action': (behav.states[behav.state] is not None and
+                                                                            behav.states[behav.state][0] is not None)
+                                                      if (action is None and state is not None) else False}})
         else:
             return Server.pack_data({'output_messages': [agent.output_messages[agent.output_messages_last_pos]],
                                      'output_messages_count': 1,
                                      'output_messages_last_pos': 0,
                                      'output_messages_ids': [agent.output_messages_ids[agent.output_messages_last_pos]],
-                                     'behav_status': {'state': state, 'action': action}})
+                                     'behav_status': {'state': state, 'action': action,
+                                                      'state_with_action': (behav.states[behav.state] is not None and
+                                                                            behav.states[behav.state][0] is not None)
+                                                      if (action is None and state is not None) else False}})
 
     def save(self):
         return Server.pack_data(self.env.save())

@@ -183,6 +183,7 @@ export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
                     x.output_messages && x.output_messages[0]
                     && !x.output_messages[0].startsWith("<FAILED>") ? x.output_messages[0] : receivedTextRef.current;
                 const isInAction = x.behav_status.action !== null;
+                const stateWithAction = x.behav_status.state_with_action;
 
                 if (text && text.length > 0) {
 
@@ -191,7 +192,7 @@ export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
 
                     let firstWord = words[0].toLowerCase();
 
-                    if (!isInAction && firstWord.endsWith("ing")) {
+                    if (!isInAction && !stateWithAction && firstWord.endsWith("ing")) {
                         if (irregularVerbsRef.current[firstWord]) {
                             words[0] = capitalize(irregularVerbsRef.current[firstWord]);
                         } else {

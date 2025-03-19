@@ -256,7 +256,7 @@ class Dataset(Stream):
 class ImageDataset(Stream):
 
     def __init__(self, image_dir: str, label_file_csv: str,
-                 device: torch.device = None, circular: bool = True):
+                 device: torch.device = None, circular: bool = True, single_class: bool = False):
         super().__init__()
         self.image_dir = image_dir
         self.device = device
@@ -279,7 +279,8 @@ class ImageDataset(Stream):
         class_names = list(class_names.keys())
 
         self.attributes = [Attributes(None, None, data_type="img", inv_img_transform=self.inv_transform),
-                           Attributes((len(class_names),), class_names, labeling_rule="geq0.5")]
+                           Attributes((len(class_names),), class_names,
+                                      labeling_rule="geq0.5" if not single_class else "max")]
 
         for idx, class_name in enumerate(class_names):
             class_name_to_index[class_name] = idx
