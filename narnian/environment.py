@@ -63,11 +63,34 @@ class Environment:
         self.agents[agent.name] = agent
         agent.env = self  # telling the agent what environment he is joining
 
+    def remove_agent(self, agent_name: str):
+        """Remove an agent from this environment."""
+
+        if agent_name in self.agents:
+            del self.agents[agent_name]
+            
+    def remove_all_agents(self):
+        """Remove all agents from this environment."""
+        
+        self.agents = {}
+    
     def add_stream(self, stream: Stream):
         """Add a new stream to this environment."""
 
         # adding the new stream
         self.streams[stream.get_hash()] = stream
+        
+    def remove_stream(self, creator: str, name: str):
+        """Remove a stream from this environment."""
+        stream_hash = Stream.build_hash(creator, name)
+        if stream_hash in self.streams:
+            del self.streams[stream_hash]
+            
+    def remove_all_streams(self):
+        """Remove all streams from this environment."""
+        
+        self.streams = {}
+
 
     def share_attributes(self):
         """Merge the labels of the descriptor components, across all streams, sharing them."""
