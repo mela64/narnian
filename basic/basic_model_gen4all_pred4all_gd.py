@@ -2,12 +2,13 @@ import torch
 from narnian.model import Model
 from narnian.attributes import Attributes
 from modules.networks import PredRNN
-from modules.networks import GenCTBEInitStateBZeroInput
+from modules.networks import set_seed, GenCTBEInitStateBZeroInput
 
 
 class BasicModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001, device: torch.device = torch.device("cpu")):
+    def __init__(self, attributes: list[Attributes], lr: float = 0.0001,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -15,6 +16,7 @@ class BasicModel(Model):
         u_shape = attributes[0].shape
         d_dim = attributes[1].shape.numel()
         y_dim = attributes[0].shape.numel()
+        set_seed(seed)
 
         generator = GenCTBEInitStateBZeroInput(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=0.1,
                                                local=False, cnu_memories=0)

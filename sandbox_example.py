@@ -54,7 +54,7 @@ ag.add_transit("good", "finished", action="check_pref_stream", args={"what": "fi
 env.add_agent(ag)
 
 # creating student agent
-ag = BasicAgent("Student", model=BasicModel(attributes=env.shared_attributes, lr=0.001, device=device),
+ag = BasicAgent("Student", model=BasicModel(attributes=env.shared_attributes, lr=0.001, device=device, seed=4),
                 authority=0.0)
 ag.add_transit("init", "got_streams", action="get_streams")
 ag.add_transit("got_streams", "got_agents", action="get_agents")
