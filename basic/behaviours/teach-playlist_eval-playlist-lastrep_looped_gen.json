@@ -56,7 +56,7 @@
         },
         "eval_time": {
             "good": [["compare_eval", {"cmp": "<=", "thres": "<cmp_thres>"}, false, 16]],
-            "bad": [["nop", {}, false, 17]]
+            "bad": [["nop", {"message": "The evaluation was not passed"}, false, 17]]
         },
         "good": {
             "exam_time": [["check_pref_stream", {"what": "not_first"}, false, 18]],

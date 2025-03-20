@@ -999,18 +999,23 @@ export default function Main() {
                         if (playPauseStatusRef.current.show !== null) {
 
                             if (_agentName_ in playPauseStatusRef.current.show) {
-                                let closeStreams = true;
                                 const listOfThingsToShow = playPauseStatusRef.current.show[_agentName_];
+                                const numStreamsToShow = Object.keys(listOfThingsToShow)
+                                    .filter(key => key !== "behavior" && key !== "console").length;
+
+                                let allNewToOpen = [];
+                                let current = [];
+                                if (openStreamPanelsRef.current[_agentButtonId_] !== undefined) {
+                                    current = [...openStreamPanelsRef.current[_agentButtonId_]];
+                                }
 
                                 // parse le list of things to show
                                 listOfThingsToShow.forEach(thingToShow => {
-
                                     if (thingToShow.toLowerCase() === "behavior") {
                                         // skip
                                     } else if (thingToShow.toLowerCase() === "console") {
                                         // skip
                                     } else {
-                                        closeStreams = false;
 
                                         // regex to check if stream name ends with " [y]" or " [d]
                                         const regex =
@@ -1023,25 +1028,28 @@ export default function Main() {
                                                 .map((btn) => btn.id) || [];
 
                                         const newToOpen = streamButtonIDsToShow.filter(item =>
-                                            !openStreamPanelsRef.current[_agentButtonId_]?.includes(item)) ?? [];
-                                        const existingToKeep = openStreamPanelsRef.current[_agentButtonId_]
-                                            ?.filter(item => streamButtonIDsToShow.includes(item)) ?? [];
-
-                                        if (newToOpen.length > 0 ||
-                                            (existingToKeep.length > 0
-                                                && existingToKeep.length < openAgentPanelsRef.current.length)) {
-                                            setOpenStreamPanels((prev) => {
-                                                return {
-                                                    ...prev, [_agentButtonId_]:
-                                                        [...existingToKeep, ...newToOpen]
-                                                };
-                                            });
-                                        }
+                                            !current?.includes(item)) ?? [];
+                                        const newToOpenFiltered =
+                                            newToOpen.filter(item => !allNewToOpen.includes(item));
+                                        allNewToOpen = [...allNewToOpen, ...newToOpenFiltered];
                                     }
                                 });
 
-                                // close the things that were not mentioned in the list
-                                if (closeStreams) {
+                                if (numStreamsToShow > 0 && allNewToOpen.length > 0) {
+                                    const existingToKeep = current
+                                        ?.filter(item => allNewToOpen.includes(item)) ?? [];
+
+                                    // open the things that were mentioned in the list
+                                    setOpenStreamPanels((prevOpenStreamPanels) => {
+                                        return {
+                                            ...prevOpenStreamPanels, [_agentButtonId_]:
+                                                [...existingToKeep, ...allNewToOpen]
+                                        };
+                                    });
+                                }
+                                if (numStreamsToShow === 0) {
+
+                                    // close everything
                                     setOpenStreamPanels((prevOpenStreamPanels) => {
                                         return {
                                             ...prevOpenStreamPanels, [_agentButtonId_]: []

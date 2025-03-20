@@ -154,8 +154,10 @@ class Agent:
     def get_action_step(self):
         return self.behav.action_step
 
-    def nop(self):
+    def nop(self, message: str | None = None):
         """Do nothing."""
+        if message is not None:
+            self.out(message)
         return True
 
     def send_agents(self, agent: Self):

@@ -271,12 +271,18 @@ class Environment:
 
                 if (state is None or behav.state == state) and \
                         (action is None or action == behav.action[0].__name__):
-                    if "skip" not in checkpoint or checkpoint["skip"] is False:
+                    if "skip" not in checkpoint:
                         checkpoint_matched = True
                         self.what_to_show_on_checkpoint = checkpoint["show"]
-                    self.next_checkpoint += 1
-                    if self.next_checkpoint >= len(checkpoints):
-                        self.next_checkpoint = -1  # a negative value tells there are not checkpoints
+                        self.next_checkpoint += 1
+                        if self.next_checkpoint >= len(checkpoints):
+                            self.next_checkpoint = -1  # a negative value tells there are not checkpoints
+                    else:
+                        checkpoint["skip"] -= 1
+                        if checkpoint["skip"] <= 0:
+                            self.next_checkpoint += 1
+                            if self.next_checkpoint >= len(checkpoints):
+                                self.next_checkpoint = -1  # a negative value tells there are not checkpoints
 
             # in step mode, we clear the external event to be able to wait for a new one
             if self.using_server:
