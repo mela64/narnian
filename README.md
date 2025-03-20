@@ -1,14 +1,10 @@
 
+![d](imgs/its_cat_community.jpg)
 
-<center>
+#  NARNIAN - NAtuRe iNspired Intelligent AgeNts 
 
-![d](imgs/its_narnian.jpg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/django)
 
-</center>
-
-#  <center> NARNIAN - NAtuRe iNspired Intelligent AgeNts </center>
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/torch)
 
 ## What is it?
 
@@ -63,67 +59,32 @@ python sandbox_example.py # A simple example of a Narnian simulation.
 
 Narnian is structured as follows:
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>narnian Folder Tree</title>
-  <style>
-    .agent       { color: red; }
-    .attributes  { color: blue; }
-    .environment { color: green; }
-    .model       { color: purple; }
-    .streams     { color: orange; }
-    pre { font-family: monospace; }
-  </style>
-</head>
-<body>
-<pre>
+```
 narnian/
 ├── narnian/
 │   ├── __init__.py         # Package initializer
-│   ├── <span class="agent">agents.py</span>           # Manages an agent's behavior, communication, and interactions
-│   ├── <span class="attributes">attributes.py</span>       # Manages attributes and labels for streams
-│   ├── <span class="environment">environment.py</span>      # Defines the environment where agents and streams interact
+│   ├── **agents.py**           # Manages an agent's behavior, communication, and interactions
+│   ├── attributes.py       # Manages attributes and labels for streams
+│   ├── **environment.py**      # Defines the environment where agents and streams interact
 │   ├── fsm.py              # Implements Finite State Machines for agent behaviors
-│   ├── <span class="model">model.py</span>            # Contains the core simulation models
+│   ├── model.py            # Contains the core simulation models
 │   ├── server.py           # Manages a server which makes the narnian world accessible through a web app
-│   ├── <span class="streams">streams.py</span>          # Handles real-time data streams      
-</pre>
-</body>
-</html>
+│   ├── **streams.py**          # Handles real-time data streams      
+```
 
 #### Basic Instance
 A basic instance of the Narnian framework is available in the **./basic** folder. It contains an example of a simulated environment where agents named students and a teacher coexist. The teacher records information from the environment and then teaches the students using that information. After a learning run, the students are evaluated on their capabilities, and the teacher decides if a student is ready to become a teacher or if it needs more assistance with several runs.
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>narnian Basic Folder Tree</title>
-  <style>
-    .agent       { color: red; }
-    .attributes  { color: blue; }
-    .environment { color: green; }
-    .model       { color: purple; }
-    .streams     { color: orange; }
-    pre { font-family: monospace; }
-  </style>
-</head>
-<body>
-<pre>
+```
 narnian/
 ├── basic/
 │   ├── utils/
 │   │   ├── hl_utils.py
-│   ├── <span class="agent">basic_agent.py</span>           # Manages an agent's behavior, communication, and interactions
-│   ├── <span class="attributes">attributes.py</span>       # Manages attributes and labels for streams
-│   ├── <span class="environment">basic_environment.py</span>      # Defines the environment where agents and streams interact
-│   ├── <span class="model">basic_model_*.py</span>            # Contains the core simulation models
-│   ├── <span class="streams">basic_streams.py</span>          # Handles real-time data streams      
-</pre>
-</body>
-</html>
+│   ├── **basic_agent.py**           # Basic's enviroment realisation of an agent
+│   ├── **basic_environment.py**      # The basic enviroment 
+│   ├── **basic_model_*.py**            # Models defined in the basic instance of narnian
+│   ├── **basic_streams.py**          # Handles real-time data streams for basic instance   
+```
 
 ### Examples
 
@@ -165,12 +126,6 @@ To execute the Signal School simulation, run the following command:
 python sandbox_signal_school.py
 ```
 
----
-
-### Basic 
-Qui aggiungere un toy example guidato su come usare l'estensione basic
-
----
 
 ### References
 
