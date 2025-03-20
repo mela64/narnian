@@ -35,6 +35,7 @@ const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 const unknownPlayPauseStatus = {
     "status": "?",
     "still_to_play": -1,
+    "time": 0.,
     "y_range": null,
     "matched_checkpoint_to_show": null,
     "more_checkpoints_available": false
@@ -44,6 +45,7 @@ const unknownPlayPauseStatus = {
 const endedStatus = {
     "status": "ended",
     "still_to_play": -1,
+    "time": 0.,
     "y_range": null,
     "matched_checkpoint_to_show": null,
     "more_checkpoints_available": false
@@ -1310,11 +1312,10 @@ export default function Main() {
         <DndProvider backend={HTML5Backend}>
             {saving && <div className="saving-spinner"></div>}
 
-            <div className="p-6 space-y-8 flex flex-col items-center w-full">
+            <div className="p-6 space-y-2 flex flex-col items-center w-full">
                 <div className="flex flex-col items-center justify-center text-center">
-                    <h1 className="text-2xl font-semibold mt-2">NARNIAN</h1>
-                    <h1 className="text-2xl font-semibold mt-2">Environment:{" "}
-                        {envTitle}
+                    <h1 className="text-2xl font-semibold mt-2 text-center">
+                        NARNIAN: {envTitle}
                         <button onClick={saveOnServer}
                                 className={`save-button inline-flex items-center pl-2 gap-2 relative top-0.5 
                                 ${offline ? "hidden" : ""}`}><Save size={20}/></button>
@@ -1325,9 +1326,12 @@ export default function Main() {
                                onChange={handleFileUpload}
                         />
                     </h1>
+                    <span className={`text-sm mt-1 ${!playPauseStatus ? "hidden" : ""}`}>
+                            Time: {playPauseStatus.time.toFixed(2)}s
+                    </span>
                 </div>
 
-                <div className="flex flex-wrap gap-4 w-full justify-center">
+                <div className="flex flex-wrap gap-4 w-full mt-0 pt-0 justify-center">
 
                     <div className="flex items-center"
                          style={{display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>

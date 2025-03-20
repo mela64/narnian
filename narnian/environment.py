@@ -19,6 +19,7 @@ class Environment:
         self.streams = {}  # streams that are available in this environment
         self.agents = {}  # agents living in this environment
         self.step = 0
+        self.delta = 0.1
         self.print_enabled = True  # if output should be printed to screen
         self.using_server = False  # it will be changed by the server, if any
         self.step_event = None  # event that triggers a new step (manipulated by the server)
