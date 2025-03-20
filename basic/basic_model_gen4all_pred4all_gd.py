@@ -7,8 +7,8 @@ from modules.networks import set_seed, GenCTBEInitStateBZeroInput
 
 class BasicModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001,
-                 device: torch.device = torch.device("cpu"), seed: int = -1):
+    def __init__(self, attributes: list[Attributes], h_dim: tuple[int] = (500, 10), delta: float = 0.1,
+                 cnu_memories: int = 0, lr: float = 0.0001, device: torch.device = torch.device("cpu"), seed: int = -1):
         """Creates a model composed of a generator and a predictor."""
 
         # getting shape info from attributes (it is needed to build the generator/predictor)
@@ -18,9 +18,9 @@ class BasicModel(Model):
         y_dim = attributes[0].shape.numel()
         set_seed(seed)
 
-        generator = GenCTBEInitStateBZeroInput(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=500, delta=0.1,
-                                               local=False, cnu_memories=0)
-        predictor = PredRNN(y_dim=y_dim, d_dim=d_dim, h_dim=10)
+        generator = GenCTBEInitStateBZeroInput(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim[0], delta=delta,
+                                               local=False, cnu_memories=cnu_memories)
+        predictor = PredRNN(y_dim=y_dim, d_dim=d_dim, h_dim=h_dim[1])
 
         # creating the model (superclass)
         super(BasicModel, self).__init__(generator, predictor, attributes, device=device)

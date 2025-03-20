@@ -1,5 +1,4 @@
 import os
-import json
 import pickle
 import inspect
 import threading
@@ -19,6 +18,7 @@ class Environment:
         self.streams = {}  # streams that are available in this environment
         self.agents = {}  # agents living in this environment
         self.step = 0
+        self.delta = 0.1
         self.print_enabled = True  # if output should be printed to screen
         self.using_server = False  # it will be changed by the server, if any
         self.step_event = None  # event that triggers a new step (manipulated by the server)
@@ -157,10 +157,16 @@ class Environment:
 
             # saving FSMs (extra)
             self.behav.save(os.path.join(where, f"{self.name}.json"))  # FSM json
-            self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))  # FSM pdf
+            try:
+                self.behav.save_pdf(os.path.join(where, f"{self.name}.pdf"))  # FSM pdf
+            except OSError:
+                self.err(f"Cannot save PDF version of the behavior of {self.name} (is GraphViz installed?")
             for agent in self.agents.values():
                 agent.behav.save(os.path.join(where, f"{agent.name}.json"))  # FSM json
-                agent.behav.save_pdf(os.path.join(where, f"{agent.name}.pdf"))  # FSM pdf
+                try:
+                    agent.behav.save_pdf(os.path.join(where, f"{agent.name}.pdf"))  # FSM pdf
+                except OSError:
+                    self.err(f"Cannot save PDF version of the behavior of {agent.name} (is GraphViz installed?")
 
         except (TypeError, ValueError, RuntimeError, IOError, FileNotFoundError) as e:
             self.out(f"Could not save the environment: {e}")

@@ -7,8 +7,9 @@ from modules.networks import set_seed, GenCTBEInitStateBZeroInput
 
 class BasicHLModel(Model):
 
-    def __init__(self, attributes: list[Attributes], delta: float = None,
-                 device: torch.device = torch.device("cpu"), seed: int = -1, cnu_memories: int = 0):
+    def __init__(self, attributes: list[Attributes], h_dim: int = 1000, delta: float = None, cnu_memories: int = 0,
+                 gamma: float = 1., theta: float = 0.2, beta: float = 0.01,
+                 device: torch.device = torch.device("cpu"), seed: int = -1):
         """Creates a model composed of a generator and a predictor."""
 
         assert delta is not None, f"Parameter 'delta' must be specified (it cannot be None)."
@@ -21,14 +22,13 @@ class BasicHLModel(Model):
         d_dim = attributes[1].shape.numel()
         y_dim = attributes[0].shape.numel()
 
-        # can be one of: { BlockExpGenerator, AntisymmetricExpGenerator }
-        generator = GenCTBEInitStateBZeroInput(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=1000, delta=delta,
+        generator = GenCTBEInitStateBZeroInput(u_shape=u_shape, d_dim=d_dim, y_dim=y_dim, h_dim=h_dim, delta=delta,
                                                local=True, cnu_memories=cnu_memories)
         predictor = None
         super(BasicHLModel, self).__init__(generator, predictor, attributes, device=device)
 
         # HL based optimization of the generator
-        self.hl_optim = HL(self.generator, gamma=1., theta=0.2, beta=0.01,
+        self.hl_optim = HL(self.generator, gamma=gamma, theta=theta, beta=beta,
                            reset_neuron_costate=False, reset_weight_costate=False, local=True)
         self.loss_gen = torch.nn.functional.mse_loss
 

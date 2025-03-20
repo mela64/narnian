@@ -190,6 +190,7 @@ class Server:
     def get_play_pause_status(self):
         ret = {'status': None,
                'still_to_play': self.env.skip_clear_for,
+               'time': self.env.step * self.env.delta,
                'y_range': self.y_range,
                'matched_checkpoint_to_show': None,
                'more_checkpoints_available': False}

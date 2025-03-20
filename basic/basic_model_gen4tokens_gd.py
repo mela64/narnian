@@ -6,7 +6,7 @@ from modules.networks import GenRNNTokenLM
 
 class BasicTokenModel(Model):
 
-    def __init__(self, attributes: list[Attributes], lr: float = 0.0001,
+    def __init__(self, attributes: list[Attributes], emb_dim: int = 16, h_dim: int = 100, lr: float = 0.0001,
                  device: torch.device = torch.device("cpu"), seed: int = -1):
         """Creates a model composed of a generator and a predictor."""
 
@@ -18,8 +18,8 @@ class BasicTokenModel(Model):
 
         # creating the model (superclass)
         super(BasicTokenModel, self).__init__(
-            generator=GenRNNTokenLM(num_emb=num_emb, emb_dim=16, d_dim=d_dim, y_dim=y_dim,
-                                    h_dim=100, device=device, seed=seed),
+            generator=GenRNNTokenLM(num_emb=num_emb, emb_dim=emb_dim, d_dim=d_dim, y_dim=y_dim,
+                                    h_dim=h_dim, device=device, seed=seed),
             predictor=None,
             attributes=attributes, device=device, seed=seed)
 
