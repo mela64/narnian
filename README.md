@@ -1,5 +1,3 @@
-
-<!-- PROJECT LOGO -->
 <br />
 <div align="center">
   <img src="imgs/its_cat_community.jpg" alt="Logo" width="500" height="500">
@@ -95,15 +93,15 @@ narnian/
 ├── basic/
 │   ├── utils/
 │   │   ├── hl_utils.py
-│   ├── **basic_agent.py**           # Basic's enviroment realisation of an agent
+│   ├── **basic_agent.py**           # Basic's environment realization of an agent
 │   ├── **basic_environment.py**      # The basic enviroment 
-│   ├── **basic_model_*.py**            # Models defined in the basic instance of narnian
-│   ├── **basic_streams.py**          # Handles real-time data streams for basic instance   
+│   ├── **basic_model_*.py**            # Models defined in the basic instance of Narnian
+│   ├── **basic_streams.py**          # Handles real-time data streams   
 ```
 
 ### Examples
 
-The root folder of the repository includes example simulations that showcase how to run the basic instance:
+The root folder of the repository includes example simulations that showcase how to run the basic:
 
 #### Animal School
 Animal School is a simulation scenario built using the basic framework that mimics an educational ecosystem. In this scenario, a virtual "school" is created where a teacher agent instructs and evaluates student agents using real-time data streams composed of animal images.
