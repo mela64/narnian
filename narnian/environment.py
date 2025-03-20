@@ -68,11 +68,14 @@ class Environment:
 
         if agent_name in self.agents:
             del self.agents[agent_name]
+            print(f"Successfully removed agent {agent_name}!")
+        else:
+            print(f"Agent {agent_name} is not here!! Maybe you were looking for one of these {list(self.agents.keys())}.")
             
     def remove_all_agents(self):
         """Remove all agents from this environment."""
-        
         self.agents = {}
+        print(f"Successfully removed all agents!")
     
     def add_stream(self, stream: Stream):
         """Add a new stream to this environment."""
@@ -85,12 +88,14 @@ class Environment:
         stream_hash = Stream.build_hash(creator, name)
         if stream_hash in self.streams:
             del self.streams[stream_hash]
+            print(f"Successfully removed stream {stream_hash}!")
+        else:
+            print(f"Stream {stream_hash} is unknown!! Maybe you were looking for one of these {list(self.streams.keys())}.")
             
     def remove_all_streams(self):
         """Remove all streams from this environment."""
-        
         self.streams = {}
-
+        print(f"Successfully removed all agents!")
 
     def share_attributes(self):
         """Merge the labels of the descriptor components, across all streams, sharing them."""
