@@ -73,7 +73,7 @@ for ag in env.agents.values():
     print(ag)
 
 # creating server
-Server(env=env)
+Server(env=env, checkpoints="sandbox_signal_school_checkpoints.json", y_range=[-1.1, 1.1])
 
 # running
-env.run(checkpoints="sandbox_signal_school_checkpoints.json")
+env.run()

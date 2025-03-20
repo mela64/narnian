@@ -17,7 +17,8 @@ const id2Color = { // plot colors
     9: "#17BECF" // cyan
 }
 
-export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _setBusy_, _ioDataRef_, _offline_ }) {
+export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_,  _isBusyRef_, _setIsBusy_,
+                                       _ioDataRef_, _offline_, _yMin_, _yMax_ }) {
     out("[PlotFigure] " +
         "_agentName_: " + _agentName_ + ", " +
         "_streamStruct_: " + JSON.stringify(_streamStruct_) + ", " +
@@ -93,7 +94,7 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
         }
 
         // this will tell the parent that this component is working
-        _setBusy_((prev) => prev + 1);
+        _isBusyRef_.current += 1; _setIsBusy_(_isBusyRef_.current);
 
         // flags
         const goingToSave = _ioDataRef_.current !== null && _ioDataRef_.current !== undefined && !_offline_;
@@ -192,10 +193,10 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
                             family: 'Arial, sans-serif',
                             size: 14,
                             color: 'black',
-                            //weight: 'bold'
                         },
                         xanchor: "center",
-                        yanchor: "middle"
+                        yanchor: "middle",
+                        textangle: -20
                     })));
 
                     limitToLastN.current = true; // this marks that we want to see only a small set of recent samples
@@ -408,13 +409,13 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
                 () => {
                     if (returnedAPICallsRef.current === numStreams) {
                         // this will tell the parent that this component is now ready
-                        _setBusy_((prev) => prev - 1);
+                        _isBusyRef_.current -= 1; _setIsBusy_(_isBusyRef_.current);
                     }
                 }
             );
         }
-    }, [_isPaused_, _streamStruct_, _agentName_, _setBusy_, _ioDataRef_, _offline_]);
-    // _isPaused_ is what we care, while _streamStruct_ changes due to (un)merge (_agentName_, _setBusy_ are constant)
+    }, [_isPaused_, _streamStruct_, _agentName_, _ioDataRef_, _offline_, _setIsBusy_, _isBusyRef_]);
+    // _isPaused_ is what we care, while _streamStruct_ changes due to (un)merge (_agentName_ is constant)
 
     // returning the <div>...</div> that will be displayed
     return (
@@ -433,8 +434,14 @@ export default function PlotFigure({ _agentName_, _streamStruct_, _isPaused_, _s
                         type: "linear", // this is fine when the x-axis component are explicitly provided
                     },
                     yaxis: {
-                        range: [allPlotData.MIMAXs.yMin,
-                            !allPlotData.limitToLastN ? allPlotData.MIMAXs.yMax : allPlotData.MIMAXs.yMax + 1.0],
+                        range: [
+                            (_yMin_ !== undefined && _yMin_ != null) ?
+                                Math.min(allPlotData.MIMAXs.yMin, _yMin_) : allPlotData.MIMAXs.yMin,
+                            (_yMax_ !== undefined && _yMax_ != null) ?
+                                Math.max(!allPlotData.limitToLastN ?
+                                    allPlotData.MIMAXs.yMax : allPlotData.MIMAXs.yMax + 1.0, _yMax_) :
+                                !allPlotData.limitToLastN ? allPlotData.MIMAXs.yMax : allPlotData.MIMAXs.yMax + 1.0
+                        ],
                         title: "",
                         type: "linear",
                     },

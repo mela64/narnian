@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { callAPI, out } from "./utils";
 import { Inbox } from "lucide-react";  // icon
 
-export default function Console({ _agentName_, _isPaused_, _setBusy_ }) {
+export default function Console({ _agentName_, _isPaused_,  _isBusyRef_, _setIsBusy_ }) {
     out("[Console] " +
         "_agentName_: " + _agentName_ + ", " +
         "_isPaused_: " + _isPaused_);
@@ -36,7 +36,7 @@ export default function Console({ _agentName_, _isPaused_, _setBusy_ }) {
         }
 
         // this will tell the parent that this component is working
-        _setBusy_((prev) => prev + 1);
+        _isBusyRef_.current += 1; _setIsBusy_(_isBusyRef_.current);
 
         out("[Console] useEffect *** fetching data (agent_name: " + _agentName_ + ") ***");
         callAPI('/get_console', "agent_name=" + _agentName_,
@@ -79,11 +79,11 @@ export default function Console({ _agentName_, _isPaused_, _setBusy_ }) {
             () => { setMessages((prev) => (prev)); return true; },
             () => {
                 // this will tell the parent that this component is now ready
-                _setBusy_((prev) => prev - 1);
+                _isBusyRef_.current -= 1; _setIsBusy_(_isBusyRef_.current);
             }
         );
-    }, [_isPaused_, _agentName_, _setBusy_]);
-    // listen to the pause state (_isPaused_), while _agentName_ and _setBusy_ are not going to change
+    }, [_isPaused_, _agentName_, _setIsBusy_, _isBusyRef_]);
+    // listen to the pause state (_isPaused_), while _agentName_ is not going to change
 
     // returning the <div>...</div> that will be displayed when no messages are there at all (some icon)
     if (messages.length === 0) {

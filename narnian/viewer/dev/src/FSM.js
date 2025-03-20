@@ -6,7 +6,7 @@ import { drag as d3_drag } from "d3-drag";
 import { read as dotRead } from "graphlib-dot"
 import {callAPI, out} from "./utils"
 
-export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
+export default function FSM({_agentName_, _isPaused_,  _isBusyRef_, _setIsBusy_}) {
     out("[FSM] " +
         "_agentName_: " + _agentName_ + ", " +
         "_isPaused_: " + _isPaused_);
@@ -158,7 +158,7 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         }
 
         // this will tell the parent that this component is working
-        _setBusy_((prev) => prev + 1);
+        _isBusyRef_.current += 1; _setIsBusy_(_isBusyRef_.current);
 
         const {width, height} = svgSize;
         out("[FSM] useEffect *** drawing *** (data ready, width: " + width + ", height: " + height + ")");
@@ -552,9 +552,9 @@ export default function FSM({_agentName_, _isPaused_, _setBusy_}) {
         setDrawingDone(true);  // marking the drawing has completed
 
         // this will tell the parent that this component is now ready
-        _setBusy_((prev) => prev - 1);
-    }, [graphvizDotStringData, svgSize, _setBusy_]);
-    // redraw when the data is loaded and when the size changes due to resize (_setBusy_ will not change)
+        _isBusyRef_.current -= 1; _setIsBusy_(_isBusyRef_.current);
+    }, [graphvizDotStringData, svgSize, _setIsBusy_, _isBusyRef_]);
+    // redraw when the data is loaded and when the size changes due to resize
 
     // returning the <div>...</div> that will be displayed when loading data (rotating spin or similar)
     if (loading) {

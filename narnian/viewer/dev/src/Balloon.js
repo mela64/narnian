@@ -2,7 +2,7 @@ import {useState, useEffect, useRef} from "react";
 import {motion} from "framer-motion";
 import {callAPI, out} from "./utils";
 
-export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
+export default function Balloon({_agentName_, _isPaused_, _isBusyRef_, _setIsBusy_}) {
     out("[Balloon] " +
         "_agentName_: " + _agentName_ + ", " +
         "_isPaused_: " + _isPaused_);
@@ -165,7 +165,7 @@ export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
         }
 
         // this will tell the parent that this component is working
-        _setBusy_((prev) => prev + 1);
+        _isBusyRef_.current += 1; _setIsBusy_(_isBusyRef_.current);
 
         out("[Balloon] useEffect *** fetching data (get last console message, agent_name: " + _agentName_ + ") ***");
         callAPI('/get_console', {agent_name: _agentName_, last_only: true},
@@ -223,11 +223,11 @@ export default function Balloon({_agentName_, _isPaused_, _setBusy_}) {
             },
             () => {
                 // this will tell the parent that this component is now ready
-                _setBusy_((prev) => prev - 1);
+                _isBusyRef_.current -= 1; _setIsBusy_(_isBusyRef_.current);
             }
         );
-    }, [_isPaused_, _agentName_, _setBusy_]);
-    // listen to the pause state (_isPaused_), while _agentName_ and _setBusy_ are not going to change
+    }, [_isPaused_, _agentName_, _setIsBusy_, _isBusyRef_]);
+    // listen to the pause state (_isPaused_), while _agentName_ is not going to change
 
     return (
         <div className="relative">

@@ -26,7 +26,7 @@ class Environment:
         self.skip_clear_for = 0
         self.shared_attributes = None
         self.next_checkpoint = 0
-        self.what_to_show_on_checkpoint = None
+        self.server_checkpoints = None
         self.steps = None
         self.output_messages = [""] * 20
         self.output_messages_ids = [-1] * 20
@@ -207,7 +207,7 @@ class Environment:
         """Print an error message to the console, if enabled."""
         self.out("<FAILED> " + msg, show_state, show_act)
 
-    def run(self, steps: int | None = None, checkpoints: list[dict] | str | None = None):
+    def run(self, steps: int | None = None):
         """Run the environment."""
 
         assert steps is None or steps > 0, "Invalid number of steps"
@@ -221,14 +221,8 @@ class Environment:
             self.step_event = threading.Event()
             self.wait_event = threading.Event()
 
-        # loading checkpoints, if needed
-        if isinstance(checkpoints, str):  # if it is a string, then it is assumed to be a file name
-            with open(checkpoints, 'r') as file:
-                checkpoints = json.load(file)  # from filename to dictionary
-
         # main loop
         self.step = 0
-        self.next_checkpoint = 0 if checkpoints is not None else -1  # a negative value tells there are not checkpoints
         while True:
 
             # in server mode, we wait for an external event to go ahead (step_event.set())
@@ -253,10 +247,9 @@ class Environment:
                 in_action = agent.behav.limbo_state is not None or in_action
 
             # matching checkpoints
-            checkpoint_matched = False
-            self.what_to_show_on_checkpoint = None
-            if self.next_checkpoint >= 0:  # a negative value tells there are not checkpoints
-                checkpoint = checkpoints[self.next_checkpoint]
+            if self.server_checkpoints is not None and self.server_checkpoints["current"] >= 0:
+                self.server_checkpoints["matched"] = -1
+                checkpoint = self.server_checkpoints["checkpoints"][self.server_checkpoints["current"]]
                 agent = checkpoint["agent"]
                 state = checkpoint["state"] if "state" in checkpoint else None
                 action = checkpoint["action"] if "action" in checkpoint else None
@@ -272,17 +265,16 @@ class Environment:
                 if (state is None or behav.state == state) and \
                         (action is None or action == behav.action[0].__name__):
                     if "skip" not in checkpoint:
-                        checkpoint_matched = True
-                        self.what_to_show_on_checkpoint = checkpoint["show"]
-                        self.next_checkpoint += 1
-                        if self.next_checkpoint >= len(checkpoints):
-                            self.next_checkpoint = -1  # a negative value tells there are not checkpoints
+                        self.server_checkpoints["matched"] = self.server_checkpoints["current"]
+                        self.server_checkpoints["current"] += 1
+                        if self.server_checkpoints["current"] >= len(self.server_checkpoints["checkpoints"]):
+                            self.server_checkpoints["current"] = -1  # this means: no more checkpoints
                     else:
                         checkpoint["skip"] -= 1
                         if checkpoint["skip"] <= 0:
-                            self.next_checkpoint += 1
-                            if self.next_checkpoint >= len(checkpoints):
-                                self.next_checkpoint = -1  # a negative value tells there are not checkpoints
+                            self.server_checkpoints["current"] += 1
+                            if self.server_checkpoints["current"] >= len(self.server_checkpoints["checkpoints"]):
+                                self.server_checkpoints["current"] = -1  # this means: no more checkpoints
 
             # in step mode, we clear the external event to be able to wait for a new one
             if self.using_server:
@@ -294,7 +286,7 @@ class Environment:
                     if state_changed:
                         self.step_event.clear()
                 elif self.skip_clear_for == -3:  # play until next checkpoint:
-                    if checkpoint_matched:
+                    if self.server_checkpoints["matched"] >= 0:
                         self.step_event.clear()
                 else:
                     self.skip_clear_for -= 1

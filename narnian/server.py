@@ -1,4 +1,5 @@
 import io
+import json
 import torch
 import base64
 from PIL import Image
@@ -11,7 +12,9 @@ from flask import Flask, jsonify, request, send_from_directory
 
 class Server:
 
-    def __init__(self, env: Environment, root: str = 'viewer/www', port: int = 5001):
+    def __init__(self, env: Environment, root: str = 'viewer/www', port: int = 5001,
+                 checkpoints: dict[str, list[dict] | int] | str | None = None,
+                 y_range: list[float] | None = None):
         self.env = env
         self.env.using_server = True  # forcing
         self.root = root
@@ -22,6 +25,21 @@ class Server:
         CORS(self.app)  # to handle cross-origin requests (needed for development)
         self.register_routes()
         self.thumb_transforms = transforms.Compose([transforms.Resize(64), transforms.CenterCrop(64)])
+        self.y_range = y_range
+
+        # loading checkpoints, if needed
+        if checkpoints is not None and isinstance(checkpoints, str):  # string: assumed to be a file name
+            file_name = checkpoints
+            checkpoints = {"checkpoints": None, "matched": -1, "current": 0}
+            with open(file_name, 'r') as file:
+                checkpoints["checkpoints"] = json.load(file)  # from filename to dictionary
+        elif checkpoints is not None:
+            checkpoints = {"checkpoints": checkpoints, "matched": -1, "current": 0}
+        self.env.server_checkpoints = checkpoints
+
+        # fixing y_range as needed
+        self.y_range = [None, None] if self.y_range is None else self.y_range
+        assert len(self.y_range) == 2, "Invalid y_range argument (it must be either None of a list of 2 floats)"
 
         # starting a new thread
         thread = Thread(target=self.__run_server)
@@ -172,14 +190,20 @@ class Server:
     def get_play_pause_status(self):
         ret = {'status': None,
                'still_to_play': self.env.skip_clear_for,
-               'show': self.env.what_to_show_on_checkpoint,
-               'checkpoint_available': (self.env.next_checkpoint >= 0)}
+               'y_range': self.y_range,
+               'matched_checkpoint_to_show': None,
+               'more_checkpoints_available': False}
         if self.env.step == self.env.steps:
             ret['status'] = 'ended'
         elif self.env.step_event.is_set():
             ret['status'] = 'playing'
         elif self.env.wait_event.is_set():
             ret['status'] = 'paused'
+        if self.env.server_checkpoints is not None:
+            ret['more_checkpoints_available'] = self.env.server_checkpoints["current"] >= 0
+            if self.env.server_checkpoints["matched"] >= 0:
+                ret['matched_checkpoint_to_show'] = (
+                    self.env.server_checkpoints)["checkpoints"][self.env.server_checkpoints["matched"]]["show"]
         return Server.pack_data(ret)
 
     def ask_to_play(self):

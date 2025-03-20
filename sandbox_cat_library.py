@@ -59,7 +59,7 @@ for ag in env.agents.values():
     print(ag)
 
 # creating server
-Server(env=env)
+Server(env=env, checkpoints="sandbox_cat_library_checkpoints.json")
 
 # running
-env.run(checkpoints="sandbox_cat_library_checkpoints.json")
+env.run()

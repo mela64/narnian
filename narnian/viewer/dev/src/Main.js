@@ -35,25 +35,25 @@ const streamButtonIcons = [<Activity/>, <Search/>, <Waves/>];
 const unknownPlayPauseStatus = {
     "status": "?",
     "still_to_play": -1,
-    "show": null,
-    "checkpoint_available": false
+    "y_range": null,
+    "matched_checkpoint_to_show": null,
+    "more_checkpoints_available": false
 }
 
 // the structure representing the ended status
 const endedStatus = {
     "status": "ended",
     "still_to_play": -1,
-    "show": null,
-    "checkpoint_available": false
+    "y_range": null,
+    "matched_checkpoint_to_show": null,
+    "more_checkpoints_available": false
 }
 
 export default function Main() {
 
     // working-state of the components used in this page
-    const [isFSMBusy, setIsFSMBusy] = useState(0);
-    const [isConsoleBusy, setIsConsoleBusy] = useState(0);
-    const [isPlotFigureBusy, setIsPlotFigureBusy] = useState(0);
-    const [isBalloonBusy, setIsBalloonBusy] = useState(0);
+    const [isBusy, setIsBusy] = useState(0);
+    const isBusyRef = useRef(0);
 
     // whenever an agent button is clicked, an agent panel is opened (with the FSM, console, streams, stream panels)
     const [agentButtons, setAgentButtons] = useState([]);
@@ -994,20 +994,17 @@ export default function Main() {
                     // such a checkpoint
                     if (serverCommunicatedPlayStepsRef.current === -3) {
 
-                        // if it was a false alarm, then playPauseStatus.show will be null,
+                        // if it was a false alarm then playPauseStatus.current.matched_checkpoint_to_show will be null,
                         // otherwise there will be data to show
-                        if (playPauseStatusRef.current.show !== null) {
+                        if (playPauseStatusRef.current.matched_checkpoint_to_show !== null) {
 
-                            if (_agentName_ in playPauseStatusRef.current.show) {
-                                const listOfThingsToShow = playPauseStatusRef.current.show[_agentName_];
-                                const numStreamsToShow = Object.keys(listOfThingsToShow)
+                            if (_agentName_ in playPauseStatusRef.current.matched_checkpoint_to_show) {
+                                const listOfThingsToShow =
+                                    playPauseStatusRef.current.matched_checkpoint_to_show[_agentName_];
+                                const numStreamsToShow = listOfThingsToShow
                                     .filter(key => key !== "behavior" && key !== "console").length;
 
                                 let allNewToOpen = [];
-                                let current = [];
-                                if (openStreamPanelsRef.current[_agentButtonId_] !== undefined) {
-                                    current = [...openStreamPanelsRef.current[_agentButtonId_]];
-                                }
 
                                 // parse le list of things to show
                                 listOfThingsToShow.forEach(thingToShow => {
@@ -1017,6 +1014,9 @@ export default function Main() {
                                         // skip
                                     } else {
 
+                                        const isSpecialCase =
+                                            thingToShow.endsWith(" [y]") || thingToShow.endsWith(" [d]");
+
                                         // regex to check if stream name ends with " [y]" or " [d]
                                         const regex =
                                             new RegExp(`^${thingToShow.toLowerCase()} \\[[yd]\\]$`);
@@ -1024,26 +1024,23 @@ export default function Main() {
                                         const streamButtonIDsToShow =
                                             streamButtonsRef.current[_agentButtonId_]
                                                 ?.filter((btn) => btn.mergedLabels.some((label) =>
-                                                    regex.test(label.toLowerCase())))
+                                                    isSpecialCase ? label.toLowerCase() === thingToShow.toLowerCase()
+                                                        : regex.test(label.toLowerCase())))
                                                 .map((btn) => btn.id) || [];
 
-                                        const newToOpen = streamButtonIDsToShow.filter(item =>
-                                            !current?.includes(item)) ?? [];
                                         const newToOpenFiltered =
-                                            newToOpen.filter(item => !allNewToOpen.includes(item));
+                                            streamButtonIDsToShow.filter(item => !allNewToOpen.includes(item));
                                         allNewToOpen = [...allNewToOpen, ...newToOpenFiltered];
                                     }
                                 });
 
                                 if (numStreamsToShow > 0 && allNewToOpen.length > 0) {
-                                    const existingToKeep = current
-                                        ?.filter(item => allNewToOpen.includes(item)) ?? [];
 
                                     // open the things that were mentioned in the list
                                     setOpenStreamPanels((prevOpenStreamPanels) => {
                                         return {
                                             ...prevOpenStreamPanels, [_agentButtonId_]:
-                                                [...existingToKeep, ...allNewToOpen]
+                                                [...allNewToOpen]
                                         };
                                     });
                                 }
@@ -1139,14 +1136,16 @@ export default function Main() {
                         // and let's close the ones that are not involved (do the same for consoles and FSMs)
                         if (serverCommunicatedPlayStepsRef.current === -3) {
 
-                            // if it was a false alarm, then x.show will be null, otherwise there will be data to show
-                            if (x.show !== null) {
+                            // if it was a false alarm, then x.matched_checkpoint_to_show will be null,
+                            // otherwise there will be data to show
+                            if (x.matched_checkpoint_to_show !== null) {
 
                                 // opening the agent-panels that are mentioned in the checkpoint
                                 // and closing the other ones
-                                const agentButtonIDsToShow = Object.keys(x.show).map((key) =>
-                                    agentButtonsRef.current.find((btn) => btn.label === key)?.id)
-                                    .filter(Boolean);
+                                const agentButtonIDsToShow =
+                                    Object.keys(x.matched_checkpoint_to_show).map((key) =>
+                                        agentButtonsRef.current.find((btn) => btn.label === key)?.id)
+                                        .filter(Boolean);
                                 const newToOpen = agentButtonIDsToShow.filter(item =>
                                     !openAgentPanelsRef.current.includes(item));
                                 const existingToKeep = openAgentPanelsRef.current.filter(item =>
@@ -1162,7 +1161,8 @@ export default function Main() {
                                 }
 
                                 // behaviors and consoles
-                                Object.entries(x.show).forEach(([agentName, listOfThingsToShow]) => {
+                                Object.entries(x.matched_checkpoint_to_show).forEach(([agentName,
+                                                                                          listOfThingsToShow]) => {
                                     let closeBehavior = true;
                                     let closeConsole = true;
 
@@ -1215,7 +1215,7 @@ export default function Main() {
                             }
                         }
 
-                        if (x.checkpoint_available && !firstCheckpointWasAlreadyFoundRef.current) {
+                        if (x.more_checkpoints_available && !firstCheckpointWasAlreadyFoundRef.current) {
                             setSelectedPlayOption("\u2714");
                             firstCheckpointWasAlreadyFoundRef.current = true;
                         }
@@ -1255,7 +1255,7 @@ export default function Main() {
     const handleClickOnPlayPauseButton = () => {
 
         // if something is drawing/working/fetching-data, do not let it go
-        if (isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0 || isBalloonBusy > 0) {
+        if (isBusy > 0) {
             out("[Main] *** click on play/pause button *** (ignored due to other components busy)");
             return;
         } else {
@@ -1360,7 +1360,7 @@ export default function Main() {
 
                     <button onClick={handleClickOnPlayPauseButton}
                             className={`px-4 py-2 rounded-2xl bg-amber-200 
-                            ${(isFSMBusy > 0 || isConsoleBusy > 0 || isPlotFigureBusy > 0 || isBalloonBusy > 0) ? 
+                            ${isBusy > 0 ? 
                                 "hover:bg-gray-200" : "hover:bg-amber-300"}`}
                             style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }} >
 
@@ -1395,7 +1395,8 @@ export default function Main() {
 
                     <div className="flex gap-2 items-center"
                          style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
-                        {(playPauseStatus.checkpoint_available ? ["\u2714", "1S", "1", "100", "1k", "100k", "\u221E"] :
+                        {(playPauseStatus.more_checkpoints_available ?
+                            ["\u2714", "1S", "1", "100", "1k", "100k", "\u221E"] :
                         ["1S", "1", "100", "1k", "100k", "\u221E"]).map((option) => (
                             <button key={option} onClick={() => setSelectedPlayOption(option)}
                                 className={selectedPlayOption === option ?
@@ -1445,7 +1446,8 @@ export default function Main() {
                                             </span>
                                             <Balloon _agentName_={agent_button.label}
                                                      _isPaused_={isPaused}
-                                                     _setBusy_={setIsBalloonBusy}
+                                                     _isBusyRef_={isBusyRef}
+                                                     _setIsBusy_={setIsBusy}
                                             />
                                         </div>
                                         <div className="flex items-center space-x-2">
@@ -1470,29 +1472,35 @@ export default function Main() {
                                             <button
                                                 className={`w-6 h-6 top font-medium flex rounded-full text-white 
                                             ${shownSignals.includes(agent_button.id) ?
-                                                    "text-white bg-blue-500" : "bg-gray-100"}
+                                                    "text-white bg-blue-500" : "text-black bg-gray-100"}
                                              items-center justify-center ml-2 pb-0 ${offline ? "hidden" : ""}`}
                                                 onClick={() =>
                                                     toggleShowSignals(agent_button.label, agent_button.id)}>
-                                                <Activity size={16}/>
+                                                <Activity size={16}
+                                                          className={`${shownSignals.includes(agent_button.id) ? 
+                                                          "text-white" : "text-black"}`} />
                                             </button>
                                             <button
                                                 className={`w-6 h-6 top font-medium flex rounded-full text-white 
                                             ${shownDescriptors.includes(agent_button.id) ?
-                                                    "text-white bg-blue-500" : "bg-gray-100"}
+                                                    "text-white bg-blue-500" : "text-black bg-gray-100"}
                                              items-center justify-center ml-2 pb-0 ${offline ? "hidden" : ""}`}
                                                 onClick={() =>
                                                     toggleShowDescriptors(agent_button.label, agent_button.id)}>
-                                                <Search size={16}/>
+                                                <Search size={16}
+                                                        className={`${shownDescriptors.includes(agent_button.id) ? 
+                                                          "text-white" : "text-black"}`} />
                                             </button>
                                             <button
                                                 className={`w-6 h-6 top font-medium flex rounded-full text-white 
                                             ${shownOwnedStreams.includes(agent_button.id) ?
-                                                    "text-white bg-blue-500" : "bg-gray-100"}
+                                                    "text-white bg-blue-500" : "text-black bg-gray-100"}
                                              items-center justify-center ml-2 pb-0 ${offline ? "hidden" : ""}`}
                                                 onClick={() =>
                                                     toggleShowOwnedStreams(agent_button.label, agent_button.id)}>
-                                                <Hand size={16}/>
+                                                <Hand size={16}
+                                                      className={`${shownOwnedStreams.includes(agent_button.id) ? 
+                                                          "text-white" : "text-black"}`} />
                                             </button>
                                         </div>
                                     </h2>
@@ -1526,7 +1534,8 @@ export default function Main() {
                                                     <h3 className="font-medium">Behavior</h3>
                                                     <FSM _agentName_={agent_button.label}
                                                          _isPaused_={isPaused}
-                                                         _setBusy_={setIsFSMBusy}
+                                                         _isBusyRef_={isBusyRef}
+                                                         _setIsBusy_={setIsBusy}
                                                     />
                                                 </div>
                                             </div>
@@ -1538,7 +1547,8 @@ export default function Main() {
                                                     <h3 className="font-medium">Console</h3>
                                                     <Console _agentName_={agent_button.label}
                                                              _isPaused_={isPaused}
-                                                             _setBusy_={setIsConsoleBusy}
+                                                             _isBusyRef_={isBusyRef}
+                                                             _setIsBusy_={setIsBusy}
                                                     />
                                                 </div>
                                             </div>
@@ -1565,9 +1575,12 @@ export default function Main() {
                                                     <PlotFigure _agentName_={agent_button.label}
                                                                 _streamStruct_={streamButton}
                                                                 _isPaused_={isPaused}
-                                                                _setBusy_={setIsPlotFigureBusy}
+                                                                _isBusyRef_={isBusyRef}
+                                                                _setIsBusy_={setIsBusy}
                                                                 _ioDataRef_={ioDataRef}
                                                                 _offline_={offlineRef.current}
+                                                                _yMin_={playPauseStatus.y_range[0]}
+                                                                _yMax_={playPauseStatus.y_range[1]}
                                                     />
                                                 </div>
                                             );
