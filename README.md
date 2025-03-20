@@ -32,9 +32,10 @@ Narnian is a nature-inspired framework that simulates an evolving ecosystem of i
 
 ## Installation
 
-Install a python enviroment ensuring than you have python 3.8 or higher.
+Install a python enviroment ensuring than you have python 3.10 or higher.
 
 Using [Anaconda](https://www.anaconda.com/products/individual) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html): 
+
 
 ```bash
 conda create -n narnian python=3.8
@@ -47,6 +48,13 @@ Clone the repository:
 git clone https://github.com/mela64/narnian
 cd narnian
 ```
+
+> [!IMPORTANT]
+> Install graphviz for visualizing the FSMs:
+> ```bash
+> sudo apt install graphviz # For Sudoers
+> conda install -c conda-forge graphviz # Otherwise
+> ```
 
 Install the dependecies with pip:
 
