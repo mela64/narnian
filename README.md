@@ -1,7 +1,16 @@
 
-![d](imgs/its_cat_community.jpg)
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <img src="imgs/its_cat_community.jpg" alt="Logo" width="500" height="500">
+  <h2 align="center">NARNIAN - NAtuRe iNspired Intelligent AgeNts</h3>
 
-#  NARNIAN - NAtuRe iNspired Intelligent AgeNts 
+  <p align="center">
+    A new paradigm for simulating evolving ecosystems of intelligent agents
+    <br />
+    <br />
+  </p>
+</div>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/django)
 
