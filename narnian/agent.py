@@ -60,28 +60,27 @@ class Agent:
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""
 
-        s = f"agent: {self.name}"
-        if show_state:
-            s += f", state: {self.behav.limbo_state if self.behav.limbo_state is not None else self.behav.state}"
-        if show_act:
-            caller = str(inspect.stack()[1].function)
-            i = 0
-            while str(caller).startswith("__") or str(caller).startswith("err"):
-                i += 1
-                caller = str(inspect.stack()[1 + i].function)
-            args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
-            s_args = Agent.__string_args(args, values)
-            s += f", act: {caller}({s_args})"
-        s = f"[{s}] {msg}"
+        if self.print_enabled:
+            s = f"agent: {self.name}"
+            if show_state:
+                s += f", state: {self.behav.limbo_state if self.behav.limbo_state is not None else self.behav.state}"
+            if show_act:
+                caller = str(inspect.stack()[1].function)
+                i = 0
+                while str(caller).startswith("__") or str(caller).startswith("err"):
+                    i += 1
+                    caller = str(inspect.stack()[1 + i].function)
+                args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
+                s_args = Agent.__string_args(args, values)
+                s += f", act: {caller}({s_args})"
+            s = f"[{s}] {msg}"
+            print(s)
 
         last_id = self.output_messages_ids[self.output_messages_last_pos]
         self.output_messages_last_pos = (self.output_messages_last_pos + 1) % len(self.output_messages)
         self.output_messages_count = min(self.output_messages_count + 1, len(self.output_messages))
         self.output_messages_ids[self.output_messages_last_pos] = last_id + 1
         self.output_messages[self.output_messages_last_pos] = msg
-
-        if self.print_enabled:
-            print(s)
 
     def err(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print an error message to the console, if enabled."""

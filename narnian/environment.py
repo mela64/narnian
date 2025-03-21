@@ -68,14 +68,14 @@ class Environment:
 
         if agent_name in self.agents:
             del self.agents[agent_name]
-            print(f"Successfully removed agent {agent_name}!")
+            self.out(f"Successfully removed agent {agent_name}!")
         else:
-            print(f"Agent {agent_name} is not here!! Maybe you were looking for one of these {list(self.agents.keys())}.")
+            self.err(f"Agent {agent_name} is not here!! Maybe you were looking for one of these {list(self.agents.keys())}.")
             
     def remove_all_agents(self):
         """Remove all agents from this environment."""
         self.agents = {}
-        print(f"Successfully removed all agents!")
+        self.out(f"Successfully removed all agents!")
     
     def add_stream(self, stream: Stream):
         """Add a new stream to this environment."""
@@ -88,14 +88,14 @@ class Environment:
         stream_hash = Stream.build_hash(name, creator)
         if stream_hash in self.streams:
             del self.streams[stream_hash]
-            print(f"Successfully removed stream {stream_hash}!")
+            self.out(f"Successfully removed stream {stream_hash}!")
         else:
-            print(f"Stream {stream_hash} is unknown!! Maybe you were looking for one of these {list(self.streams.keys())}.")
+            self.err(f"Stream {stream_hash} is unknown!! Maybe you were looking for one of these {list(self.streams.keys())}.")
             
     def remove_all_streams(self):
         """Remove all streams from this environment."""
         self.streams = {}
-        print(f"Successfully removed all agents!")
+        self.out(f"Successfully removed all agents!")
 
     def share_attributes(self):
         """Merge the labels of the descriptor components, across all streams, sharing them."""
@@ -214,28 +214,27 @@ class Environment:
     def out(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print a message to the console, if enabled."""
 
-        s = f"envir: {self.name}"
-        if show_state:
-            s += f", state: {self.behav.limbo_state if self.behav.limbo_state is not None else self.behav.state}"
-        if show_act:
-            caller = str(inspect.stack()[1].function)
-            i = 0
-            while str(caller).startswith("__") or str(caller).startswith("err"):
-                i += 1
-                caller = str(inspect.stack()[1 + i].function)
-            args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
-            s_args = Environment.__string_args(args, values)
-            s += f", act: {caller}({s_args})"
-        s = f"[{s}] {msg}"
+        if self.print_enabled:
+            s = f"envir: {self.name}"
+            if show_state:
+                s += f", state: {self.behav.limbo_state if self.behav.limbo_state is not None else self.behav.state}"
+            if show_act:
+                caller = str(inspect.stack()[1].function)
+                i = 0
+                while str(caller).startswith("__") or str(caller).startswith("err"):
+                    i += 1
+                    caller = str(inspect.stack()[1 + i].function)
+                args, _, _, values = inspect.getargvalues(inspect.stack()[1 + i].frame)
+                s_args = Environment.__string_args(args, values)
+                s += f", act: {caller}({s_args})"
+            s = f"[{s}] {msg}"
+            print(s)
 
         last_id = self.output_messages_ids[self.output_messages_last_pos]
         self.output_messages_last_pos = (self.output_messages_last_pos + 1) % len(self.output_messages)
         self.output_messages_count = min(self.output_messages_count + 1, len(self.output_messages))
         self.output_messages_ids[self.output_messages_last_pos] = last_id + 1
         self.output_messages[self.output_messages_last_pos] = msg
-
-        if self.print_enabled:
-            print(s)
 
     def err(self, msg: str, show_state: bool = True, show_act: bool = True):
         """Print an error message to the console, if enabled."""
