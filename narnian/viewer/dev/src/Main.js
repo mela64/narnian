@@ -1327,7 +1327,7 @@ export default function Main() {
                         />
                     </h1>
                     <span className={`text-sm mt-1 ${!playPauseStatus ? "hidden" : ""}`}>
-                            Time: {playPauseStatus.time.toFixed(2)}s
+                            Environment Time: {playPauseStatus.time.toFixed(2)}s
                     </span>
                 </div>
 
@@ -1596,6 +1596,9 @@ export default function Main() {
                     })}
                 </div>
             </div>
+            <div className="flex items-center justify-center w-full"><span className="text-sm">
+                <a href="https://cai.diism.unisi.it/" className="text-blue-800 hover:underline">
+                    Collectionless AI Team</a> - &#169; Stefano Melacci (2025)</span></div>
         </DndProvider>
     );
 }

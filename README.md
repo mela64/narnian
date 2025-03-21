@@ -146,3 +146,4 @@ python sandbox_signal_school.py
   <h3 style="display: inline; margin-left: 10px;"><a href='https://cai.diism.unisi.it/'>Collectionless AI</a></h3>
 </div>
 
+Collectionless AI Team - &copy; Stefano Melacci (2025)
