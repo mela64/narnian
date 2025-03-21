@@ -86,7 +86,7 @@ narnian/
 ```
 
 #### Basic Instance
-A basic instance of the Narnian framework is available in the **./basic** folder. It contains an example of a simulated environment where agents named students and a teacher coexist. The teacher records information from the environment and then teaches the students using that information. After a learning run, the students are evaluated on their capabilities, and the teacher decides if a student is ready to become a teacher or if it needs more assistance with several runs.
+A basic instance of the Narnian framework is available in the **basic** folder. It contains an example of a simulated environment where student-like agents named Mario and Luigi and a teacher-like agent named Dr. Greeen coexist. The teacher exploits information from the environment to teach the students. After one or more lectures, the students are evaluated on their capabilities, and, in some cases, the teacher may decide if a student is ready to become a new teacher or if it needs more assistance.
 
 ```
 narnian/
@@ -104,7 +104,7 @@ narnian/
 The root folder of the repository includes example simulations that showcase how to run the basic:
 
 #### Animal School
-Animal School is a simulation scenario built using the basic framework that mimics an educational ecosystem. In this scenario, a virtual "school" is created where a teacher agent instructs and evaluates student agents using real-time data streams composed of animal images.
+Animal School is a simulation scenario (what we call "sandbox") built using the basic framework that mimics an educational ecosystem. In this scenario, a virtual "school" is created where a teacher agent instructs and evaluates student agents using real-time data streams composed of animal images.
 
 At its core, the scenario emulates a classroom setting where:
 
@@ -112,7 +112,7 @@ At its core, the scenario emulates a classroom setting where:
 
 - **Student Agents ("Mario" and "Luigi")** adopt the teacher’s behavior patterns, engage with the provided data, and respond to teaching instructions. Their interactions simulate a typical learning process where they are guided, assessed, and eventually promoted based on their performance.
 
-To execute the Animal School simulation, run the following command:
+To execute the Animal School sandbox, run the following command:
 
 ```bash
 python sandbox_animal_school.py
@@ -122,18 +122,18 @@ It will start the server for monitoring
 the simulation in a web browser. Follow the hyperlink provided in the terminal to access the web interface.
 
 #### Cat Library
-Cat Library is a simulation scenario where a digital "library" of textual data forms the basis for an educational ecosystem. In this scenario, agents interact with a stream of tokens—words or phrases related to cats. The simulation emulates a teaching and learning environment where the teacher agent compiles a "book" from the token stream, and the student agent learns from that prepared content.
+Cat Library is a simulation scenario ("sandbox") where a digital "library" of textual data forms the basis for an educational ecosystem. In this scenario, agents interact with a stream of tokens—words related to cats. The simulation emulates a teaching and learning environment where the teacher agent compiles a "book" from the token stream, and the student agent learns from that prepared content.
 
-To execute the Cat Library simulation, run the following command:
+To execute the Cat Library sandbox, run the following command:
 
 ```bash
 python sandbox_cat_library.py
 ```
 
 #### Signal School
-Signal School models a dynamic educational ecosystem where multiple signal streams are processed to evaluate learning, generalization, and predictive performance. The simulation involves a teacher agent orchestrating a teaching-evaluation loop over diverse signal datasets, while a student agent adapts and learns to generalize across these signals.
+Signal School sandbox is a dynamic ecosystem where multiple streams of scalar signal are processed to evaluate learning, generalization, and predictive performance. The simulation involves a teacher agent orchestrating a teaching-evaluation loop over diverse scalar signals, while a student agent adapts and learns to generalize across these signals.
 
-To execute the Signal School simulation, run the following command:
+To execute the Signal School sandbox, run the following command:
 
 ```bash
 python sandbox_signal_school.py
