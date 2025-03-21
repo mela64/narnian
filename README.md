@@ -48,7 +48,7 @@ cd narnian
 ```
 
 > [!IMPORTANT]
-> Install graphviz for visualizing the FSMs:
+> Install graphviz for visualizing the FSMs (not strictly required for running narnian simulations):
 > ```bash
 > sudo apt install graphviz # For Sudoers
 > conda install -c conda-forge graphviz # Otherwise
@@ -76,13 +76,13 @@ Narnian is structured as follows:
 narnian/
 ├── narnian/
 │   ├── __init__.py         # Package initializer
-│   ├── **agents.py**           # Manages an agent's behavior, communication, and interactions
+│   ├── [agents.py]          # Manages an agent's behavior, communication, and interactions
 │   ├── attributes.py       # Manages attributes and labels for streams
-│   ├── **environment.py**      # Defines the environment where agents and streams interact
+│   ├── [environment.py]      # Defines the environment where agents and streams interact
 │   ├── fsm.py              # Implements Finite State Machines for agent behaviors
-│   ├── model.py            # Contains the core simulation models
+│   ├── [model.py]            # Contains the core simulation models
 │   ├── server.py           # Manages a server which makes the narnian world accessible through a web app
-│   ├── **streams.py**          # Handles real-time data streams      
+│   ├── [streams.py]          # Handles real-time data streams      
 ```
 
 #### Basic Instance
@@ -93,10 +93,10 @@ narnian/
 ├── basic/
 │   ├── utils/
 │   │   ├── hl_utils.py
-│   ├── **basic_agent.py**           # Basic's environment realization of an agent
-│   ├── **basic_environment.py**      # The basic enviroment 
-│   ├── **basic_model_*.py**            # Models defined in the basic instance of Narnian
-│   ├── **basic_streams.py**          # Handles real-time data streams   
+│   ├── [basic_agent.py]           # Basic's environment realization of an agent
+│   ├── [basic_environment.py]      # The basic enviroment 
+│   ├── [basic_model_*.py]            # Models defined in the basic instance of Narnian
+│   ├── [basic_streams.py]          # Handles real-time data streams   
 ```
 
 ### Examples
@@ -141,6 +141,8 @@ python sandbox_signal_school.py
 
 
 ### References
-
-- [bla bla](https://arxiv.org/abs)
+<div align="center">
+  <img src="imgs/caicat.png" alt="Logo" width="60" height="60" style="vertical-align: middle;">
+  <h3 style="display: inline; margin-left: 10px;"><a href='https://cai.diism.unisi.it/'>Collectionless AI</a></h3>
+</div>
 
