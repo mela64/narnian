@@ -1,7 +1,7 @@
 <br />
 <div align="center">
-  <img src="imgs/its_cat_community.jpg" alt="Logo" width="500" height="500">
-  <h2 align="center">NARNIAN - NAtuRe iNspired Intelligent AgeNts</h3>
+  <img src="imgs/narniancats.jpg" alt="Logo" width="500" height="500">
+  <h2 align="center">NARNIAN - NAtuRe iNspired Intelligent AgeNts</h2>
 
   <p align="center" style="font-size: 1.1em; font-style: italic;">
     A new paradigm for simulating evolving ecosystems of intelligent agents
