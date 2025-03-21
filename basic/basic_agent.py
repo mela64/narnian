@@ -511,7 +511,7 @@ class BasicAgent(Agent):
 
         return True
 
-    def compare_eval(self, cmp: str, thres: float) -> bool:
+    def compare_eval(self, cmp: str, thres: float, good_if_true: True) -> bool:
         """After having completed an evaluation."""
 
         assert cmp in ["<", ">", ">=", "<="], f"Invalid comparison operator: {cmp}"
@@ -537,16 +537,23 @@ class BasicAgent(Agent):
             elif cmp == ">=" and eval_result >= thres:
                 outcome = True
 
-            if cmp[0] == "<":
-                alias = 'error level'
+            if cmp[0] == "<" or cmp[0] == "<=":
+                alias = 'error level' if good_if_true else 'mark'
             else:
-                alias = 'mark'
+                alias = 'mark' if good_if_true else 'error level'
 
-            if outcome:
-                msgs.append(f"Agent {agent.name} passed with {alias} {eval_result}/{thres}")
-                self.valid_cmp_agents.append(agent)
+            if good_if_true:
+                if outcome:
+                    msgs.append(f"Agent {agent.name} passed with {alias} {eval_result}/{thres}")
+                    self.valid_cmp_agents.append(agent)
+                else:
+                    msgs.append(f"Agent {agent.name} did not pass")
             else:
-                msgs.append(f"Agent {agent.name} did not pass")
+                if outcome:
+                    msgs.append(f"Agent {agent.name} did not pass")
+                else:
+                    msgs.append(f"Agent {agent.name} passed with {alias} {eval_result}/{thres}")
+                    self.valid_cmp_agents.append(agent)
 
             if len(msgs) > 1:
                 msgs[-1] = msgs[-1].lower()[0] + msgs[-1][1:]

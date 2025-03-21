@@ -60,7 +60,8 @@ ag.add_transit("exam_in_progress", "student_finished_exam", action="done_gen_and
 # element of the playlist and asks the student to learn the new signal
 ag.add_state_action("student_finished_exam", action="eval",
                     args={"stream_hash": "<playlist>", "what": "y", "how": "mse", "steps": 500})
-ag.add_transit("student_finished_exam", "good", action="compare_eval", args={"cmp": "<=", "thres": 0.05})
+ag.add_transit("student_finished_exam", "good", action="compare_eval",
+               args={"cmp": "<=", "thres": 0.05, "good_if_true": True})
 ag.add_transit("student_finished_exam", "teaching_time", action="nop", args={"message": "Insufficient"})
 ag.add_state_action("good", action="next_pref_stream")
 ag.add_transit("good", "teaching_time", action="check_pref_stream", args={"what": "not_first"})
