@@ -13,15 +13,15 @@
 
 ## What is it?
 
-Narnian is a nature-inspired framework that simulates an evolving ecosystem of intelligent agents. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world. Agents capture real-time data streams, adapt their behavior using Finite State Machines (FSMs), and can even evolve from students into teachers as they gain new capabilities.
+Narnian is a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
 
 ## Dictionary of Key Concepts
 
 - **Agents**  
-  Narnian is roled by Agents, an agent is an entity that can interact with the environment and with the other agents living in it. Agents can be human or artificial, and they can have different levels of intelligence and different learning capabilities. Agents can be controlled by the user, or they can be controlled by the framework itself. An agent can be a student, a teacher, or any other entity that can interact with the environment. Each agent is represented by its Finite State Machine (FSM) which role its behavior.
+  NARNIAN is a dynamic world populated by Agents, where an Agent is an entity that can interact with the environment and with the other agents living in it. Agents can be human or artificial, and they can have different levels of intelligence and different learning capabilities. Agents can be controlled by the user, or they can be controlled by the framework itself. In the current implementation, each agent is represented by its Finite State Machine (FSM) which describe its *Behavior*, and by a neural *Model* that determines how it reacts to perceptual stimuli. The *Model* is capable of *generation* and of prediction of *descriptors* of the generated or given data.
 
 - **Streams**  
-  Real-time data flows representing sensory informations or descriptors from the environment.
+  Real-time data flows representing *sensory information* and *descriptors* from the environment.
 
 - **Environment**  
   The simulation world where agents and streams coexist. The enviroment can be a physical world, a virtual world, or a combination of both. The environment can be static or dynamic, and it can have different levels of complexity. The environment can be controlled by the user, or it can be controlled by the framework itself. 
@@ -146,3 +146,4 @@ python sandbox_signal_school.py
   <h3 style="display: inline; margin-left: 10px;"><a href='https://cai.diism.unisi.it/'>Collectionless AI</a></h3>
 </div>
 
+Collectionless AI Team - &copy; Stefano Melacci (2025)
