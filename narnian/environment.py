@@ -85,7 +85,7 @@ class Environment:
         
     def remove_stream(self, creator: str, name: str):
         """Remove a stream from this environment."""
-        stream_hash = Stream.build_hash(creator, name)
+        stream_hash = Stream.build_hash(name, creator)
         if stream_hash in self.streams:
             del self.streams[stream_hash]
             print(f"Successfully removed stream {stream_hash}!")
