@@ -511,7 +511,7 @@ class BasicAgent(Agent):
 
         return True
 
-    def compare_eval(self, cmp: str, thres: float, good_if_true: True) -> bool:
+    def compare_eval(self, cmp: str, thres: float, good_if_true: bool = True) -> bool:
         """After having completed an evaluation."""
 
         assert cmp in ["<", ">", ">=", "<="], f"Invalid comparison operator: {cmp}"

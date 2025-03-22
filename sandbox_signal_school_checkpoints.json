@@ -27,7 +27,7 @@
   {"agent": "Dr. Green", "state": "student_finished_following", "show": {"Mario": ["Mario:generated1 [y]",
     "Mario:generated2 [y]", "Mario:generated3 [y]", "Mario:generated4 [y]", "Mario:generated5 [y]",
     "Mario:generated6 [y]", "Mario:generated7 [y]"]}},
-  {"agent": "Dr. Green", "state": "student_finished_following", "skip":  20},
+  {"agent": "Dr. Green", "state": "student_finished_following", "skip":  13},
   {"agent": "Dr. Green", "state": "student_finished_following", "show": {"Mario": ["Mario:generated15 [y]",
     "Mario:generated16 [y]", "Mario:generated17 [y]", "Mario:generated18 [y]", "Mario:generated19 [y]",
     "Mario:generated20 [y]", "Mario:generated21 [y]"]}},

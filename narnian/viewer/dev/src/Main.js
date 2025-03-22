@@ -100,6 +100,7 @@ export default function Main() {
 
     // the value of the selected play option: \u221E (inf), 1S, 1, 100, 1k, 100k
     const [selectedPlayOption, setSelectedPlayOption] = useState("1S");
+    const selectedPlayOptionRef = useRef(selectedPlayOption);
     const serverCommunicatedPlayStepsRef = useRef(-1)
 
     // references to "streamButtons" above and "openStreamPanels" above, used in click (and similar) callbacks
@@ -1218,8 +1219,18 @@ export default function Main() {
                         }
 
                         if (x.more_checkpoints_available && !firstCheckpointWasAlreadyFoundRef.current) {
-                            setSelectedPlayOption("\u2714");
+                            setSelectedPlayOption(() => {
+                                selectedPlayOptionRef.current = "\u2714";
+                                return "\u2714";
+                            });
                             firstCheckpointWasAlreadyFoundRef.current = true;
+                        }
+
+                        if (!x.more_checkpoints_available && selectedPlayOptionRef.current === "\u2714") {
+                            setSelectedPlayOption(() => {
+                                selectedPlayOptionRef.current = "1S";
+                                return "1S";
+                            });
                         }
 
                         setIsPaused(() => {
@@ -1401,12 +1412,14 @@ export default function Main() {
                          style={{ display: playPauseStatus.status === 'ended' ? 'none' : 'flex' }}>
                         {(playPauseStatus.more_checkpoints_available ?
                             ["\u2714", "1S", "1", "100", "1k", "100k", "\u221E"] :
-                        ["1S", "1", "100", "1k", "100k", "\u221E"]).map((option) => (
-                            <button key={option} onClick={() => setSelectedPlayOption(option)}
-                                className={selectedPlayOption === option ?
-                                    "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
-                                    "px-2 py-0 rounded-2xl" : "h-6 text-sm bg-gray-100 hover:bg-gray-200 px-2 py-0 " +
-                                    "rounded-2xl"}>
+                            ["1S", "1", "100", "1k", "100k", "\u221E"]).map((option) => (
+                            <button key={option} onClick={() => setSelectedPlayOption(() => {
+                                selectedPlayOptionRef.current = option;
+                                return option;
+                            })} className={selectedPlayOption === option ?
+                                "h-6 text-sm bg-amber-200 hover:bg-amber-300 " +
+                                "px-2 py-0 rounded-2xl" : "h-6 text-sm bg-gray-100 hover:bg-gray-200 px-2 py-0 " +
+                                "rounded-2xl"}>
                                 {option}
                             </button>
                         ))}
