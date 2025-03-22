@@ -4,7 +4,7 @@
   <h2 align="center">NARNIAN - NAtuRe iNspired Intelligent AgeNts</h2>
 
   <p align="center" style="font-size: 1.1em; font-style: italic;">
-    A new paradigm for simulating evolving ecosystems of intelligent agents
+    A new paradigm for simulating evolving ecosystems of intelligent agents that learn over time
   </p>
 </div>
 
