@@ -36,7 +36,7 @@ Using [Anaconda](https://www.anaconda.com/products/individual) or [Miniconda](ht
 
 
 ```bash
-conda create -n narnian python=3.8
+conda create -n narnian python=3.10
 conda activate narnian
 ```
 
