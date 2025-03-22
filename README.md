@@ -70,19 +70,19 @@ python sandbox_example.py # A simple example of a Narnian simulation.
 
 ### Project Structure
 
-Narnian is structured as follows:
+Narnian is structured as follows, where we emphasized with square brakets those files that will be extended when creating an instance of NARNIAN environment (see below):
 
 ```
 narnian/
 ├── narnian/
-│   ├── __init__.py         # Package initializer
-│   ├── [agents.py]          # Manages an agent's behavior, communication, and interactions
-│   ├── attributes.py       # Manages attributes and labels for streams
-│   ├── [environment.py]      # Defines the environment where agents and streams interact
-│   ├── fsm.py              # Implements Finite State Machines for agent behaviors
-│   ├── [model.py]            # Contains the core simulation models
-│   ├── server.py           # Manages a server which makes the narnian world accessible through a web app
-│   ├── [streams.py]          # Handles real-time data streams      
+│   ├── __init__.py            # Package initializer
+│   ├── [agents.py]            # A NARNIAN agent, with its basic skills in communication and interaction
+│   ├── attributes.py          # Manages attributes and labels for streams
+│   ├── [environment.py]       # Defines the environment where agents and streams interact
+│   ├── fsm.py                 # Implements Finite State Machines for agent behaviors
+│   ├── [model.py]             # Contains the structure of the core models of the agents (generators, predictors)
+│   ├── server.py              # Manages a server which makes the NARNIAN world accessible through a web app
+│   ├── [streams.py]           # Handles real-time data streams      
 ```
 
 #### Basic Instance
@@ -93,10 +93,10 @@ narnian/
 ├── basic/
 │   ├── utils/
 │   │   ├── hl_utils.py
-│   ├── [basic_agent.py]           # Basic's environment realization of an agent
-│   ├── [basic_environment.py]      # The basic enviroment 
-│   ├── [basic_model_*.py]            # Models defined in the basic instance of Narnian
-│   ├── [basic_streams.py]          # Handles real-time data streams   
+│   ├── [basic_agent.py]       # An agent living in a basic environment
+│   ├── [basic_environment.py] # The basic enviroment 
+│   ├── [basic_model_*.py]     # Neural models that can be used in the basic envirnment
+│   ├── [basic_streams.py]     # Streams that can be used in the basic environment 
 ```
 
 ### Examples
