@@ -1426,7 +1426,7 @@ export default function Main() {
                     ))}
                 </div>
 
-                <div className={`grid ${gridCols} gap-8 w-full`}>
+                <div className={`grid ${gridCols} gap-8 w-full pt-4`}>
                     {agentButtons.map((agent_button) => {
                         const isOpen = openAgentPanels.includes(agent_button.id);
                         const isForcedOpen = openAgentPanels.includes(-agent_button.id);
