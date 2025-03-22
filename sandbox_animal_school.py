@@ -25,20 +25,20 @@ env.add_stream(Stream.create(name="all", creator=env.name,
                                                  label_file_csv="data/animals/first3c_10i.csv")))
 
 # modeling behaviour of the environment
-env.add_transit("init", "basic/behaviours/env_sharing_info.json", action="nop")
+env.add_transit("init", "basic/behaviors/env_sharing_info.json", action="nop")
 
 # creating the teacher agent "Dr. Green"
 ag = BasicAgent("Dr. Green", model=EmptyModel(), authority=1.0)
 
 # getting generic info from the environment
-ag.add_transit("init", "basic/behaviours/getting_from_env.json", action="nop")
+ag.add_transit("init", "basic/behaviors/getting_from_env.json", action="nop")
 
 # preparing exam
 ag.add_transit("got_contacts", "exam_prepared", action="record",
                args={"stream_hash": env.name + ":all", "steps": 30})
 
 # engaging students, teaching and, afterward, evaluating students
-ag.add_transit("exam_prepared", "basic/behaviours/teach-playlist_eval-recorded1_pred.json",
+ag.add_transit("exam_prepared", "basic/behaviors/teach-playlist_eval-recorded1_pred.json",
                action="set_pref_streams", args={"stream_hashes": [env.name + ":albatross",
                                                                   env.name + ":cheetah",
                                                                   env.name + ":giraffe"]},
@@ -68,7 +68,7 @@ ag.behave_as(env.agents["Dr. Green"], wildcards={"Dr. Green": ag.name})
 ag.wait_for_actions(ag, "got_contacts", "exam_prepared", wait=True)
 
 # generic behaviour of a student who listens to the requests from the teacher
-ag.add_transit("got_contacts", "./basic/behaviours/listening_to_teacher.json", action="get_engagement",
+ag.add_transit("got_contacts", "./basic/behaviors/listening_to_teacher.json", action="get_engagement",
                args={"min_auth": 1.0, "max_auth": 1.0})
 
 # when the teacher will send the student back home
