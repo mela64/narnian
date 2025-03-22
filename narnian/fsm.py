@@ -121,7 +121,10 @@ class FiniteStateMachine:
         """Go back to the initial state of the FSM."""
 
         self.state = self.initial_state
+        self.limbo_state = None
         self.prev_state = None
+        self.action = None
+        self.action_step = 0
 
     def get_states(self) -> Iterable[str]:
         """Get all the states of the FSM."""
