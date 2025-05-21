@@ -59,6 +59,7 @@ npm audit fix --force
 cd <narnian project folder>
 cd narnian
 cd viewer
+cd dev
 ```
 
 - Run the development server:

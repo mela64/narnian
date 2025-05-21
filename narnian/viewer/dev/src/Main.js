@@ -1326,7 +1326,7 @@ export default function Main() {
             <div className="p-6 space-y-2 flex flex-col items-center w-full">
                 <div className="flex flex-col items-center justify-center text-center">
                     <h1 className="text-2xl font-semibold mt-2 text-center">
-                        NARNIAN: {envTitle}
+                        UNaIVERSE World: {envTitle}
                         <button onClick={saveOnServer}
                                 className={`save-button inline-flex items-center pl-2 gap-2 relative top-0.5 
                                 ${offline ? "hidden" : ""}`}><Save size={20}/></button>
