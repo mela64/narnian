@@ -1,7 +1,7 @@
 <br />
 <div align="center">
-  <img src="imgs/narniancats.jpg" alt="Logo" width="500" height="500">
-  <h2 align="center">NARNIAN - NAtuRe iNspired Intelligent AgeNts</h2>
+  <img src="imgs/unaivesecats.jpg" alt="Logo" width="500" height="500">
+  <h2 align="center">UNaIVERSE - A Collectionless AI Project</h2>
 
   <p align="center" style="font-size: 1.1em; font-style: italic;">
     A new paradigm for simulating evolving ecosystems of intelligent agents that learn over time
@@ -13,12 +13,12 @@
 
 ## What is it?
 
-The NARNIAN project promotes a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
+The UNaIVERSE project promotes a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
 
 ## Dictionary of Key Concepts
 
 - **Agents**  
-  NARNIAN is a dynamic world populated by Agents, where an Agent is an entity that can interact with the environment and with the other agents living in it. Agents can be human or artificial, and they can have different levels of intelligence and different learning capabilities. Agents can be controlled by the user, or they can be controlled by the framework itself. In the current implementation, each agent is represented by its Finite State Machine (FSM) which describe its *Behavior*, and by a neural *Model* that determines how it reacts to perceptual stimuli. The *Model* is capable of *generation* and of prediction of *descriptors* of the generated or given data.
+  UNaIVERSE is a dynamic set of worlds populated by Agents, where an Agent is an entity that can interact with the environment and with the other agents living in it. Agents can be human or artificial, and they can have different levels of intelligence and different learning capabilities. Agents can be controlled by the user, or they can be controlled by the framework itself. In the current implementation, each agent is represented by its Finite State Machine (FSM) which describe its *Behavior*, and by a neural *Model* that determines how it reacts to perceptual stimuli. The *Model* is capable of *generation* and of prediction of *descriptors* of the generated or given data.
 
 - **Streams**  
   Real-time data flows representing *sensory information* and *descriptors* from the environment.
@@ -36,19 +36,19 @@ Using [Anaconda](https://www.anaconda.com/products/individual) or [Miniconda](ht
 
 
 ```bash
-conda create -n narnian python=3.10
-conda activate narnian
+conda create -n unaiverse python=3.10
+conda activate unaiverse
 ```
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/mela64/narnian
-cd narnian
+git clone https://github.com/mela64/unaiverse
+cd unaiverse
 ```
 
 > [!IMPORTANT]
-> Install graphviz for visualizing the FSMs (not strictly required for running narnian simulations):
+> Install graphviz for visualizing the FSMs (not strictly required for running simulations):
 > ```bash
 > sudo apt install graphviz # For Sudoers
 > conda install -c conda-forge graphviz # Otherwise
@@ -70,18 +70,18 @@ python sandbox_example.py # A simple example of a Narnian simulation.
 
 ### Project Structure
 
-Narnian is structured as follows, where we emphasized with square brakets those files that will be extended when creating an instance of NARNIAN environment (see below):
+Narnian is structured as follows, where we emphasized with square brakets those files that will be extended when creating an instance of worlds (see below):
 
 ```
-narnian/
-├── narnian/
+unaiverse/
+├── unaiverse/
 │   ├── __init__.py            # Package initializer
-│   ├── [agents.py]            # A NARNIAN agent, with its basic skills in communication and interaction
+│   ├── [agents.py]            # An agent, with its basic skills in communication and interaction
 │   ├── attributes.py          # Manages attributes and labels for streams
 │   ├── [environment.py]       # Defines the environment where agents and streams interact
 │   ├── fsm.py                 # Implements Finite State Machines for agent behaviors
 │   ├── [model.py]             # Contains the structure of the core models of the agents (generators, predictors)
-│   ├── server.py              # Manages a server which makes the NARNIAN world accessible through a web app
+│   ├── server.py              # Manages a server which makes a world accessible through a web app
 │   ├── [streams.py]           # Handles real-time data streams      
 ```
 
@@ -89,7 +89,7 @@ narnian/
 A basic instance of the Narnian framework is available in the **basic** folder. It contains an example of a simulated environment where student-like agents named Mario and Luigi and a teacher-like agent named Dr. Greeen coexist. The teacher exploits information from the environment to teach the students. After one or more lectures, the students are evaluated on their capabilities, and, in some cases, the teacher may decide if a student is ready to become a new teacher or if it needs more assistance.
 
 ```
-narnian/
+unaiverse/
 ├── basic/
 │   ├── utils/
 │   │   ├── hl_utils.py
