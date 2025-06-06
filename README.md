@@ -13,7 +13,7 @@
 
 ## What is it?
 
-The UNaIVERSE project (dev name was NARNIAN, now not used anymore) promotes a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
+The UNaIVERSE project (**dev name was NARNIAN, which is the name of this repo, now not used anymore, stay tuned!**) promotes a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
 
 **This is a pre-release version with no network functionalities (dev name was NARNIAN). Stay tuned for the first release of the UNaIVERSE platform!**
 
@@ -45,8 +45,8 @@ conda activate unaiverse
 Clone the repository:
 
 ```bash
-git clone https://github.com/mela64/unaiverse
-cd unaiverse
+git clone https://github.com/mela64/narnian
+cd narnian
 ```
 
 > [!IMPORTANT]
@@ -65,18 +65,18 @@ pip install -r requirements.txt
 Try one of the examples:
 
 ```bash
-python sandbox_example.py # A simple example of a Narnian simulation.
+python sandbox_example.py # A simple example of a UNAiVERSE (in its NARNIAN pre-release fashion) simulation.
 ```
 
 ---
 
 ### Project Structure
 
-Narnian is structured as follows, where we emphasized with square brakets those files that will be extended when creating an instance of worlds (see below):
+UNaIVERSE (in its NARNIAN pre-release instance) is structured as follows, where we emphasized with square brakets those files that will be extended when creating an instance of worlds (see below):
 
 ```
-unaiverse/
-├── unaiverse/
+narnian/
+├── narnian/
 │   ├── __init__.py            # Package initializer
 │   ├── [agents.py]            # An agent, with its basic skills in communication and interaction
 │   ├── attributes.py          # Manages attributes and labels for streams
@@ -91,7 +91,7 @@ unaiverse/
 A basic instance of the Narnian framework is available in the **basic** folder. It contains an example of a simulated environment where student-like agents named Mario and Luigi and a teacher-like agent named Dr. Greeen coexist. The teacher exploits information from the environment to teach the students. After one or more lectures, the students are evaluated on their capabilities, and, in some cases, the teacher may decide if a student is ready to become a new teacher or if it needs more assistance.
 
 ```
-unaiverse/
+narnian/
 ├── basic/
 │   ├── utils/
 │   │   ├── hl_utils.py
