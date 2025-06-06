@@ -13,7 +13,9 @@
 
 ## What is it?
 
-The UNaIVERSE project promotes a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
+The UNaIVERSE project (dev name was NARNIAN, now not used anymore) promotes a nature-inspired framework that simulates an evolving ecosystem of agents that learn over time by interacting with each other and with humans. Designed for flexibility and extensibility, it enables researchers and developers to study dynamic learning and teaching processes in a customizable simulation world, that might be directly linked to "reality". Agents capture, generate, and share real-time data streams and adapt their capabilities (their *Model*) in function of the information to which they are exposed. Their interactions patterns are handled by an architectural component called *Behavior*.
+
+**This is a pre-release version with no network functionalities (dev name was NARNIAN). Stay tuned for the first release of the UNaIVERSE platform!**
 
 ## Dictionary of Key Concepts
 
